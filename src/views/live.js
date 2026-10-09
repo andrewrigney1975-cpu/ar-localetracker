@@ -2,7 +2,8 @@ import { App } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
 import { activity as activityProfile } from '../activities.js';
 import { navigate } from '../router.js';
-import { finalizeJournal, newWorkoutId } from '../services/workoutService.js';
+import { getWorkout } from '../db/workouts.js';
+import { finalizeJournal, newWorkoutId, waitForNativeSave } from '../services/workoutService.js';
 import { settings, updateSettings } from '../settings.js';
 import { verticalThreshold } from '../stats/summary.js';
 import { parseJournal } from '../tracker/journal.js';
@@ -326,7 +327,7 @@ export async function mount(root, params, _query, ctx) {
   }
 
   let finishing = false;
-  async function finish(workoutId) {
+  async function finish(workoutId, savedNatively = false) {
     if (finishing) return;
     finishing = true;
     phase = 'saving';
@@ -335,7 +336,12 @@ export async function mount(root, params, _query, ctx) {
     root.querySelector('.live').appendChild(overlay);
     tracker.setKeepScreenOn(false);
     try {
-      const w = workoutId ? await finalizeJournal(workoutId) : null;
+      // Saved by TrackingService already (Android/SQLite), or import the journal here.
+      const w = !workoutId
+        ? null
+        : savedNatively || (await waitForNativeSave(workoutId))
+          ? await getWorkout(workoutId)
+          : await finalizeJournal(workoutId);
       window.dispatchEvent(new CustomEvent('workouts-changed'));
       if (w) navigate(`/workout/${encodeURIComponent(w.id)}`, { replace: true });
       else {
@@ -352,7 +358,7 @@ export async function mount(root, params, _query, ctx) {
 
   async function onStop() {
     const res = await tracker.stop();
-    await finish(res.workoutId ?? status.workoutId);
+    await finish(res.workoutId ?? status.workoutId, Boolean(res.saved));
   }
 
   // ---- Events -----------------------------------------------------------------------------

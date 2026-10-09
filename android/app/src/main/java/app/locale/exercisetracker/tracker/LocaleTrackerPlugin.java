@@ -290,10 +290,11 @@ public class LocaleTrackerPlugin extends Plugin {
             call.resolve(o);
             return;
         }
-        svc.requestStop((workoutId, count) -> {
+        svc.requestStop((workoutId, count, saved) -> {
             JSObject o = new JSObject();
             o.put("workoutId", workoutId);
             o.put("pointCount", count);
+            o.put("saved", saved);
             call.resolve(o);
         });
     }

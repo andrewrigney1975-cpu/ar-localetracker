@@ -26,6 +26,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import app.locale.exercisetracker.MainActivity;
 import app.locale.exercisetracker.R;
+import app.locale.exercisetracker.store.WorkoutStore;
 import com.getcapacitor.JSObject;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -73,7 +74,8 @@ public class TrackingService extends Service {
     enum State { IDLE, RECORDING, PAUSED, AUTOPAUSED }
 
     interface StopCallback {
-        void onStopped(String workoutId, long pointCount);
+        /** @param saved true when the workout was processed and stored natively (SQLite). */
+        void onStopped(String workoutId, long pointCount, boolean saved);
     }
 
     private static volatile TrackingService instance;
@@ -331,7 +333,7 @@ public class TrackingService extends Service {
 
     private void stopWorkout(StopCallback cb) {
         if (state == State.IDLE) {
-            if (cb != null) cb.onStopped(workoutId, 0);
+            if (cb != null) cb.onStopped(workoutId, 0, false);
             stopSelf();
             return;
         }
@@ -351,8 +353,26 @@ public class TrackingService extends Service {
         unregisterSensors();
         if (wakeLock.isHeld()) wakeLock.release();
         stopForeground(STOP_FOREGROUND_REMOVE);
-        if (cb != null) cb.onStopped(id, count);
+        boolean saved = finalizeNatively(id);
+        if (cb != null) cb.onStopped(id, count, saved);
         stopSelf();
+    }
+
+    /**
+     * Process the finished journal and store it in SQLite, then delete the journal. Only once
+     * the IndexedDB → SQLite migration has completed (otherwise the app may still be reading
+     * IndexedDB). On any failure the journal is kept and the app imports it as before.
+     */
+    private boolean finalizeNatively(String id) {
+        WorkoutStore store = WorkoutStore.get(this);
+        if (store.getMeta("migrated_from_idb") == null) return false;
+        boolean saved = NativeFinalizer.finalizeJournal(this, store, id);
+        if (saved) {
+            JSObject ev = new JSObject();
+            ev.put("workoutId", id);
+            TrackerHub.emit("saved", ev);
+        }
+        return saved;
     }
 
     private void setState(State next, String reason) {

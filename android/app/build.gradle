@@ -16,6 +16,10 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    sourceSets {
+        // On-device tests use the same JS-generated fixtures as the JVM tests.
+        androidTest.resources.srcDirs += ['src/test/resources']
+    }
     buildTypes {
         release {
             minifyEnabled false
@@ -39,6 +43,8 @@ dependencies {
     implementation "com.google.android.gms:play-services-location:21.3.0"
     implementation "com.google.android.gms:play-services-wearable:20.0.1"
     testImplementation "junit:junit:$junitVersion"
+    // Real org.json for JVM unit tests (Android's is a stub there).
+    testImplementation "org.json:json:20260814"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')

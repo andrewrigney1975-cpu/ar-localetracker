@@ -129,6 +129,10 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Font:** Google Sans, bundled for offline use.
 - **Privacy:** workouts are stored only on the device. The network is used for map tiles
   and nothing else.
+- **Storage:** on Android, workouts live in an app-private **SQLite** database. Existing
+  IndexedDB data migrates automatically on first launch, verified per track by CRC-32.
+  A workout stopped from the watch, a widget or the notification is processed and saved
+  natively right away. The browser build keeps IndexedDB.
 
 ## Getting started
 
@@ -192,7 +196,8 @@ src/
   tracker/   native plugin client + browser simulator, journal parser
   geo/       geodesy, Kalman/RTS smoothing, journal → track processing, snapping
   stats/     summary, splits, hysteresis climb, stationary time, ski runs
-  db/        IndexedDB: workouts, columnar tracks, gzipped raw journals
+  db/        storage facade: SQLite on Android (nativeStore), IndexedDB in the browser
+             (idbStore), track codec, one-time migration
   export/    FIT, GPX, TCX, KML, GeoJSON, CSV
   map/       MapLibre map view        profile/  elevation side view
   view3d/    Three.js 3D view, satellite imagery
@@ -203,6 +208,8 @@ android/app/src/main/java/app/locale/exercisetracker/tracker/
   LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
   WearListenerService  WearSync          (watch link)
   LocaleWidgets  Widget1x1/2x1/2x2Provider  (home-screen widgets)
+android/app/src/main/java/app/locale/exercisetracker/store/
+  WorkoutStore (SQLite)  LocaleStorePlugin  TrackCodec  WorkoutBuilder (JS processing port)
 android/wear/            Wear OS companion app (Kotlin, Compose for Wear OS)
   MainActivity  HeartRateService  PhoneLink  PhoneListenerService  LocaleTileService
 tests/       Vitest suites
@@ -210,7 +217,7 @@ docs/        screenshots
 ```
 
 See [PLAN.md](PLAN.md) for the design and decisions, and [BACKLOG.md](BACKLOG.md) for
-planned features: SQLite storage, voice announcements and 3D smoothing.
+planned features: voice announcements, 3D smoothing and a live position mode.
 
 ## Credits
 

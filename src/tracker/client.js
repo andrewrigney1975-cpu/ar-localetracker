@@ -183,7 +183,7 @@ function simTracker() {
       append(id, { type: 'end', t: now(), elapsedMs: st.elapsedBase, distance: st.distance });
       clearInterval(timer);
       st = idleState();
-      return { workoutId: id, pointCount: count };
+      return { workoutId: id, pointCount: count, saved: false };
     },
     async getStatus() {
       return snapshot();

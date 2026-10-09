@@ -1,46 +1,23 @@
 // Turns finished native journals into stored workouts.
 
-import { activity as activityProfile } from '../activities.js';
-import { hasWorkout, saveWorkout } from '../db/workouts.js';
-import { processJournal } from '../geo/process.js';
-import { computeSummary, previewPolyline } from '../stats/summary.js';
-import { parseJournal } from '../tracker/journal.js';
+import { currentBackend, hasWorkout, saveWorkout } from '../db/workouts.js';
+import { buildWorkout } from './buildWorkout.js';
 import { tracker } from '../tracker/client.js';
 
-export function newWorkoutId() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  const rand = Math.random().toString(36).slice(2, 6);
-  return `w${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${rand}`;
-}
+export { buildWorkout, defaultName, newWorkoutId } from './buildWorkout.js';
 
-export function defaultName(activityId, startedAt) {
-  const h = new Date(startedAt).getHours();
-  const part = h < 5 ? 'Night' : h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : h < 21 ? 'Evening' : 'Night';
-  return `${part} ${activityProfile(activityId).label}`;
-}
-
-/** Build a workout record + processed track from journal text. */
-export function buildWorkout(text, idOverride) {
-  const journal = parseJournal(text);
-  const { track, info } = processJournal(journal);
-  const id = idOverride ?? journal.meta?.workoutId ?? newWorkoutId();
-  const summary = computeSummary(track, info);
-  const workout = {
-    id,
-    activity: info.activity,
-    name: defaultName(info.activity, info.startedAt),
-    notes: '',
-    startedAt: info.startedAt,
-    endedAt: info.endedAt,
-    createdAt: Date.now(),
-    tzOffset: new Date(info.startedAt).getTimezoneOffset(),
-    device: info.device,
-    activeIntervals: info.activeIntervals,
-    summary,
-    preview: previewPolyline(track),
-  };
-  return { workout, track, journal };
+/**
+ * After a stop on Android, TrackingService processes and stores the workout itself (SQLite).
+ * Wait briefly for that before falling back to importing the journal in JS.
+ */
+export async function waitForNativeSave(workoutId, timeoutMs = 4000) {
+  if (!workoutId || currentBackend() !== 'sqlite') return false;
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    if (await hasWorkout(workoutId)) return true;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return false;
 }
 
 /**

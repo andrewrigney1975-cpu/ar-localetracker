@@ -1,6 +1,18 @@
 # Plan: migrate workout storage from IndexedDB to SQLite
 
-Status: proposal (October 2026). Backlog item 2.
+Status: **implemented** (October 2026). Backlog item 2.
+
+> **Built:** `WorkoutStore`, `LocaleStorePlugin`, `TrackCodec` and `WorkoutBuilder` (Java);
+> `trackCodec.js`, `nativeStore.js`, `idbStore.js` and `migrate.js` (JS); native
+> finalisation on stop (`NativeFinalizer`); 30-day IndexedDB cleanup.
+>
+> **Verified:**
+> - JVM tests: the Java port matches the JS on six shared fixtures.
+> - On-device store tests.
+> - The real migration on a Pixel 10a: 2 workouts, every column, record and raw journal
+>   byte-identical, and FIT exports identical (`scripts/verify-migration.mjs`).
+>
+> The cleanup is time-based (30 days after migration), not "two releases".
 
 ## 1. Questions answered
 

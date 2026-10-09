@@ -29,7 +29,7 @@ implementation notes for whoever picks it up.
 
 ---
 
-## 2. Migrate IndexedDB to SQLite
+## 2. Migrate IndexedDB to SQLite: ✅ done (October 2026)
 
 > Detailed plan, with storage measurements: [docs/plans/sqlite-migration.md](docs/plans/sqlite-migration.md).
 
@@ -167,3 +167,32 @@ implementation notes for whoever picks it up.
 - Test: a fixture track with injected altitude noise gives a smoothed curve whose total
   vertical oscillation drops by a set factor, while start, finish and marker positions
   stay within a few metres.
+
+---
+
+## 6. Live position mode (no recording)
+
+**Request:** a "Live" mode that uses GPS and the barometer to find and display where you
+are, without recording a workout.
+
+- A screen (e.g. a **Locate** tab or a button on Home) that shows, continuously:
+  - latitude/longitude (with a coordinate-format option: decimal or degrees-minutes-seconds)
+  - GPS accuracy (±m) and satellites in use
+  - altitude, with barometric/GPS source and its vertical accuracy
+  - speed and heading (GPS course when moving, compass when still)
+  - a small map with the current position and accuracy circle
+- Nothing is written: no journal, no workout, no notification. It stops when you leave the
+  screen or lock the phone.
+- Handy extras: copy coordinates, share location as text/`geo:` link, hold a reading
+  (freeze display).
+
+*Notes:*
+- Reuse the existing **warm-up** path in `LocaleTrackerPlugin` (`startWarmup`): fused
+  location at 1 Hz plus GNSS status, foreground only, with no service. Add barometer
+  readings (`AltitudeFusion`) and MSL altitude (`AltitudeConverter`) there, so altitude
+  matches what a recording would show.
+- Compass heading already exists (`startHeading`).
+- Stop all sensors in `handleOnPause` so it costs no battery in the background.
+- The map can reuse MapLibre (a single marker plus an accuracy circle layer), with no
+  track.
+- Optional later: a "Mark this spot" button that saves a waypoint, if waypoints are added.
