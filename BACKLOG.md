@@ -131,3 +131,33 @@ implementation notes for whoever picks it up.
 - Phrase-building is a pure function, so it can be unit-tested. Mirror it in JS if the
   browser simulator should speak (Web Speech API) for testing.
 - Optional: mirror announcements to the watch as a short vibration.
+
+---
+
+## 5. Smooth data points in the 3D view
+
+**Request:** draw a smooth route in the 3D view instead of a jagged one.
+
+- With vertical exaggeration (up to 10×), small altitude noise and 1 Hz GPS wobble show up
+  as zig-zags in the route line, the altitude curtain and the arrows.
+- The 3D route should look like a clean ribbon that follows the terrain. It must still
+  pass through the real distance markers, start and finish.
+
+*Notes:*
+- Display-only smoothing in `view3d/view3d.js`. Stats, splits, exports and the stored track
+  stay unchanged.
+- Resample the track by **distance** (every ~5–10 m, scaled to route length) instead of
+  drawing every fix. This also cuts vertex count on long workouts.
+- Smooth altitude more strongly for display, e.g. a Gaussian or Savitzky–Golay filter over
+  ~50–100 m. Widen the window as exaggeration increases, because the noise is amplified by
+  the same factor.
+- Draw the line and curtain from a Catmull-Rom spline (`THREE.CatmullRomCurve3`, centripetal)
+  through the resampled points, sampled at a fixed number of segments.
+- Place direction arrows (tangents) and distance-marker sprites on the smoothed curve, so
+  they sit exactly on the line.
+- Keep segment breaks (manual pauses) as separate curves, and don't smooth across them.
+- Optional: a "Smooth" toggle next to the Satellite button, for anyone who wants to see the
+  raw fixes.
+- Test: a fixture track with injected altitude noise gives a smoothed curve whose total
+  vertical oscillation drops by a set factor, while start, finish and marker positions
+  stay within a few metres.
