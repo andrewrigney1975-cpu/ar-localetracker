@@ -104,8 +104,11 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - Three.js plot with an altitude exaggeration slider from 1× to 10×.
   - **Satellite imagery** on the ground.
   - Direction arrows, and the same clickable distance markers as the map.
-- **Export** as GPX, TCX, KML (3D in Google Earth), GeoJSON or CSV, through the
-  Android share sheet.
+- **Export** through the Android share sheet as:
+  - **FIT**: Garmin's binary activity format, the best fit for Strava and Garmin Connect.
+    Includes per-km laps, heart rate, climb and calories. The encoder is written from the
+    FIT protocol spec and checked in tests with Garmin's official FIT SDK.
+  - GPX, TCX, KML (3D in Google Earth), GeoJSON or CSV.
 
 ### General
 - **Units:** metric by default, imperial in Settings.
@@ -177,7 +180,7 @@ src/
   geo/       geodesy, Kalman/RTS smoothing, journal → track processing, snapping
   stats/     summary, splits, hysteresis climb, stationary time, ski runs
   db/        IndexedDB: workouts, columnar tracks, gzipped raw journals
-  export/    GPX, TCX, KML, GeoJSON, CSV
+  export/    FIT, GPX, TCX, KML, GeoJSON, CSV
   map/       MapLibre map view        profile/  elevation side view
   view3d/    Three.js 3D view, satellite imagery
   seed/      City2Surf sample workout (course data + generator)

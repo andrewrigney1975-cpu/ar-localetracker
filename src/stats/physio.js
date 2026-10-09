@@ -179,6 +179,16 @@ export function estimateCalories(track, activity, profile, atMs) {
   return { kcal, method: share > 0.9 ? 'heart-rate' : share > 0 ? 'mixed' : 'activity' };
 }
 
+/** Calories for track indices [from, to); null without a complete profile. */
+export function caloriesForRange(track, from, to, activity, profile, atMs) {
+  if (!profile || to - from < 2) return null;
+  const slice = {};
+  for (const [k, v] of Object.entries(track)) slice[k] = ArrayBuffer.isView(v) ? v.subarray(from, to) : v;
+  slice.n = to - from;
+  const est = estimateCalories(slice, activity, profile, atMs);
+  return est ? Math.round(est.kcal) : null;
+}
+
 /** Plain-language label for a TRIMP value (per-workout scale). */
 export function loadLabel(value) {
   if (value == null) return '';

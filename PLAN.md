@@ -343,7 +343,7 @@ because it can't change later).
 | **M8** | 3D view: exaggerated altitude, arrows, clickable markers | |
 | **M9** | Export: GPX, TCX, KML, GeoJSON, CSV + share | GPX/TCX import cleanly into Strava, Garmin Connect, Google Earth |
 | **M10** | Polish: settings, units, theming, accessibility, battery audit, release signing | Battery use under ~6%/hour with screen off, measured |
-| Phase 2 | FIT export, GPX import, Live Update notification polish, offline map tile caching, heart-rate BLE sensors | |
+| Phase 2 | GPX import, Live Update notification polish, offline map tile caching, heart-rate BLE sensors | |
 
 ---
 
@@ -378,7 +378,7 @@ because it can't change later).
 1. App name **Locale Exercise Tracker**. Application ID `app.locale.exercisetracker`
    (change before the first Play upload if a different ID is wanted).
 2. Units are metric by default; the user can switch to imperial in Settings.
-3. FIT export moves to phase 2.
+3. FIT export moves to phase 2 (added October 2026; see §16).
 4. No live map on the workout screen.
 5. No BLE heart-rate in v1.
 
@@ -426,3 +426,8 @@ Verified so far:
 - Verified on a Pixel 10a (Android 17) and Pixel Watch 3 (Android 17): install, launch,
   watch↔phone messaging, permissions. A full outdoor workout with live heart rate is still
   to be confirmed.
+- **FIT export** (`src/export/fit.js`): a dependency-free FIT 2.0 encoder.
+  - Writes `file_id`, timer `event`s around manual pauses, per-fix `record`s, per-km
+    `lap`s, `session` and `activity`.
+  - Tests decode the output with Garmin's `@garmin/fitsdk` (dev dependency only) and check
+    integrity and values.
