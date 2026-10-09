@@ -57,6 +57,20 @@ public class LocaleTrackerPlugin extends Plugin {
     private final Handler main = new Handler(Looper.getMainLooper());
 
     private boolean warmupActive;
+    /** Warm-up (also used by the Live position screen) wanted; resumed after the app returns. */
+    private boolean warmupWanted;
+    private android.os.HandlerThread warmThread;
+    private final AltitudeFusion warmAltitude = new AltitudeFusion();
+    private final android.location.altitude.AltitudeConverter altitudeConverter = new android.location.altitude.AltitudeConverter();
+    private final SensorEventListener warmPressure = new SensorEventListener() {
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            warmAltitude.onPressure(event.values[0]);
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+    };
     private boolean headingRequested;
     private boolean headingRegistered;
     private Location warmupLocation;
@@ -82,6 +96,8 @@ public class LocaleTrackerPlugin extends Plugin {
         inForeground = false;
         appVisible = false;
         unregisterHeading();
+        // Nothing runs in the background unless a workout is recording.
+        stopWarmupInternal();
     }
 
     @Override
@@ -91,6 +107,7 @@ public class LocaleTrackerPlugin extends Plugin {
         // Permissions may have changed in Settings; widgets choose start vs. open-app on that.
         LocaleWidgets.updateAll(getContext());
         if (headingRequested) registerHeading();
+        if (warmupWanted) startWarmupInternal();
     }
 
     @Override
@@ -390,10 +407,26 @@ public class LocaleTrackerPlugin extends Plugin {
         public void onLocationResult(@NonNull LocationResult result) {
             Location loc = result.getLastLocation();
             if (loc == null) return;
+            // Same altitude pipeline as a recording: MSL from the geoid model, anchored barometer.
+            if (!loc.hasMslAltitude() && loc.hasAltitude()) {
+                try {
+                    altitudeConverter.addMslAltitudeToLocation(getContext(), loc);
+                } catch (Exception ignored) {
+                    // geoid model unavailable: ellipsoidal altitude
+                }
+            }
+            double gnssAlt = loc.hasMslAltitude() ? loc.getMslAltitudeMeters() : loc.hasAltitude() ? loc.getAltitude() : Double.NaN;
+            double vAcc = loc.hasMslAltitudeAccuracy() ? loc.getMslAltitudeAccuracyMeters()
+                : loc.hasVerticalAccuracy() ? loc.getVerticalAccuracyMeters() : Double.NaN;
+            double fusedAlt = warmAltitude.onGnss(gnssAlt, vAcc, System.currentTimeMillis());
             warmupLocation = loc;
+            JSObject last = locationToJs(loc, fusedAlt);
+            last.put("altitudeSource", warmAltitude.hasPressure() ? "barometer" : "gps");
+            if (warmAltitude.hasPressure()) last.put("pressure", Math.round(warmAltitude.pressureHpa() * 100) / 100.0);
+            if (!Double.isNaN(vAcc)) last.put("altitudeAccuracy", vAcc);
             JSObject ev = new JSObject();
             ev.put("state", "idle");
-            ev.put("last", locationToJs(loc, Double.NaN));
+            ev.put("last", last);
             if (inForeground) notifyListeners("point", ev);
         }
     };
@@ -430,19 +463,32 @@ public class LocaleTrackerPlugin extends Plugin {
             return;
         }
         TrackingService svc = TrackingService.get();
-        if (warmupActive || (svc != null && !"idle".equals(svc.snapshot().getString("state")))) {
-            call.resolve();
-            return;
+        warmupWanted = true;
+        if (!(svc != null && !"idle".equals(svc.snapshot().getString("state")))) startWarmupInternal();
+        call.resolve();
+    }
+
+    @SuppressLint("MissingPermission")
+    private void startWarmupInternal() {
+        if (warmupActive || getPermissionState("location") != PermissionState.GRANTED) return;
+        TrackingService svc = TrackingService.get();
+        if (svc != null && !"idle".equals(svc.snapshot().getString("state"))) return; // the service supplies fixes
+        if (warmThread == null) {
+            warmThread = new android.os.HandlerThread("LocaleWarmup");
+            warmThread.start();
         }
         LocationRequest req = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000).build();
-        fused.requestLocationUpdates(req, warmupCallback, Looper.getMainLooper());
+        // Off the main thread: the geoid (MSL) lookup does disk I/O.
+        fused.requestLocationUpdates(req, warmupCallback, warmThread.getLooper());
         locationManager.registerGnssStatusCallback(warmupGnss, main);
+        Sensor pressure = sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE);
+        if (pressure != null) sensorManager.registerListener(warmPressure, pressure, 200_000, new Handler(warmThread.getLooper()));
         warmupActive = true;
-        call.resolve();
     }
 
     @PluginMethod
     public void stopWarmup(PluginCall call) {
+        warmupWanted = false;
         stopWarmupInternal();
         call.resolve();
     }
@@ -451,6 +497,7 @@ public class LocaleTrackerPlugin extends Plugin {
         if (!warmupActive) return;
         fused.removeLocationUpdates(warmupCallback);
         locationManager.unregisterGnssStatusCallback(warmupGnss);
+        sensorManager.unregisterListener(warmPressure);
         warmupActive = false;
     }
 
