@@ -1,0 +1,8 @@
+{
+  "appId": "app.locale.exercisetracker",
+  "appName": "Locale Exercise Tracker",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#0f1419"
+  }
+}

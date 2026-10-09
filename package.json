@@ -1,0 +1,31 @@
+{
+  "name": "locale-exercise-tracker",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Locale Exercise Tracker: GPS workout tracking for walking, running, cycling and skiing",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "sync": "vite build && cap sync android",
+    "android:build": "npm run sync && cd android && gradlew.bat assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/filesystem": "^8.1.4",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.3",
+    "maplibre-gl": "^6.13.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
+    "fast-xml-parser": "^5.11.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
+  }
+}

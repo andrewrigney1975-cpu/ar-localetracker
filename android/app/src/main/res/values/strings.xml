@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Locale Exercise Tracker</string>
+    <string name="title_activity_main">Locale Exercise Tracker</string>
+    <string name="package_name">app.locale.exercisetracker</string>
+    <string name="custom_url_scheme">app.locale.exercisetracker</string>
+</resources>
