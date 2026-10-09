@@ -91,7 +91,7 @@ private fun IdleScreen(error: String?, reachable: Boolean?, onStart: (String) ->
                     Button(
                         onClick = { onStart(id) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = ACCENT.getValue(id), contentColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = ACCENT.getValue(id), contentColor = Color.White, iconColor = Color.White),
                         icon = { Icon(painterResource(R.drawable.ic_action_play), contentDescription = null) },
                         label = { Text("Start $label") },
                     )
