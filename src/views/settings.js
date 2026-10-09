@@ -48,9 +48,9 @@ export async function mount(root) {
 
             <div class="section-title">Maps</div>
             <div class="card settings-group">
-              <div class="setting"><div class="text">Map style</div>
+              <div class="setting stack"><div class="text">Map style</div>
                 ${segmented('mapStyle', Object.entries(MAP_STYLE_LABELS), s.mapStyle)}</div>
-              <div class="setting"><div class="text">3D vertical exaggeration<small>Auto fits the climb to the route size</small></div>
+              <div class="setting stack"><div class="text">3D vertical exaggeration<small>Auto fits the climb to the route size</small></div>
                 ${segmented('exaggeration', [['auto', 'Auto'], ['2', '2×'], ['5', '5×'], ['10', '10×']], s.exaggeration)}</div>
               <label class="setting"><span class="text">Satellite in 3D<small>Show aerial imagery under the 3D route (needs a connection)</small></span>
                 <input type="checkbox" class="switch" data-toggle="satellite3d" ${s.satellite3d ? 'checked' : ''} /></label>

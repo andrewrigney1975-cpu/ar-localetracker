@@ -159,7 +159,7 @@ export async function mount(root, params, _query, ctx) {
     }
     ref.headingLabel.textContent = src ? `Heading · ${src}` : 'Heading';
     if (heading != null) {
-      ref.heading.textContent = `${Math.round(heading)}° ${headingCardinal(heading)}`;
+      ref.heading.innerHTML = `${Math.round(heading)}°<small>${headingCardinal(heading)}</small>`;
       headingSvg.style.transform = `rotate(${heading}deg)`;
     } else ref.heading.textContent = '–';
     if (last && Number.isFinite(last.altitude)) {

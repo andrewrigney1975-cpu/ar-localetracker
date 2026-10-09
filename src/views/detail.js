@@ -283,7 +283,7 @@ function renderSplits(panel, w, track, units, preferSpeed) {
               return `<tr class="${sp.partial ? 'partial' : ''}">
                 <td>${label}</td><td>${perf}</td><td>${elev > 0 ? '+' : ''}${elev}</td>
                 <td class="bar-cell"><div class="split-bar ${cls}" style="width:${width}%"></div></td>
-                <td>${formatDuration(sp.time)}</td></tr>`;
+                <td>${formatDuration(Math.round(sp.time))}</td></tr>`;
             })
             .join('')}
         </tbody>

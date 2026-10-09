@@ -372,10 +372,14 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
   controls.addEventListener('start', () => {
     userMoved = true;
   });
+  const portraitOffset = new THREE.Vector3(-WORLD * 0.3, WORLD * 1.35, WORLD * 0.6);
   const fitCamera = (aspect) => {
     if (userMoved) return;
-    const factor = Math.max(1, 1.25 / aspect);
-    camera.position.copy(center).addScaledVector(baseOffset, factor);
+    // Portrait: blend toward a steeper view so the route fills the tall screen.
+    const t = Math.min(1, Math.max(0, (1.1 - aspect) / 0.6));
+    const offset = baseOffset.clone().lerp(portraitOffset, t);
+    const factor = Math.max(1, 1.05 / aspect);
+    camera.position.copy(center).addScaledVector(offset, factor);
     controls.update();
   };
 

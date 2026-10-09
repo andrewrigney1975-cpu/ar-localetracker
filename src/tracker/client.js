@@ -53,7 +53,7 @@ function simTracker() {
   const listeners = new Map();
   const emit = (name, data) => listeners.get(name)?.forEach((cb) => cb(data));
   const JKEY = (id) => `sim-journal:${id}`;
-  const START = { lat: 50.1163, lon: -122.9574 };
+  const START = { lat: -33.8731, lon: 151.2111, alt: 32 };
 
   let st = idleState();
   let timer = null;
@@ -178,7 +178,7 @@ function simTracker() {
       let acc = 40;
       warmTimer = setInterval(() => {
         acc = Math.max(4, acc * 0.7);
-        emit('point', { state: 'idle', last: { t: Date.now(), lat: START.lat, lon: START.lon, accuracy: acc, altitude: 680, speed: 0 } });
+        emit('point', { state: 'idle', last: { t: Date.now(), lat: START.lat, lon: START.lon, accuracy: acc, altitude: START.alt, speed: 0 } });
         emit('gnss', { satsUsed: Math.round(30 - acc / 2), satsVisible: 34, cn0: 32 });
       }, 1000);
     },
