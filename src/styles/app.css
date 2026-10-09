@@ -584,6 +584,11 @@ main#view {
   gap: 10px;
 }
 
+.share-actions .btn {
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
 .dialog .section-title {
   margin: 20px 0 4px;
 }
