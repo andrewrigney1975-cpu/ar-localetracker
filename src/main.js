@@ -89,6 +89,8 @@ async function boot() {
   await Promise.race([document.fonts.load('400 16px "Google Sans Variable"'), new Promise((r) => setTimeout(r, 1500))]).catch(() => {});
   await loadSettings();
   requestPersistence();
+  // One-time sample workout (City2Surf). Loaded lazily so the course data stays out of the main bundle.
+  await import('./seed/seedDefaults.js').then((m) => m.seedDefaultWorkouts()).catch((e) => console.error(e));
   startRouter($('#view'), renderTabbar);
 
   App.addListener('backButton', () => {
