@@ -101,7 +101,14 @@ export async function mount(root, params, query, ctx) {
         } else {
           const { mountView3D } = await import('../view3d/view3d.js');
           if (tab !== id) return;
-          disposeTab = mountView3D(panel, { workout: w, track, units, exaggeration: s.exaggeration });
+          disposeTab = mountView3D(panel, {
+            workout: w,
+            track,
+            units,
+            exaggeration: s.exaggeration,
+            satellite: settings().satellite3d,
+            onSatelliteChange: (on) => updateSettings({ satellite3d: on }),
+          });
         }
       } catch (e) {
         console.error(e);

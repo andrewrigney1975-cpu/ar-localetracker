@@ -1500,6 +1500,27 @@ main#view {
   font-size: 0.85rem;
 }
 
+.view3d-controls .chip {
+  flex: none;
+}
+
+.view3d-attrib {
+  position: absolute;
+  right: 12px;
+  bottom: calc(var(--safe-bottom) + 76px);
+  z-index: 3;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.45);
+  color: rgb(255 255 255 / 0.85);
+  font-size: 0.68rem;
+  pointer-events: none;
+}
+
+.view3d-attrib[hidden] {
+  display: none;
+}
+
 .view3d-controls input[type='range'] {
   flex: 1;
   accent-color: var(--accent);

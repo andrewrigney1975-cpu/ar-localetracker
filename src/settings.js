@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   liveSpeedMode: { walk: 'pace', run: 'pace', cycle: 'speed', ski: 'speed' },
   mapStyle: 'streets',
   exaggeration: 'auto',
+  satellite3d: true,
 };
 
 let current = structuredClone(DEFAULT_SETTINGS);

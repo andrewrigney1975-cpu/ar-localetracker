@@ -12,19 +12,26 @@ import { rampRGB, speedRange } from '../ui/colors.js';
 import { cssVar, Disposer } from '../ui/dom.js';
 import { markerInfoHTML, Popover } from '../ui/popover.js';
 import { distanceUnit, formatPace, splitLength } from '../units.js';
+import { IMAGERY, latToPx, loadImagery, lonToPx } from './imagery.js';
 
 const WORLD = 100; // horizontal extent normalised to this many scene units
 
 /**
  * @param {HTMLElement} root
- * @param {{workout:object, track:object, units:string, exaggeration:'auto'|number}} opts
+ * @param {{workout:object, track:object, units:string, exaggeration:'auto'|number, satellite?:boolean, onSatelliteChange?:(on:boolean)=>void}} opts
  */
-export function mountView3D(root, { workout, track, units, exaggeration = 'auto' }) {
+export function mountView3D(root, { workout, track, units, exaggeration = 'auto', satellite = true, onSatelliteChange }) {
   const d = new Disposer();
+  let disposed = false;
+  d.add(() => {
+    disposed = true;
+  });
   root.innerHTML = `
     <div class="view3d">
       <div class="view3d-hint">Drag to orbit · pinch to zoom · two fingers to pan</div>
+      <div class="view3d-attrib" hidden>${IMAGERY.attribution}</div>
       <div class="view3d-controls">
+        <button class="chip" data-act="satellite" aria-pressed="false">Satellite</button>
         <label for="exag">Vertical</label>
         <input id="exag" type="range" min="1" max="10" step="0.5" />
         <output for="exag"></output>
@@ -93,6 +100,98 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
   const grid = new THREE.GridHelper(gridSize, 13, isDark ? 0x3a4652 : 0xb9c3cc, isDark ? 0x222c35 : 0xdde3e9);
   grid.position.set(center.x, 0, center.z);
   scene.add(grid);
+
+  // Satellite ground plane, loaded on demand. Each vertex gets UVs from its own Web Mercator
+  // position, so the imagery lines up exactly with the locally projected route.
+  const ground = { mesh: null, texture: null, loading: false };
+  let satOn = satellite;
+  const satBtn = root.querySelector('[data-act="satellite"]');
+  const attribution = root.querySelector('.view3d-attrib');
+
+  function applyGround() {
+    const showing = satOn && Boolean(ground.mesh);
+    if (ground.mesh) ground.mesh.visible = satOn;
+    grid.visible = !showing;
+    attribution.hidden = !showing;
+    satBtn.setAttribute('aria-pressed', String(satOn));
+    render();
+  }
+
+  async function loadGround() {
+    if (ground.mesh || ground.loading) return;
+    ground.loading = true;
+    satBtn.disabled = true;
+    const pad = Math.max(200, extentM * 0.12);
+    const x0 = minX - pad;
+    const x1 = maxX + pad;
+    const y0 = minY - pad;
+    const y1 = maxY + pad;
+    const [south, west] = proj.toLatLon(x0, y0);
+    const [north, east] = proj.toLatLon(x1, y1);
+    try {
+      const maxPx = Math.min(4096, renderer.capabilities.maxTextureSize);
+      const img = await loadImagery([west, south, east, north], { maxPx, isCancelled: () => disposed });
+      if (disposed) return;
+      const geom = new THREE.PlaneGeometry((x1 - x0) * scale, (y1 - y0) * scale, 48, 48);
+      geom.rotateX(-Math.PI / 2);
+      geom.translate(((x0 + x1) / 2) * scale, -0.03, (-(y0 + y1) / 2) * scale);
+      const pos = geom.attributes.position;
+      const uv = geom.attributes.uv;
+      for (let i = 0; i < pos.count; i++) {
+        const [lat, lon] = proj.toLatLon(pos.getX(i) / scale, -pos.getZ(i) / scale);
+        uv.setXY(
+          i,
+          (lonToPx(lon, img.z) - img.originX) / img.canvas.width,
+          1 - (latToPx(lat, img.z) - img.originY) / img.canvas.height
+        );
+      }
+      uv.needsUpdate = true;
+      const tex = new THREE.CanvasTexture(img.canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      // Slightly dimmed so the speed-coloured route stays the hero.
+      const mat = new THREE.MeshBasicMaterial({ map: tex, color: 0xd9d9d9 });
+      ground.mesh = new THREE.Mesh(geom, mat);
+      ground.mesh.renderOrder = -1;
+      ground.texture = tex;
+      scene.add(ground.mesh);
+    } catch (e) {
+      if (disposed) return;
+      console.warn('3D imagery', e);
+      flashHint('Satellite imagery unavailable offline');
+      satOn = false;
+    } finally {
+      ground.loading = false;
+      if (!disposed) {
+        satBtn.disabled = false;
+        applyGround();
+      }
+    }
+  }
+
+  function flashHint(text) {
+    root.querySelector('.view3d-hint')?.remove();
+    const hint = document.createElement('div');
+    hint.className = 'view3d-hint';
+    hint.textContent = text;
+    host.appendChild(hint);
+    setTimeout(() => hint.remove(), 3500);
+  }
+
+  satBtn.addEventListener('click', () => {
+    satOn = !satOn;
+    onSatelliteChange?.(satOn);
+    if (satOn && !ground.mesh) loadGround();
+    else applyGround();
+  });
+
+  d.add(() => {
+    if (ground.mesh) {
+      ground.mesh.geometry.dispose();
+      ground.mesh.material.dispose();
+      ground.texture.dispose();
+    }
+  });
 
   const [vmin, vmax] = speedRange(track);
   const accent = new THREE.Color(cssVar('--accent', root) || '#f2672e');
@@ -266,12 +365,27 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
   }
   controls.addEventListener('change', render);
 
+  // Initial framing is tuned for a landscape view; pull back on narrow (portrait) screens so
+  // the whole route fits horizontally. Only applies until the user moves the camera.
+  const baseOffset = camera.position.clone().sub(center);
+  let userMoved = false;
+  controls.addEventListener('start', () => {
+    userMoved = true;
+  });
+  const fitCamera = (aspect) => {
+    if (userMoved) return;
+    const factor = Math.max(1, 1.25 / aspect);
+    camera.position.copy(center).addScaledVector(baseOffset, factor);
+    controls.update();
+  };
+
   const resize = () => {
     const w = host.clientWidth;
     const h = host.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    fitCamera(camera.aspect);
     camera.updateProjectionMatrix();
     lineMaterial.resolution.set(w, h);
     render();
@@ -293,6 +407,8 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
 
   build();
   resize();
+  satBtn.setAttribute('aria-pressed', String(satOn));
+  if (satOn) loadGround();
 
   d.add(() => {
     cancelAnimationFrame(frame);
