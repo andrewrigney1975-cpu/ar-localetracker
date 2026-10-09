@@ -14,6 +14,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Set by the tile's "Start" button. */
         const val EXTRA_START_ACTIVITY = "start"
+        /** Debug builds: `adb shell am start ... --ez demo true` shows sample workout data. */
+        const val EXTRA_DEMO = "demo"
     }
 
     private var afterPermissions: (() -> Unit)? = null
@@ -25,6 +27,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (BuildConfig.DEBUG && intent?.getBooleanExtra(EXTRA_DEMO, false) == true) PhoneLink.enterDemo()
         setContent {
             LocaleWearApp(
                 onStart = ::startWorkout,
@@ -44,6 +47,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (PhoneLink.demo) return
         send("/locale/status-request")
         // Foreground is the reliable moment to (re)start heart rate for a phone-started workout.
         HeartRateService.sync(this, PhoneLink.status.value)
@@ -81,6 +85,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun send(path: String) {
+        if (PhoneLink.demo) return
         lifecycleScope.launch { PhoneLink.send(this@MainActivity, path) }
     }
 }

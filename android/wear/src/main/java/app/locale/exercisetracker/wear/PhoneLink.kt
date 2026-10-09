@@ -43,6 +43,25 @@ object PhoneLink {
 
     @Volatile private var pendingStartAt = 0L
 
+    /** Debug builds only: show sample data for screenshots; ignores the phone and sensors. */
+    @Volatile var demo = false
+        private set
+
+    fun enterDemo() {
+        demo = true
+        status.value = PhoneStatus(
+            state = "recording",
+            workoutId = "demo",
+            activity = "run",
+            elapsedMs = 47 * 60_000L + 15_000L,
+            receivedAt = SystemClock.elapsedRealtime(),
+            distance = 7470.0,
+            speed = 2.56,
+        )
+        heartRate.value = 158
+        phoneReachable.value = true
+    }
+
     fun markStartRequested() {
         pendingStartAt = SystemClock.elapsedRealtime()
     }
@@ -76,6 +95,7 @@ object PhoneLink {
     }
 
     fun onStatus(ctx: Context, json: JSONObject) {
+        if (demo) return
         val next = PhoneStatus(
             state = json.optString("state", "idle"),
             workoutId = json.optString("workoutId").ifEmpty { null },

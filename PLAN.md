@@ -406,3 +406,23 @@ Verified so far:
 
 **Not yet verified on an emulator or device** (no AVD installed). The M1/M2
 "done when" criteria still need real-device runs.
+
+## 16. Post-v1 additions (October 2026)
+
+- **3D satellite ground** (Esri World Imagery): see §15.
+- **Wear OS companion** (`android/wear`, Kotlin + Compose for Wear OS, Wear OS 5+). It
+  starts, pauses and stops phone workouts over the Wearable Data Layer, has a tile and an
+  ongoing activity, and streams Health Services heart rate to the phone.
+  - Starting while the phone app is in the background needs location "Allow all the
+    time" and no battery optimisation. Otherwise the phone shows a one-tap start
+    notification.
+  - The module is pinned to Wear Compose 1.6 / Compose 1.10, because newer versions
+    require AGP 9.1 and Capacitor uses AGP 8.13.
+- **Heart-rate analysis** (`src/stats/physio.js`):
+  - zones on % heart-rate reserve
+  - Banister TRIMP cardio load
+  - Keytel (2005) calories, with an ACSM/MET fallback
+  - Needs a profile (sex, birth year, weight) in Settings.
+- Verified on a Pixel 10a (Android 17) and Pixel Watch 3 (Android 17): install, launch,
+  watch↔phone messaging, permissions. A full outdoor workout with live heart rate is still
+  to be confirmed.

@@ -1,9 +1,11 @@
 # Locale Exercise Tracker
 
 Locale is a GPS workout tracker for Android 16+ covering **walking, running, cycling and
-snow skiing**. It records reliably in the background with the screen off. Afterwards you
-can review each workout as stats, splits, an interactive map with an elevation side view,
-or a 3D plot over satellite imagery.
+snow skiing**. It records reliably in the background with the screen off. A **Wear OS
+companion** lets you start and stop workouts from your watch and adds live heart rate.
+Afterwards you can review each workout as stats, heart-rate effort (calories, cardio load,
+zones), splits, an interactive map with an elevation side view, or a 3D plot over
+satellite imagery.
 
 The app is written in HTML5, vanilla JavaScript and CSS3, and packaged with
 [Capacitor](https://capacitorjs.com/). A small Java plugin handles background GPS and
@@ -12,21 +14,29 @@ sensors.
 <p align="center">
   <img src="docs/screenshots/home.png" width="250" alt="Home screen with activity tiles and the City2Surf sample workout">
   &nbsp;
-  <img src="docs/screenshots/live.png" width="250" alt="Live workout screen showing elapsed time, distance, pace, heading, altitude and location">
+  <img src="docs/screenshots/live.png" width="250" alt="Live workout screen with elapsed time, heart rate, distance, pace, heading, altitude and location">
   &nbsp;
   <img src="docs/screenshots/summary.png" width="250" alt="Workout summary with distance, times, speed, pace, climb and altitude">
 </p>
 <p align="center">
-  <img src="docs/screenshots/map.jpeg" width="250" alt="Map view with speed-coloured route, distance marker popover and linked elevation profile">
+  <img src="docs/screenshots/effort.png" width="250" alt="Effort: average and max heart rate, calories, cardio load and time in heart-rate zones">
+  &nbsp;
+  <img src="docs/screenshots/map.jpeg" width="250" alt="Map view with speed-coloured route, distance marker popover, and elevation profile with heart-rate line">
   &nbsp;
   <img src="docs/screenshots/3d.jpeg" width="250" alt="3D route over satellite imagery with exaggerated altitude">
+</p>
+<p align="center">
+  <img src="docs/screenshots/splits.png" width="250" alt="Per-kilometre splits with pace, elevation change, heart rate and time">
   &nbsp;
-  <img src="docs/screenshots/splits.png" width="250" alt="Per-kilometre splits with pace, elevation change and time">
+  <img src="docs/screenshots/watch-home.png" width="200" alt="Pixel Watch: Locale start screen with Start Run and Start Walk">
+  &nbsp;
+  <img src="docs/screenshots/watch-workout.png" width="200" alt="Pixel Watch: workout in progress with elapsed time, distance, pace, heart rate, pause and stop">
 </p>
 
-<sub>The screenshots show the built-in sample workout, a simulated run of the Sydney
-City2Surf (Hyde Park to Bondi via Heartbreak Hill at 6:18/km). It is generated from the
-course map and is not a real recording.</sub>
+<sub>The phone screenshots show the built-in sample workout, a simulated run of the Sydney
+City2Surf (Hyde Park to Bondi via Heartbreak Hill at 6:18/km, with simulated heart rate).
+It is generated from the course map and is not a real recording. The watch screenshots
+are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</sub>
 
 ## Features
 
