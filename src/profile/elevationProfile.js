@@ -113,7 +113,7 @@ export class ElevationProfile {
     const border = cssVar('--border') || '#ccc';
     const surface = cssVar('--surface') || '#fff';
     ctx.clearRect(0, 0, w, h);
-    ctx.font = '11px system-ui, Roboto, sans-serif';
+    ctx.font = '11px "Google Sans Variable", system-ui, Roboto, sans-serif';
 
     // Horizontal grid + altitude labels.
     const ticks = niceTicks(altitudeValue(this.altMin, this.units), altitudeValue(this.altMax, this.units), 4);
@@ -197,7 +197,7 @@ export class ElevationProfile {
       ctx.stroke();
 
       const label = `${Math.round(altitudeValue(s.alt, this.units))} ${altitudeUnit(this.units)} · ${distanceValue(this.cursor, this.units).toFixed(2)}`;
-      ctx.font = '600 11px system-ui, Roboto, sans-serif';
+      ctx.font = '600 11px "Google Sans Variable", system-ui, Roboto, sans-serif';
       const tw = ctx.measureText(label).width + 12;
       const lx = Math.min(Math.max(cx - tw / 2, PAD.l), w - PAD.r - tw);
       const ly = Math.max(2, Math.min(cy - 28, h - PAD.b - 22));

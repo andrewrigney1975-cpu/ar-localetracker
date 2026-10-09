@@ -322,7 +322,7 @@ function markerTexture(label, fill) {
   g.strokeStyle = '#ffffff';
   g.stroke();
   g.fillStyle = '#ffffff';
-  g.font = `700 ${label.length > 2 ? 20 : 26}px system-ui, Roboto, sans-serif`;
+  g.font = `700 ${label.length > 2 ? 20 : 26}px "Google Sans Variable", system-ui, Roboto, sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(label, s / 2, s / 2 + 1);

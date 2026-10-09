@@ -1,3 +1,4 @@
+import '@fontsource-variable/google-sans';
 import './styles/app.css';
 import { App } from '@capacitor/app';
 import { activity } from './activities.js';
@@ -84,6 +85,8 @@ async function handleRecovery() {
 }
 
 async function boot() {
+  // Canvas text (profile, 3D markers) needs the bundled font before first draw.
+  await Promise.race([document.fonts.load('400 16px "Google Sans Variable"'), new Promise((r) => setTimeout(r, 1500))]).catch(() => {});
   await loadSettings();
   requestPersistence();
   startRouter($('#view'), renderTabbar);

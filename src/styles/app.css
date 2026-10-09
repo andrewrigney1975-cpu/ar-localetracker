@@ -26,8 +26,8 @@
   --radius: 16px;
   --radius-sm: 10px;
   --gap: 12px;
-  --font: system-ui, 'Roboto', 'Segoe UI', sans-serif;
-  --font-num: 'Roboto', system-ui, sans-serif;
+  --font: 'Google Sans Variable', system-ui, 'Roboto', sans-serif;
+  --font-num: 'Google Sans Variable', 'Roboto', system-ui, sans-serif;
 
   --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
