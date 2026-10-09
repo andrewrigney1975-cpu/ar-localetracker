@@ -567,6 +567,27 @@ main#view {
   resize: vertical;
 }
 
+.share-preview {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.share-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.dialog .section-title {
+  margin: 20px 0 4px;
+}
+
 .option-list {
   display: grid;
   gap: 8px;

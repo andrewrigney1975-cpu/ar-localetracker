@@ -11,6 +11,28 @@ function toBase64(bytes) {
   return btoa(s);
 }
 
+/** Share plain text through the Android share sheet (Messages, WhatsApp, email, …). */
+export async function shareText({ text, title }) {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await Share.share({ title, text, dialogTitle: 'Share workout' });
+    } else if (navigator.share) {
+      await navigator.share({ title, text });
+    } else {
+      await navigator.clipboard.writeText(text);
+      return 'copied';
+    }
+  } catch (e) {
+    if (!/cancel|abort/i.test(String(e?.message ?? e?.name ?? e))) throw e;
+  }
+  return 'shared';
+}
+
+/** Open the default SMS app with the message pre-filled (sms: URIs open externally). */
+export function openSms(uri) {
+  window.location.href = uri;
+}
+
 /** Share a text (string) or binary (Uint8Array) export. */
 export async function shareFile({ filename, content, mime, title }) {
   const binary = content instanceof Uint8Array;

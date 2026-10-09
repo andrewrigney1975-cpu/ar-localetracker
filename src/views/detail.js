@@ -2,7 +2,8 @@ import { activity as activityProfile } from '../activities.js';
 import { deleteWorkout, getTrack, getWorkout, updateWorkout } from '../db/workouts.js';
 import { EXPORT_FORMATS, renderExport } from '../export/index.js';
 import { navigate } from '../router.js';
-import { shareFile } from '../services/share.js';
+import { workoutShareText, smsUri } from '../export/text.js';
+import { openSms, shareFile, shareText } from '../services/share.js';
 import { settings, updateSettings } from '../settings.js';
 import { estimateCalories, loadLabel, profileComplete, trimp, ZONES, zoneSeconds } from '../stats/physio.js';
 import { computeSplits } from '../stats/summary.js';
@@ -53,7 +54,7 @@ export async function mount(root, params, query, ctx) {
         <button class="icon-btn" data-act="back" aria-label="Back">${icons.back}</button>
         <h1 data-ref="title"></h1>
         <button class="icon-btn" data-act="edit" aria-label="Rename or add notes">${icons.edit}</button>
-        <button class="icon-btn" data-act="export" aria-label="Export">${icons.share}</button>
+        <button class="icon-btn" data-act="export" aria-label="Share">${icons.share}</button>
         <button class="icon-btn" data-act="delete" aria-label="Delete">${icons.trash}</button>
       </header>
       <div class="detail">
@@ -151,18 +152,40 @@ export async function mount(root, params, query, ctx) {
   });
 
   root.querySelector('[data-act="export"]').addEventListener('click', async () => {
+    const cal = estimateCalories(track, w.activity, settings().profile, w.startedAt);
+    const message = workoutShareText(w, { units, calories: cal?.kcal });
     const fmt = await openDialog((dlg, close) => {
-      dlg.innerHTML = `<h2>Export</h2><p>Share this workout as a GPS file.</p><div class="option-list"></div>
-        <div class="actions"><button class="btn ghost">Cancel</button></div>`;
+      dlg.innerHTML = `<h2>Share</h2>
+        <div class="share-preview" aria-label="Message preview"></div>
+        <div class="share-actions">
+          <button class="btn primary" data-v="sms">${icons.message}Text message</button>
+          <button class="btn ghost" data-v="text">${icons.share}Other apps</button>
+        </div>
+        <div class="section-title">Export file</div>
+        <div class="option-list"></div>
+        <div class="actions"><button class="btn ghost" data-v="cancel">Cancel</button></div>`;
+      dlg.querySelector('.share-preview').textContent = message;
+      dlg.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => close(b.dataset.v === 'cancel' ? null : b.dataset.v)));
       const list = dlg.querySelector('.option-list');
       for (const f of EXPORT_FORMATS) {
         const b = el(`<button><span class="tag">${f.label}</span><span>${f.label}<small>${f.description}</small></span></button>`);
         b.addEventListener('click', () => close(f.id));
         list.appendChild(b);
       }
-      dlg.querySelector('.actions button').addEventListener('click', () => close(null));
     });
     if (!fmt) return;
+    if (fmt === 'sms') {
+      openSms(smsUri(message));
+      return;
+    }
+    if (fmt === 'text') {
+      try {
+        if ((await shareText({ text: message, title: w.name })) === 'copied') toast('Workout summary copied');
+      } catch (e) {
+        toast(`Sharing failed: ${e?.message ?? e}`);
+      }
+      return;
+    }
     try {
       const out = renderExport(fmt, w, track, { profile: settings().profile });
       await shareFile({ filename: out.filename, content: out.content, mime: out.mime, title: w.name });

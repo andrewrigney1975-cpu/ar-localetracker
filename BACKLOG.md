@@ -5,7 +5,9 @@ implementation notes for whoever picks it up.
 
 ---
 
-## 1. Share workout details as text (SMS)
+## 1. Share workout details as text (SMS): ✅ done (October 2026)
+
+> Implemented in `src/export/text.js`. Share sheet → **Text message** opens the default SMS app with the summary pre-filled (`sms:?body=`). **Other apps** opens the Android share sheet.
 
 **Request:** share a workout's details as plain text, for example by SMS.
 

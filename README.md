@@ -105,6 +105,8 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - Three.js plot with an altitude exaggeration slider from 1× to 10×.
   - **Satellite imagery** on the ground.
   - Direction arrows, and the same clickable distance markers as the map.
+- **Share as text:** a short summary (distance, time, pace or speed, climb, heart rate,
+  calories) by **SMS** with one tap, or to any app through the Android share sheet.
 - **Export** through the Android share sheet as:
   - **FIT**: Garmin's binary activity format, the best fit for Strava and Garmin Connect.
     Includes per-km laps, heart rate, climb and calories. The encoder is written from the
@@ -197,8 +199,8 @@ docs/        screenshots
 ```
 
 See [PLAN.md](PLAN.md) for the design and decisions, and [BACKLOG.md](BACKLOG.md) for
-planned features: share as text, SQLite storage, home-screen widgets, voice announcements
-and 3D smoothing.
+planned features: SQLite storage, home-screen widgets, voice announcements and 3D
+smoothing.
 
 ## Credits
 
