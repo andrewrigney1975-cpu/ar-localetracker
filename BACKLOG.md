@@ -31,6 +31,8 @@ implementation notes for whoever picks it up.
 
 ## 2. Migrate IndexedDB to SQLite
 
+> Detailed plan, with storage measurements: [docs/plans/sqlite-migration.md](docs/plans/sqlite-migration.md).
+
 **Request:** move workout storage from IndexedDB to SQLite.
 
 - One-time migration on upgrade:
