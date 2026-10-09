@@ -5,7 +5,8 @@ snow skiing**. It records reliably in the background with the screen off. A **We
 companion** lets you start and stop workouts from your watch and adds live heart rate.
 Afterwards you can review each workout as stats, heart-rate effort (calories, cardio load,
 zones), splits, an interactive map with an elevation side view, or a 3D plot over
-satellite imagery.
+satellite imagery. Then you can export it as **FIT** (for Strava and Garmin Connect),
+GPX, TCX, KML, GeoJSON or CSV.
 
 The app is written in HTML5, vanilla JavaScript and CSS3, and packaged with
 [Capacitor](https://capacitorjs.com/). A small Java plugin handles background GPS and
@@ -195,7 +196,9 @@ tests/       Vitest suites
 docs/        screenshots
 ```
 
-See [PLAN.md](PLAN.md) for the design, decisions and roadmap.
+See [PLAN.md](PLAN.md) for the design and decisions, and [BACKLOG.md](BACKLOG.md) for
+planned features: share as text, SQLite storage, home-screen widgets, voice announcements
+and 3D smoothing.
 
 ## Credits
 
@@ -204,6 +207,9 @@ See [PLAN.md](PLAN.md) for the design, decisions and roadmap.
   [OpenTopoMap](https://opentopomap.org) (CC-BY-SA).
 - **Satellite imagery:** © Esri, Maxar, Earthstar Geographics.
 - **Sample course elevation:** Copernicus GLO-90 DEM via [Open-Meteo](https://open-meteo.com).
+- **FIT protocol:** files are validated in tests with Garmin's
+  [FIT SDK](https://developer.garmin.com/fit/) (a dev dependency only; it isn't shipped
+  in the app).
 - **Font:** [Google Sans](https://fonts.google.com/specimen/Google+Sans) (SIL Open Font
   License).
 
