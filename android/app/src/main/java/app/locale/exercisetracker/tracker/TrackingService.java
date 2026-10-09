@@ -65,6 +65,7 @@ public class TrackingService extends Service {
     private static final long SNAPSHOT_INTERVAL_MS = 10000;
     private static final long GNSS_EMIT_INTERVAL_MS = 2000;
     private static final long WEAR_PUSH_INTERVAL_MS = 2000;
+    private static final long WIDGET_INTERVAL_MS = 30_000;
     private static final long HR_FRESH_MS = 15000;
     /** Wake lock is held in short leases, renewed on every fix, so it can never leak. */
     private static final long WAKE_LEASE_MS = 10 * 60 * 1000;
@@ -118,6 +119,7 @@ public class TrackingService extends Service {
     private int lastHr;
     private long lastHrAt;
     private long lastWearPushMs;
+    private long lastWidgetUpdateMs;
     private int satsVisible;
     private double meanCn0;
     private long lastNotificationMs;
@@ -153,6 +155,7 @@ public class TrackingService extends Service {
     @Override
     public void onDestroy() {
         instance = null;
+        LocaleWidgets.updateAll(this); // back to the start buttons
         stopLocationUpdates();
         unregisterSensors();
         if (wakeLock.isHeld()) wakeLock.release();
@@ -179,14 +182,18 @@ public class TrackingService extends Service {
         }
         String action = intent.getAction();
         if (ACTION_START.equals(action)) {
-            if (!promoteToForeground("Starting workout")) {
+            // Already recording (e.g. a second widget tap): keep the current notification.
+            if (!promoteToForeground(state == State.IDLE ? "Starting workout" : null)) {
                 stopSelf();
                 return START_NOT_STICKY;
             }
-            String id = intent.getStringExtra(EXTRA_WORKOUT_ID);
+            // Widgets send only the activity; fill in a fresh ID and the user's settings here.
             String act = intent.getStringExtra(EXTRA_ACTIVITY);
-            boolean ap = intent.getBooleanExtra(EXTRA_AUTO_PAUSE, false);
-            String u = intent.getStringExtra(EXTRA_UNITS);
+            String id = intent.hasExtra(EXTRA_WORKOUT_ID) ? intent.getStringExtra(EXTRA_WORKOUT_ID) : newWorkoutId();
+            boolean ap = intent.hasExtra(EXTRA_AUTO_PAUSE)
+                ? intent.getBooleanExtra(EXTRA_AUTO_PAUSE, false)
+                : PhoneSettings.autoPause(this, act == null ? "run" : act);
+            String u = intent.hasExtra(EXTRA_UNITS) ? intent.getStringExtra(EXTRA_UNITS) : PhoneSettings.units(this);
             boolean resume = intent.getBooleanExtra(EXTRA_RESUME, false);
             handler.post(() -> startWorkout(id, act, ap, u, resume));
         } else if (ACTION_PAUSE.equals(action)) {
@@ -197,6 +204,12 @@ public class TrackingService extends Service {
             handler.post(() -> stopWorkout(null));
         }
         return START_STICKY;
+    }
+
+    /** Same format as the web app's newWorkoutId(). */
+    static String newWorkoutId() {
+        return "w" + new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new java.util.Date())
+            + "-" + Integer.toString(new java.util.Random().nextInt(36 * 36 * 36 * 36), 36);
     }
 
     private boolean promoteToForeground(String text) {
@@ -275,6 +288,7 @@ public class TrackingService extends Service {
             journal.append(meta, true);
         }
         WearListenerService.clearStartPrompt(this);
+        LocaleWidgets.rememberActivity(this, profile.id);
         synchronized (this) {
             lastHr = 0;
             lastHrAt = 0;
@@ -367,6 +381,7 @@ public class TrackingService extends Service {
         ev.put("reason", reason);
         TrackerHub.emit("state", ev);
         pushWearStatus(true);
+        LocaleWidgets.updateAll(this);
     }
 
     // ---- Location ---------------------------------------------------------------------------
@@ -442,6 +457,10 @@ public class TrackingService extends Service {
         if (nowMs - lastNotificationMs >= NOTIFICATION_INTERVAL_MS) updateNotification(false);
         if (nowMs - lastSnapshotMs >= SNAPSHOT_INTERVAL_MS) saveSnapshot();
         pushWearStatus(false);
+        if (nowMs - lastWidgetUpdateMs >= WIDGET_INTERVAL_MS) {
+            lastWidgetUpdateMs = nowMs;
+            LocaleWidgets.updateAll(this); // distance; the chronometer ticks on its own
+        }
     }
 
     // ---- Watch ------------------------------------------------------------------------------

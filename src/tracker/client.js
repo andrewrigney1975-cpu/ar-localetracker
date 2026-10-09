@@ -35,6 +35,7 @@ function nativeTracker() {
     deleteJournal: (workoutId) => Native.deleteJournal({ workoutId }),
     setKeepScreenOn: (enabled) => Native.setKeepScreenOn({ enabled }),
     getWatchStatus: () => Native.getWatchStatus(),
+    pinWidget: (size) => Native.pinWidget({ size }),
     requestBackgroundLocation: () => Native.requestBackgroundLocation(),
     requestIgnoreBatteryOptimizations: () => Native.requestIgnoreBatteryOptimizations(),
     openAppSettings: () => Native.openAppSettings(),
@@ -245,6 +246,9 @@ function simTracker() {
       return { deleted: true };
     },
     async setKeepScreenOn() {},
+    async pinWidget() {
+      return { supported: false };
+    },
     async getWatchStatus() {
       return { supported: true, connected: true, watches: [{ name: 'Simulated watch', nearby: true }], backgroundLocation: true };
     },

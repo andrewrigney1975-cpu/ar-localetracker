@@ -4,4 +4,16 @@
     <string name="title_activity_main">Locale Exercise Tracker</string>
     <string name="package_name">app.locale.exercisetracker</string>
     <string name="custom_url_scheme">app.locale.exercisetracker</string>
+    <string name="widget_1x1_label">Locale: last activity</string>
+    <string name="widget_2x1_label">Locale: run or walk</string>
+    <string name="widget_2x2_label">Locale: all activities</string>
+    <string name="widget_1x1_description">One tap starts your last-used activity</string>
+    <string name="widget_2x1_description">Start a run or a walk</string>
+    <string name="widget_2x2_description">Start a walk, run, ride or ski</string>
+    <string name="activity_walk">Walk</string>
+    <string name="activity_run">Run</string>
+    <string name="activity_cycle">Cycle</string>
+    <string name="activity_ski">Ski</string>
+    <string name="widget_recording">Recording</string>
+    <string name="widget_distance_placeholder">0.00 km</string>
 </resources>

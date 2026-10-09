@@ -105,6 +105,10 @@ async function boot() {
     }
   });
   App.addListener('resume', handleRecovery);
+  // A workout started outside the app (widget, watch, notification) while it's open: show it.
+  tracker.on('state', (ev) => {
+    if (ev.reason === 'start' && !currentPath().startsWith('/live')) navigate('/live');
+  });
 
   // If a workout is running (app reopened from the notification), jump straight to it.
   const status = await tracker.getStatus().catch(() => ({ state: 'idle' }));

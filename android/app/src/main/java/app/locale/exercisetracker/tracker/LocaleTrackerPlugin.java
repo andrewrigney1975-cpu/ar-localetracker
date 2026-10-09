@@ -88,6 +88,8 @@ public class LocaleTrackerPlugin extends Plugin {
     protected void handleOnResume() {
         inForeground = true;
         appVisible = true;
+        // Permissions may have changed in Settings; widgets choose start vs. open-app on that.
+        LocaleWidgets.updateAll(getContext());
         if (headingRequested) registerHeading();
     }
 
@@ -143,6 +145,25 @@ public class LocaleTrackerPlugin extends Plugin {
     private void backgroundLocationResult(PluginCall call) {
         JSObject o = new JSObject();
         o.put("granted", getPermissionState("backgroundLocation") == PermissionState.GRANTED);
+        call.resolve(o);
+    }
+
+    // ---- Widgets ----------------------------------------------------------------------------
+
+    /** Ask the launcher to add a widget ("1x1", "2x1" or "2x2"); the user confirms in a system dialog. */
+    @PluginMethod
+    public void pinWidget(PluginCall call) {
+        android.appwidget.AppWidgetManager manager = android.appwidget.AppWidgetManager.getInstance(getContext());
+        JSObject o = new JSObject();
+        if (manager == null || !manager.isRequestPinAppWidgetSupported()) {
+            o.put("supported", false);
+            call.resolve(o);
+            return;
+        }
+        Class<?> provider = LocaleWidgets.providerFor(call.getString("size", "2x2"));
+        boolean requested = manager.requestPinAppWidget(new android.content.ComponentName(getContext(), provider), null, null);
+        o.put("supported", true);
+        o.put("requested", requested);
         call.resolve(o);
     }
 

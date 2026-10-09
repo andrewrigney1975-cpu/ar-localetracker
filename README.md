@@ -50,6 +50,13 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Controls:** start, pause, resume and **hold-to-stop**, so a gloved hand can't end a
   workout by accident.
 - **Auto-pause:** optional, set separately for each activity.
+- **Home-screen widgets:**
+  - **1×1:** your last-used activity
+  - **2×1:** run and walk
+  - **2×2:** all four activities
+
+  One tap starts recording, even with the app closed. While recording, the widget shows
+  the activity, a running timer and distance. Add one from Settings → Home-screen widgets.
 - **Live screen:**
   - elapsed time
   - distance
@@ -195,6 +202,7 @@ src/
 android/app/src/main/java/app/locale/exercisetracker/tracker/
   LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
   WearListenerService  WearSync          (watch link)
+  LocaleWidgets  Widget1x1/2x1/2x2Provider  (home-screen widgets)
 android/wear/            Wear OS companion app (Kotlin, Compose for Wear OS)
   MainActivity  HeartRateService  PhoneLink  PhoneListenerService  LocaleTileService
 tests/       Vitest suites
@@ -202,8 +210,7 @@ docs/        screenshots
 ```
 
 See [PLAN.md](PLAN.md) for the design and decisions, and [BACKLOG.md](BACKLOG.md) for
-planned features: SQLite storage, home-screen widgets, voice announcements and 3D
-smoothing.
+planned features: SQLite storage, voice announcements and 3D smoothing.
 
 ## Credits
 

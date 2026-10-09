@@ -59,7 +59,9 @@ implementation notes for whoever picks it up.
 
 ---
 
-## 3. Home-screen widgets to start a workout
+## 3. Home-screen widgets to start a workout: ✅ done (October 2026)
+
+> Implemented in `LocaleWidgets.java` and `Widget1x1Provider`, `Widget2x1Provider`, `Widget2x2Provider`. Add one from Settings → Home-screen widgets or the launcher's widget picker.
 
 **Request:** home-screen widgets in three sizes:
 

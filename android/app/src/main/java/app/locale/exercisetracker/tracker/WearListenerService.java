@@ -15,10 +15,6 @@ import app.locale.exercisetracker.R;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.WearableListenerService;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import java.util.Random;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -131,11 +127,9 @@ public class WearListenerService extends WearableListenerService {
     }
 
     static Intent startIntent(Context ctx, String activity) {
-        String id = "w" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date())
-            + "-" + Integer.toString(new Random().nextInt(36 * 36 * 36 * 36), 36);
         return new Intent(ctx, TrackingService.class)
             .setAction(TrackingService.ACTION_START)
-            .putExtra(TrackingService.EXTRA_WORKOUT_ID, id)
+            .putExtra(TrackingService.EXTRA_WORKOUT_ID, TrackingService.newWorkoutId())
             .putExtra(TrackingService.EXTRA_ACTIVITY, activity)
             .putExtra(TrackingService.EXTRA_AUTO_PAUSE, PhoneSettings.autoPause(ctx, activity))
             .putExtra(TrackingService.EXTRA_UNITS, PhoneSettings.units(ctx));

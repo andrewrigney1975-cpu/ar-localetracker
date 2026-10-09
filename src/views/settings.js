@@ -72,6 +72,18 @@ export async function mount(root) {
                 ${watch?.backgroundLocation ? '<span class="status-ok">Allowed</span>' : '<button class="btn ghost" data-act="bglocation">Allow</button>'}</div>
             </div>
 
+            <div class="section-title">Home-screen widgets</div>
+            <div class="card settings-group">
+              ${[
+                ['1x1', '1 × 1', 'Your last-used activity'],
+                ['2x1', '2 × 1', 'Run and walk'],
+                ['2x2', '2 × 2', 'Walk, run, cycle and ski'],
+              ]
+                .map(([size, label, desc]) => `<div class="setting"><div class="text">${label}<small>${desc}. One tap starts recording.</small></div>
+                  <button class="btn ghost" data-widget="${size}">Add</button></div>`)
+                .join('')}
+            </div>
+
             <div class="section-title">Auto-pause</div>
             <div class="card settings-group">
               ${ACTIVITY_IDS.map((id) => {
@@ -137,6 +149,12 @@ export async function mount(root) {
         else profile[field] = v == null ? null : Math.round(v);
         await updateSettings({ profile });
         if (field === 'birthYear' || field === 'maxHr') render();
+      })
+    );
+    root.querySelectorAll('[data-widget]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const res = await tracker.pinWidget(b.dataset.widget).catch(() => ({ supported: false }));
+        if (!res.supported) toast('Long-press your home screen, choose Widgets, then Locale');
       })
     );
     root.querySelector('[data-act="bglocation"]')?.addEventListener('click', async () => {
