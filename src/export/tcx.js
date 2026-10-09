@@ -1,5 +1,5 @@
 import { activity } from '../activities.js';
-import { estimateCalories } from '../stats/physio.js';
+import { caloriesForRange } from '../stats/physio.js';
 import { computeSplits } from '../stats/summary.js';
 import { esc, fixed, iso } from './xml.js';
 
@@ -32,7 +32,7 @@ export function toTCX(workout, track, { profile } = {}) {
     lines.push(`        <TotalTimeSeconds>${fixed(lap.time, 1)}</TotalTimeSeconds>`);
     lines.push(`        <DistanceMeters>${fixed(lap.endDistance - lap.startDistance, 1)}</DistanceMeters>`);
     lines.push(`        <MaximumSpeed>${fixed(lap.maxSpeed, 2)}</MaximumSpeed>`);
-    lines.push(`        <Calories>${lapCalories(track, from, i, workout, profile)}</Calories>`);
+    lines.push(`        <Calories>${caloriesForRange(track, from, i, workout.activity, profile, workout.startedAt) ?? 0}</Calories>`);
     if (lap.avgHr != null) lines.push(`        <AverageHeartRateBpm><Value>${Math.round(lap.avgHr)}</Value></AverageHeartRateBpm>`);
     if (lap.maxHr != null) lines.push(`        <MaximumHeartRateBpm><Value>${Math.round(lap.maxHr)}</Value></MaximumHeartRateBpm>`);
     lines.push('        <Intensity>Active</Intensity>');
@@ -71,12 +71,3 @@ export function toTCX(workout, track, { profile } = {}) {
   return lines.join('\n') + '\n';
 }
 
-/** Calories for track indices [from, to); 0 without a complete profile. */
-function lapCalories(track, from, to, workout, profile) {
-  if (!profile || to - from < 2) return 0;
-  const slice = {};
-  for (const [k, v] of Object.entries(track)) slice[k] = ArrayBuffer.isView(v) ? v.subarray(from, to) : v;
-  slice.n = to - from;
-  const est = estimateCalories(slice, workout.activity, profile, workout.startedAt);
-  return est ? Math.round(est.kcal) : 0;
-}

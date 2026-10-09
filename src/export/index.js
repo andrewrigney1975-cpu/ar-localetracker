@@ -1,10 +1,12 @@
 import { toCSV } from './csv.js';
+import { toFIT } from './fit.js';
 import { toGeoJSON } from './geojson.js';
 import { toGPX } from './gpx.js';
 import { toKML } from './kml.js';
 import { toTCX } from './tcx.js';
 
 export const EXPORT_FORMATS = [
+  { id: 'fit', label: 'FIT', description: 'Garmin Connect, Strava: laps, heart rate, calories', ext: 'fit', mime: 'application/vnd.ant.fit', binary: true, fn: toFIT },
   { id: 'gpx', label: 'GPX', description: 'Universal GPS track: Strava, Garmin, Komoot', ext: 'gpx', mime: 'application/gpx+xml', fn: toGPX },
   { id: 'tcx', label: 'TCX', description: 'Garmin Training Center, with 1 km laps', ext: 'tcx', mime: 'application/vnd.garmin.tcx+xml', fn: toTCX },
   { id: 'kml', label: 'KML', description: 'Google Earth, shown in 3D', ext: 'kml', mime: 'application/vnd.google-earth.kml+xml', fn: toKML },

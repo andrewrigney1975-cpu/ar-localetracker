@@ -2,7 +2,7 @@ import { activity as activityProfile } from '../activities.js';
 import { deleteWorkout, getTrack, getWorkout, updateWorkout } from '../db/workouts.js';
 import { EXPORT_FORMATS, renderExport } from '../export/index.js';
 import { navigate } from '../router.js';
-import { shareTextFile } from '../services/share.js';
+import { shareFile } from '../services/share.js';
 import { settings, updateSettings } from '../settings.js';
 import { estimateCalories, loadLabel, profileComplete, trimp, ZONES, zoneSeconds } from '../stats/physio.js';
 import { computeSplits } from '../stats/summary.js';
@@ -165,7 +165,7 @@ export async function mount(root, params, query, ctx) {
     if (!fmt) return;
     try {
       const out = renderExport(fmt, w, track, { profile: settings().profile });
-      await shareTextFile({ filename: out.filename, content: out.content, mime: out.mime, title: w.name });
+      await shareFile({ filename: out.filename, content: out.content, mime: out.mime, title: w.name });
     } catch (e) {
       console.error(e);
       toast(`Export failed: ${e?.message ?? e}`);

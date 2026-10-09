@@ -575,7 +575,7 @@ main#view {
 
 .option-list button {
   display: grid;
-  grid-template-columns: 56px 1fr;
+  grid-template-columns: 72px 1fr;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -589,10 +589,12 @@ main#view {
   display: grid;
   place-items: center;
   height: 36px;
+  padding: 0 4px;
   border-radius: 8px;
   background: var(--surface-2);
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  overflow: hidden;
 }
 
 .option-list small {
