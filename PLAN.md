@@ -392,7 +392,7 @@ from the plan above:
 | Kotlin native plugin | **Java** (`tracker/*.java`) | Matches Capacitor's template and avoids adding a Kotlin toolchain |
 | Gradle toolchain pinned to JDK 21 if needed | **Gradle 9.1.0 wrapper** | Runs on Android Studio's bundled JDK 25 with no machine-specific config |
 | Grid index for snapping | Brute-force nearest segment | Well under 1 ms for 10k points; simpler |
-| 3D base plane with map texture | Ground grid + track shadow | Rendering tiles off-screen adds fragility; phase 2 |
+| 3D base plane with map texture | Esri World Imagery satellite ground (toggle), grid fallback offline | Added after v1 on `feature/3d-satellite` |
 | Exporter XSD validation | Well-formedness + structure tests | No XSD validator dependency |
 | "Save to Downloads" (SAF) | Share sheet only | The share sheet already offers Files/Drive; phase 2 |
 | Kotlin `TrackingNotification` class | Built into `TrackingService` | Small enough not to need its own class |

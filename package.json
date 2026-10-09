@@ -3,6 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "description": "Locale Exercise Tracker: GPS workout tracking for walking, running, cycling and skiing",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

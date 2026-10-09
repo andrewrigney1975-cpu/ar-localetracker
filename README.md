@@ -1,91 +1,163 @@
 # Locale Exercise Tracker
 
-GPS workout tracker for **walking, running, cycling and snow skiing** on Android 16+.
-The UI is HTML5, vanilla JS and CSS3, packaged with Capacitor 8. A small Java plugin
-records in the background through a foreground service.
+Locale is a GPS workout tracker for Android 16+ covering **walking, running, cycling and
+snow skiing**. It records reliably in the background with the screen off. Afterwards you
+can review each workout as stats, splits, an interactive map with an elevation side view,
+or a 3D plot over satellite imagery.
+
+The app is written in HTML5, vanilla JavaScript and CSS3, and packaged with
+[Capacitor](https://capacitorjs.com/). A small Java plugin handles background GPS and
+sensors.
+
+<p align="center">
+  <img src="docs/screenshots/home.png" width="250" alt="Home screen with activity tiles and the City2Surf sample workout">
+  &nbsp;
+  <img src="docs/screenshots/live.png" width="250" alt="Live workout screen showing elapsed time, distance, pace, heading, altitude and location">
+  &nbsp;
+  <img src="docs/screenshots/summary.png" width="250" alt="Workout summary with distance, times, speed, pace, climb and altitude">
+</p>
+<p align="center">
+  <img src="docs/screenshots/map.jpeg" width="250" alt="Map view with speed-coloured route, distance marker popover and linked elevation profile">
+  &nbsp;
+  <img src="docs/screenshots/3d.jpeg" width="250" alt="3D route over satellite imagery with exaggerated altitude">
+  &nbsp;
+  <img src="docs/screenshots/splits.png" width="250" alt="Per-kilometre splits with pace, elevation change and time">
+</p>
+
+<sub>The screenshots show the built-in sample workout, a simulated run of the Sydney
+City2Surf (Hyde Park to Bondi via Heartbreak Hill at 6:18/km). It is generated from the
+course map and is not a real recording.</sub>
 
 ## Features
 
-- **Start / pause / resume / stop per activity.** Stop is hold-to-confirm, so a gloved
-  hand can't end a workout by accident. Auto-pause can be set per activity.
-- **Background tracking with high accuracy.** A location foreground service uses the
-  fused provider (high accuracy, 1 Hz). It also reads the barometer, GNSS status
-  (satellites, signal), MSL altitude via `AltitudeConverter`, and the compass.
-  - Notification controls appear as an Android 16 Live Update.
-  - Points are written to a crash-safe journal on disk.
-  - Workouts survive process death.
-- **Live screen** shows elapsed time, distance, speed or pace (tap to toggle),
-  heading (GPS course when moving, compass when slow), latitude/longitude, altitude,
-  climb so far, and GPS quality.
-- **Review:**
-  - Distance, time, moving and stationary time, average speed and pace, max speed.
-  - Climb, descent, net vertical, min/max altitude.
-  - Splits per km or mile.
-  - For skiing: runs, lifts, ski vertical and lift time.
-- **Map:** MapLibre with free OpenFreeMap or OpenTopoMap tiles.
-  - The track is coloured by speed, with subtle direction chevrons.
-  - Tapping a distance marker opens a popover with distance, time, clock time,
-    latitude, longitude and altitude.
-  - An **elevation side view** sits below the map. Dragging the marker on the map, or
-    scrubbing the profile, moves the other.
-- **3D:** Three.js route plot with a vertical exaggeration slider (1–10×), plus
-  direction arrows and the same clickable distance markers.
-- **Export:** GPX 1.1, TCX, KML (3D), GeoJSON and CSV, sent through the Android
-  share sheet.
-- Metric by default, with imperial in Settings. Light, dark and auto themes.
+### Record
+- **Four activities:** walk, run, cycle and ski, each with tuned accuracy filters and
+  stationary thresholds.
+- **Controls:** start, pause, resume and **hold-to-stop**, so a gloved hand can't end a
+  workout by accident.
+- **Auto-pause:** optional, set separately for each activity.
+- **Live screen:**
+  - elapsed time
+  - distance
+  - speed or pace (tap to switch)
+  - heading: GPS course while moving, compass when slow
+  - latitude/longitude
+  - altitude and climb so far
+  - GPS accuracy and satellite count
+- **Background tracking** runs through a location foreground service:
+  - fused GPS at 1 Hz, high accuracy
+  - barometer fused with GNSS altitude, for smooth climb figures
+  - mean-sea-level altitude
+  - GNSS satellite status
+- **Lock-screen notification** with pause, resume and stop. It shows as an Android 16
+  Live Update.
+- **Crash-safe recording:** every fix goes to an on-disk journal. A workout survives the
+  app being killed, and interrupted workouts can be saved or continued.
+
+### Review
+- **Stats:**
+  - distance
+  - time, moving time and stationary time
+  - average speed and average pace
+  - max speed
+  - climb, descent and net vertical
+  - min and max altitude
+- **Ski extras:** runs, lifts, ski vertical, lift time and max run speed.
+- **Splits** per km or mile, with pace, elevation change and fastest/slowest bars.
+- **Map:**
+  - MapLibre with free OpenFreeMap streets, light or dark styles, or OpenTopoMap topo.
+  - The route is coloured by speed, with subtle direction chevrons.
+  - **Distance markers** open a popover showing distance, time, clock time, latitude,
+    longitude and altitude.
+- **Elevation side view** below the map. Drag the marker along the route, or scrub the
+  profile, and the two follow each other.
+- **3D view:**
+  - Three.js plot with an altitude exaggeration slider from 1× to 10×.
+  - **Satellite imagery** on the ground.
+  - Direction arrows, and the same clickable distance markers as the map.
+- **Export** as GPX, TCX, KML (3D in Google Earth), GeoJSON or CSV, through the
+  Android share sheet.
+
+### General
+- **Units:** metric by default, imperial in Settings.
+- **Theme:** light, dark and auto.
+- **Font:** Google Sans, bundled for offline use.
+- **Privacy:** workouts are stored only on the device. The network is used for map tiles
+  and nothing else.
+
+## Getting started
+
+Requirements:
+- Node 20+
+- Android Studio, whose bundled JDK works
+- Android SDK platform 36
+- A device or emulator running Android 16 or later
+
+```sh
+npm install
+npm test         # unit tests (Vitest)
+npm run dev      # run in a browser with a simulated GPS route
+```
+
+The browser build uses a GPS simulator that starts at Hyde Park, Sydney. Add `?sim=10` to
+the URL to run it 10× faster.
+
+### Build and install on a device
+
+```sh
+npm run build
+npx cap sync android
+cd android
+# Point JAVA_HOME at Android Studio's bundled JDK, e.g.
+#   set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr
+gradlew.bat assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+You can also open `android/` in Android Studio and press **Run**.
+
+> The Gradle wrapper is pinned to 9.1, because Android Studio's bundled JDK 25 is too new
+> for the Gradle 8.x that Capacitor generates. `android/local.properties` (gitignored)
+> must point `sdk.dir` at your Android SDK.
+
+### Testing GPS
+
+- **Emulator:** Extended controls → Location → load a GPX/KML route and press play.
+- **Background survival:** start a workout, turn the screen off, then run
+  `adb shell dumpsys deviceidle force-idle`.
 
 ## Project layout
 
 ```
 src/
   main.js, router.js, settings.js, units.js, activities.js
-  tracker/   client.js (native plugin + browser simulator), journal.js, synthetic.js
-  geo/       geo.js, kalman.js (RTS smoother), process.js (journal → track), snap.js
-  stats/     summary.js (stats, splits, vertical hysteresis, ski runs)
+  tracker/   native plugin client + browser simulator, journal parser
+  geo/       geodesy, Kalman/RTS smoothing, journal → track processing, snapping
+  stats/     summary, splits, hysteresis climb, stationary time, ski runs
   db/        IndexedDB: workouts, columnar tracks, gzipped raw journals
-  export/    gpx, tcx, kml, geojson, csv
-  map/       mapView.js     profile/ elevationProfile.js     view3d/ view3d.js
+  export/    GPX, TCX, KML, GeoJSON, CSV
+  map/       MapLibre map view        profile/  elevation side view
+  view3d/    Three.js 3D view, satellite imagery
+  seed/      City2Surf sample workout (course data + generator)
   views/     home, live, history, detail, settings
 android/app/src/main/java/app/locale/exercisetracker/tracker/
-  LocaleTrackerPlugin.java  TrackingService.java  Journal.java  AltitudeFusion.java
-tests/       Vitest unit tests (geo, processing, stats, exporters)
+  LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
+tests/       Vitest suites
+docs/        screenshots
 ```
 
-## Develop
+See [PLAN.md](PLAN.md) for the design, decisions and roadmap.
 
-```sh
-npm install
-npm test                  # unit tests
-npm run dev               # browser dev server with a simulated GPS route
-                          # (append ?sim=10 to run the simulator 10× faster)
-```
+## Credits
 
-## Build for Android
+- **Map data:** © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
+- **Map tiles:** [OpenFreeMap](https://openfreemap.org) and
+  [OpenTopoMap](https://opentopomap.org) (CC-BY-SA).
+- **Satellite imagery:** © Esri, Maxar, Earthstar Geographics.
+- **Sample course elevation:** Copernicus GLO-90 DEM via [Open-Meteo](https://open-meteo.com).
+- **Font:** [Google Sans](https://fonts.google.com/specimen/Google+Sans) (SIL Open Font
+  License).
 
-Requires Android Studio (its bundled JBR works as the JDK) and SDK platform 36.
+## License
 
-```sh
-npm run build && npx cap sync android
-cd android
-# Use Android Studio's bundled JDK:
-#   set JAVA_HOME=F:\Program Files\Android\Android Studio\jbr
-gradlew.bat assembleDebug
-```
-
-You can also open the `android/` folder in Android Studio and run it.
-
-Toolchain notes:
-- The Gradle wrapper is pinned to **9.1.0**, because Android Studio's bundled JDK 25
-  is too new for the Gradle 8.14 that Capacitor generates.
-- `android/local.properties` (gitignored) must point `sdk.dir` at your Android SDK.
-
-### Testing GPS on the emulator
-
-Extended controls → Location → load a GPX/KML route and press play. To check
-background survival, turn the screen off, then run
-`adb shell dumpsys deviceidle force-idle`.
-
-## Data and privacy
-
-Workouts stay on the device (IndexedDB inside the app). Nothing is uploaded. The
-network is used only to fetch map tiles.
+[MIT](LICENSE) © 2026 Andrew Rigney
