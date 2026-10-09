@@ -13,6 +13,8 @@ export const DEFAULT_SETTINGS = {
   mapStyle: 'streets',
   exaggeration: 'auto',
   satellite3d: true,
+  /** For calories, heart-rate zones and cardio load. Weight in kg. */
+  profile: { birthYear: null, sex: null, weightKg: null, restingHr: null, maxHr: null },
 };
 
 let current = structuredClone(DEFAULT_SETTINGS);
@@ -28,6 +30,7 @@ export async function loadSettings() {
         ...saved,
         autoPause: { ...DEFAULT_SETTINGS.autoPause, ...saved.autoPause },
         liveSpeedMode: { ...DEFAULT_SETTINGS.liveSpeedMode, ...saved.liveSpeedMode },
+        profile: { ...DEFAULT_SETTINGS.profile, ...saved.profile },
       };
     }
   } catch {

@@ -19,6 +19,7 @@ import { smoothAxis } from './kalman.js';
  * @property {Float32Array} acc    horizontal accuracy (m)
  * @property {Float32Array} course direction of travel (deg)
  * @property {Uint8Array}   moving 1 when moving
+ * @property {Float32Array} [hr]   heart rate (bpm, NaN when unknown); present only with watch data
  */
 
 /**
@@ -88,6 +89,10 @@ export function processJournal(journal, activityId) {
     track.alt[i] = p.af ?? p.am ?? p.ae ?? NaN;
   }
   smoothAltitude(track.alt, info.hasBarometer);
+  if (journal.hr?.length) {
+    track.hr = alignHeartRate(track.t, journal.hr);
+    info.hasHeartRate = true;
+  }
 
   // 5. Speed: Doppler where trustworthy, else from smoothed positions.
   for (let i = 0; i < n; i++) {
@@ -141,6 +146,26 @@ export function allocTrack(n) {
     course: new Float32Array(n),
     moving: new Uint8Array(n),
   };
+}
+
+/** Heart rate at each track time, interpolated between watch samples no more than 10 s away. */
+export function alignHeartRate(times, samples, maxGapMs = 10000) {
+  const n = times.length;
+  const out = new Float32Array(n).fill(NaN);
+  let j = 0;
+  for (let i = 0; i < n; i++) {
+    const t = times[i];
+    while (j < samples.length - 1 && samples[j + 1].t <= t) j++;
+    const a = samples[j];
+    const b = samples[j + 1];
+    if (a.t <= t && b && b.t - a.t <= maxGapMs * 2 && t - a.t <= maxGapMs && b.t - t <= maxGapMs) {
+      out[i] = a.bpm + ((b.bpm - a.bpm) * (t - a.t)) / (b.t - a.t || 1);
+    } else {
+      const near = [a, b].filter((s) => s && Math.abs(s.t - t) <= maxGapMs).sort((x, y) => Math.abs(x.t - t) - Math.abs(y.t - t))[0];
+      if (near) out[i] = near.bpm;
+    }
+  }
+  return out;
 }
 
 function smoothSegment(kept, from, to, proj, q, track) {
@@ -251,6 +276,13 @@ export function sampleAtDistance(track, d) {
   return sampleAt(track, lo, f);
 }
 
+function lerpHr(hr, i, j, f) {
+  const a = hr[i];
+  const b = hr[j];
+  if (Number.isFinite(a) && Number.isFinite(b)) return a + (b - a) * f;
+  return Number.isFinite(a) ? a : b;
+}
+
 /** Interpolated sample between index i and i+1 at fraction f. */
 export function sampleAt(track, i, f) {
   const j = Math.min(track.n - 1, i + 1);
@@ -265,5 +297,6 @@ export function sampleAt(track, i, f) {
     dist: lerp(track.dist),
     active: lerp(track.active),
     course: track.course[i],
+    hr: track.hr ? lerpHr(track.hr, i, j, f) : NaN,
   };
 }

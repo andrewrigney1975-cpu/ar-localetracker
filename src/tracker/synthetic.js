@@ -22,6 +22,49 @@ function gaussian(rand) {
 const BASE_SPEED = { walk: 1.4, run: 3.1, cycle: 7.5, ski: 11 };
 
 /**
+ * Simple heart-rate response: target from speed and grade per activity, first-order lag
+ * (faster rise than fall), slow cardiac drift and sensor noise.
+ */
+export class HeartModel {
+  constructor({ rest = 58, max = 186, seed = 11 } = {}) {
+    this.rest = rest;
+    this.max = max;
+    this.rand = mulberry32(seed);
+    this.hr = rest + 15;
+    this.elapsed = 0;
+  }
+
+  intensity(activity, speed, gradePct) {
+    let x;
+    switch (activity) {
+      case 'walk':
+        x = 0.3 + 0.13 * (speed - 1.0);
+        break;
+      case 'cycle':
+        x = 0.42 + 0.028 * (speed - 4);
+        break;
+      case 'ski':
+        x = speed > 0.5 ? 0.55 + 0.012 * speed : 0.3;
+        break;
+      default:
+        x = 0.62 + 0.11 * (speed - 2.0);
+    }
+    if (speed < 0.3) x = 0.25;
+    x += gradePct > 0 ? 0.015 * gradePct : 0.004 * gradePct;
+    return Math.max(0.2, Math.min(1, x));
+  }
+
+  step(dt, activity, speed, gradePct = 0) {
+    this.elapsed += dt;
+    const drift = (this.elapsed / 60) * 0.035;
+    const target = this.rest + (this.max - this.rest) * this.intensity(activity, speed, gradePct) + drift;
+    const tau = target > this.hr ? 22 : 38;
+    this.hr += (target - this.hr) * (1 - Math.exp(-dt / tau));
+    return Math.round(this.hr + gaussian(this.rand) * 1.2);
+  }
+}
+
+/**
  * A route generator that advances in true position and emits noisy fixes.
  * Ski alternates 6-minute lifts (straight climbs) with zig-zag descents.
  */
@@ -124,8 +167,10 @@ const round = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
  * @param {number} opts.seconds   active recording length
  * @param {Array<[number, number]>} [opts.pauses]  [atSecond, durationSeconds]
  */
-export function generateJournal({ activity = 'run', seconds = 1800, pauses = [], startedAt = Date.UTC(2026, 0, 10, 15, 0, 0), seed = 7, noise = 3, stops = true, hasBarometer = true } = {}) {
+export function generateJournal({ activity = 'run', seconds = 1800, pauses = [], startedAt = Date.UTC(2026, 0, 10, 15, 0, 0), seed = 7, noise = 3, stops = true, hasBarometer = true, heartRate = false } = {}) {
   const route = new SyntheticRoute({ activity, seed, noise, stops });
+  const heart = heartRate ? new HeartModel({ seed: seed + 1 }) : null;
+  let prevAlt = null;
   const lines = [];
   const workoutId = `syn-${activity}-${seed}`;
   lines.push({ type: 'meta', v: 1, workoutId, activity, startedAt, autoPause: false, hasBarometer, device: 'synthetic' });
@@ -146,6 +191,11 @@ export function generateJournal({ activity = 'run', seconds = 1800, pauses = [],
       p.af = p.am;
     }
     lines.push({ type: 'pt', s: ++seq, ...p, seg });
+    if (heart) {
+      const grade = prevAlt == null ? 0 : ((p.af - prevAlt) / Math.max(0.5, p.sp)) * 100;
+      lines.push({ type: 'hr', t, bpm: heart.step(1, activity, p.sp, grade) });
+    }
+    prevAlt = p.af;
     if (pauseQueue.length && s === pauseQueue[0][0]) {
       const [, dur] = pauseQueue.shift();
       lines.push({ type: 'state', t, state: 'paused', reason: 'pause', seg });

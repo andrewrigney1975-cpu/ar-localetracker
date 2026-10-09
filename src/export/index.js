@@ -19,8 +19,9 @@ export function exportFileName(workout, ext) {
   return `locale_${workout.activity}_${stamp}.${ext}`;
 }
 
-export function renderExport(formatId, workout, track) {
+/** @param {{profile?: object}} [opts] profile enables calorie fields where a format has them */
+export function renderExport(formatId, workout, track, opts = {}) {
   const fmt = EXPORT_FORMATS.find((f) => f.id === formatId);
   if (!fmt) throw new Error(`Unknown export format ${formatId}`);
-  return { ...fmt, filename: exportFileName(workout, fmt.ext), content: fmt.fn(workout, track) };
+  return { ...fmt, filename: exportFileName(workout, fmt.ext), content: fmt.fn(workout, track, opts) };
 }

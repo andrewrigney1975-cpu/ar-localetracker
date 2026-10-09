@@ -86,6 +86,8 @@ export async function mount(root, params, _query, ctx) {
   let statusAt = performance.now();
   let compass = null;
   let gnss = { satsUsed: status.satsUsed ?? 0 };
+  // Heart rate from the watch (via the phone), shown only while fresh.
+  let heart = status.hr ? { bpm: status.hr, at: performance.now() } : null;
   let speedMode = s.liveSpeedMode[act.id] ?? act.liveSpeedMode;
   let busy = false;
   const climb = new ClimbCounter(verticalThreshold(Boolean(status.hasBarometer ?? true)));
@@ -104,7 +106,7 @@ export async function mount(root, params, _query, ctx) {
             <span class="gps-quality" data-ref="sats"></span>
           </div>
           <div class="metrics">
-            <div class="metric hero"><label>Elapsed time</label><div class="value" data-ref="elapsed">0:00</div></div>
+            <div class="metric hero"><label>Elapsed time</label><div class="hero-row"><div class="value" data-ref="elapsed">0:00</div><div class="hero-hr" data-ref="hr" hidden aria-label="Heart rate"><span aria-hidden="true">♥</span><b data-ref="hrValue">--</b><small>bpm</small></div></div></div>
             <div class="metric"><label>Distance</label><div class="value" data-ref="distance">0.00<small>${distanceUnit(units)}</small></div></div>
             <div class="metric"><label data-ref="speedLabel"></label><button class="value" data-ref="speed" aria-label="Toggle speed or pace"></button></div>
             <div class="metric"><label data-ref="headingLabel">Heading</label><div class="value heading-value"><span data-ref="headingArrow">${icons.arrowUp.replace('<svg', '<svg class="heading-arrow"')}</span><span data-ref="heading">–</span></div></div>
@@ -134,6 +136,9 @@ export async function mount(root, params, _query, ctx) {
 
   function renderTimer() {
     ref.elapsed.textContent = formatDuration(elapsedMs() / 1000);
+    const fresh = heart && performance.now() - heart.at < 15000;
+    ref.hr.hidden = !fresh;
+    if (fresh) ref.hrValue.textContent = String(heart.bpm);
   }
 
   function renderMetrics() {
@@ -377,6 +382,12 @@ export async function mount(root, params, _query, ctx) {
     })
   );
   d.add(
+    tracker.on('hr', (ev) => {
+      heart = { bpm: ev.bpm, at: performance.now() };
+      renderTimer();
+    })
+  );
+  d.add(
     tracker.on('gnss', (ev) => {
       gnss = ev;
       renderMetrics();
@@ -398,6 +409,7 @@ export async function mount(root, params, _query, ctx) {
     }
     status = st;
     statusAt = performance.now();
+    if (st.hr) heart = { bpm: st.hr, at: performance.now() };
     if (phase !== st.state) {
       phase = st.state;
       renderAll();

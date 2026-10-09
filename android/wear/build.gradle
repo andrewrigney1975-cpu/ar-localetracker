@@ -1,0 +1,55 @@
+// Locale for Wear OS: start/stop phone workouts from the watch and stream heart rate.
+// Shares the phone app's applicationId (required for the Wearable Data Layer).
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
+
+android {
+    namespace = "app.locale.exercisetracker.wear"
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId "app.locale.exercisetracker"
+        // Wear OS 5+ (health foreground-service type). Pixel Watch 3 ships with Wear OS 5.
+        minSdkVersion 34
+        targetSdkVersion 36
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildFeatures {
+        compose = true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    }
+}
+
+dependencies {
+    // Pinned to the Compose generation that supports AGP 8.x (Capacitor's toolchain);
+    // Compose 1.12+ / Wear Compose 1.7+ require AGP 9.1.
+    implementation "androidx.activity:activity-compose:1.12.4"
+    implementation "androidx.fragment:fragment:$androidxFragmentVersion"
+    implementation "androidx.wear.compose:compose-material3:1.6.2"
+    implementation "androidx.wear.compose:compose-foundation:1.6.2"
+    implementation "androidx.health:health-services-client:1.1.0"
+    implementation "com.google.android.gms:play-services-wearable:20.0.1"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.11.0"
+    implementation "androidx.lifecycle:lifecycle-service:2.10.0"
+    implementation "androidx.lifecycle:lifecycle-runtime-compose:2.10.0"
+    implementation "androidx.wear:wear-ongoing:1.1.0"
+    implementation "androidx.wear.tiles:tiles:1.6.2"
+    implementation "androidx.wear.protolayout:protolayout:1.4.2"
+    implementation "androidx.wear.protolayout:protolayout-expression:1.4.2"
+    implementation "androidx.concurrent:concurrent-futures:1.3.0"
+    implementation "androidx.core:core-ktx:$androidxCoreVersion"
+}

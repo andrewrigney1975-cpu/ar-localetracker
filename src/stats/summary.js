@@ -2,6 +2,7 @@
 
 import { activity as activityProfile } from '../activities.js';
 import { bbox as computeBbox, makeProjection, simplifyIndices } from '../geo/geo.js';
+import { heartRateStats } from './physio.js';
 
 export const STATIONARY_MIN_SECONDS = 5;
 
@@ -93,7 +94,7 @@ export function computeSplits(track, splitLen, hasBarometer) {
       const f = span > 0 ? (target - dist[i - 1]) / span : 1;
       const tAt = active[i - 1] + (active[i] - active[i - 1]) * f;
       const altAt = alt[i - 1] + (alt[i] - alt[i - 1]) * f;
-      splits.push(makeSplit(k, startD, target, startT, tAt, startAlt, altAt, alt, speed, startIdx, i + 1, th));
+      splits.push(makeSplit(k, startD, target, startT, tAt, startAlt, altAt, alt, speed, startIdx, i + 1, th, false, track.hr));
       startIdx = i;
       startD = target;
       startT = tAt;
@@ -102,17 +103,28 @@ export function computeSplits(track, splitLen, hasBarometer) {
     }
   }
   if (total - startD >= Math.min(50, splitLen * 0.05)) {
-    splits.push(makeSplit(k, startD, total, startT, active[n - 1], startAlt, alt[n - 1], alt, speed, startIdx, n, th, true));
+    splits.push(makeSplit(k, startD, total, startT, active[n - 1], startAlt, alt[n - 1], alt, speed, startIdx, n, th, true, track.hr));
   }
   return splits;
 }
 
-function makeSplit(index, d0, d1, t0, t1, alt0, alt1, alt, speed, from, to, th, partial = false) {
+function makeSplit(index, d0, d1, t0, t1, alt0, alt1, alt, speed, from, to, th, partial = false, hr = null) {
   const distance = d1 - d0;
   const time = Math.max(0, t1 - t0);
   const { gain, loss } = verticalGainLoss(alt, th, from, to);
   let maxSpeed = 0;
   for (let i = from; i < to; i++) if (speed[i] > maxSpeed) maxSpeed = speed[i];
+  let hrSum = 0;
+  let hrCount = 0;
+  let hrMax = 0;
+  if (hr) {
+    for (let i = from; i < to; i++) {
+      if (!Number.isFinite(hr[i])) continue;
+      hrSum += hr[i];
+      hrCount++;
+      if (hr[i] > hrMax) hrMax = hr[i];
+    }
+  }
   return {
     index,
     startDistance: d0,
@@ -124,6 +136,8 @@ function makeSplit(index, d0, d1, t0, t1, alt0, alt1, alt, speed, from, to, th, 
     elevChange: Number.isFinite(alt1 - alt0) ? alt1 - alt0 : 0,
     elevGain: gain,
     elevLoss: loss,
+    avgHr: hrCount ? hrSum / hrCount : null,
+    maxHr: hrCount ? hrMax : null,
     partial,
   };
 }
@@ -230,6 +244,8 @@ export function computeSummary(track, info) {
     hasBarometer: info.hasBarometer,
     bbox: n ? computeBbox(track.lat, track.lon, n) : null,
   };
+  const hr = heartRateStats(track);
+  if (hr) summary.heartRate = { avg: hr.avg, max: hr.max };
   if (act.id === 'ski' && n > 2) {
     const ski = analyzeSki(track, info.hasBarometer);
     summary.ski = {
@@ -285,6 +301,7 @@ export function distanceMarkers(track, splitLen) {
       lat: lerp(track.lat),
       lon: lerp(track.lon),
       alt: lerp(track.alt),
+      hr: track.hr ? lerp(track.hr) : NaN,
     });
   }
   return out;

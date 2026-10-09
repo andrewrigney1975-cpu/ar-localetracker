@@ -4,6 +4,7 @@ import { EXPORT_FORMATS, renderExport } from '../export/index.js';
 import { navigate } from '../router.js';
 import { shareTextFile } from '../services/share.js';
 import { settings, updateSettings } from '../settings.js';
+import { estimateCalories, loadLabel, profileComplete, trimp, ZONES, zoneSeconds } from '../stats/physio.js';
 import { computeSplits } from '../stats/summary.js';
 import { confirmDialog, openDialog } from '../ui/dialog.js';
 import { Disposer, el, escapeHtml } from '../ui/dom.js';
@@ -163,7 +164,7 @@ export async function mount(root, params, query, ctx) {
     });
     if (!fmt) return;
     try {
-      const out = renderExport(fmt, w, track);
+      const out = renderExport(fmt, w, track, { profile: settings().profile });
       await shareTextFile({ filename: out.filename, content: out.content, mime: out.mime, title: w.name });
     } catch (e) {
       console.error(e);
@@ -222,10 +223,56 @@ function renderSummary(panel, w, track, units) {
   panel.innerHTML = `
     <div class="page">
       <div class="stat-grid num" style="margin-top:12px">${rows.join('')}</div>
+      ${effortHTML(w, track)}
       <div class="card mini-profile">${miniProfileSVG(track)}</div>
       ${w.notes ? `<div class="card notes">${escapeHtml(w.notes)}</div>` : ''}
       <p class="about">Altitude source: ${sm.hasBarometer ? 'barometer anchored to GPS' : 'GPS only'} · ${sm.pointCount.toLocaleString()} points${sm.segments > 1 ? ` · ${sm.segments} segments` : ''}${w.device ? ` · ${escapeHtml(w.device)}` : ''}</p>
     </div>`;
+}
+
+/** Heart rate, calories, cardio load and time in zones. */
+function effortHTML(w, track) {
+  const profile = settings().profile;
+  const sm = w.summary;
+  const hr = sm.heartRate;
+  const complete = profileComplete(profile);
+  const cal = estimateCalories(track, w.activity, profile, w.startedAt);
+  const load = hr ? trimp(track, profile, w.startedAt) : null;
+  const zones = hr ? zoneSeconds(track, profile, w.startedAt) : null;
+  const tiles = [];
+  if (hr) {
+    tiles.push(statHTML('Avg heart rate', Math.round(hr.avg), 'bpm'));
+    if (hr.max) tiles.push(statHTML('Max heart rate', Math.round(hr.max), 'bpm'));
+  }
+  if (cal) tiles.push(statHTML(cal.method === 'activity' ? 'Calories (est.)' : 'Calories', Math.round(cal.kcal).toLocaleString(), 'kcal'));
+  if (load != null) tiles.push(statHTML('Cardio load', Math.round(load), loadLabel(load)));
+  const hint = !complete
+    ? `<p class="effort-hint">Add your sex, birth year and weight in <a href="#/settings">Settings → Profile</a> to estimate calories${hr ? ', heart-rate zones and cardio load' : ''}.</p>`
+    : '';
+  if (!tiles.length && !hint) return '';
+  let zoneBlock = '';
+  const total = zones ? zones.slice(1).reduce((a, b) => a + b, 0) : 0;
+  if (zones && total > 0) {
+    zoneBlock = `
+      <div class="card zones">
+        <div class="zones-title">Time in heart-rate zones</div>
+        ${ZONES.slice()
+          .reverse()
+          .map((z) => {
+            const secs = zones[z.id];
+            const pct = (secs / total) * 100;
+            return `<div class="zone-row"><span class="zone-name">Z${z.id} ${z.label}</span>
+              <span class="zone-bar"><i style="width:${Math.max(pct > 0 ? 2 : 0, pct).toFixed(1)}%;background:${z.color}"></i></span>
+              <span class="zone-time num">${formatDuration(Math.round(secs))}</span></div>`;
+          })
+          .join('')}
+      </div>`;
+  }
+  return `
+    ${tiles.length ? `<div class="section-title">Effort</div><div class="stat-grid num">${tiles.join('')}</div>` : ''}
+    ${zoneBlock}
+    ${hint}
+    ${cal || load != null ? '<p class="about">Calories use the Keytel (2005) heart-rate equation, or activity, speed and slope when heart rate is missing. Cardio load is Banister TRIMP. Both are estimates.</p>' : ''}`;
 }
 
 function miniProfileSVG(track) {
@@ -268,10 +315,11 @@ function renderSplits(panel, w, track, units, preferSpeed) {
   const slowest = Math.min(...speeds);
   const au = altitudeUnit(units);
   const unit = distanceUnit(units);
+  const withHr = splits.some((sp) => sp.avgHr != null);
   panel.innerHTML = `
     <div class="page">
       <table class="splits-table">
-        <thead><tr><th>${unit}</th><th>${preferSpeed ? speedUnit(units) : `Pace ${paceUnit(units)}`}</th><th>Elev ${au}</th><th></th><th>Time</th></tr></thead>
+        <thead><tr><th>${unit}</th><th>${preferSpeed ? speedUnit(units) : `Pace ${paceUnit(units)}`}</th><th>Elev ${au}</th>${withHr ? '<th>♥</th>' : ''}<th></th><th>Time</th></tr></thead>
         <tbody>
           ${splits
             .map((sp) => {
@@ -281,7 +329,7 @@ function renderSplits(panel, w, track, units, preferSpeed) {
               const width = fastest > 0 ? Math.max(6, (sp.avgSpeed / fastest) * 100) : 0;
               const cls = !sp.partial && full.length > 1 ? (sp.avgSpeed === fastest ? 'fast' : sp.avgSpeed === slowest ? 'slow' : '') : '';
               return `<tr class="${sp.partial ? 'partial' : ''}">
-                <td>${label}</td><td>${perf}</td><td>${elev > 0 ? '+' : ''}${elev}</td>
+                <td>${label}</td><td>${perf}</td><td>${elev > 0 ? '+' : ''}${elev}</td>${withHr ? `<td>${sp.avgHr != null ? Math.round(sp.avgHr) : '–'}</td>` : ''}
                 <td class="bar-cell"><div class="split-bar ${cls}" style="width:${width}%"></div></td>
                 <td>${formatDuration(Math.round(sp.time))}</td></tr>`;
             })

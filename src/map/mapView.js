@@ -221,6 +221,7 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
       ['Alt', formatAltitude(s.alt, units)],
       ['', speedTxt],
       ['Grade', `${grade >= 0 ? '+' : ''}${grade.toFixed(1)}%`],
+      ...(Number.isFinite(s.hr) ? [['♥', `${Math.round(s.hr)}`]] : []),
     ]
       .map(([k, v]) => `<span>${k ? `${k} ` : ''}<b>${escapeHtml(v)}</b></span>`)
       .join('');

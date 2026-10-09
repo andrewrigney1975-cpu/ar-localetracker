@@ -5,7 +5,7 @@ import { bearing, destination, haversine } from '../geo/geo.js';
 import { processJournal } from '../geo/process.js';
 import { computeSummary } from '../stats/summary.js';
 import { parseJournal } from '../tracker/journal.js';
-import { mulberry32 } from '../tracker/synthetic.js';
+import { HeartModel, mulberry32 } from '../tracker/synthetic.js';
 import course from './city2surf-course.json';
 
 export const CITY2SURF_SAMPLE_ID = 'sample-city2surf-2026';
@@ -106,6 +106,7 @@ export function generateCity2SurfJournal({ seed = 2026, startedAt = CITY2SURF_ST
   let t = startedAt;
   let seq = 0;
   let phase = rand() * 10;
+  const heart = new HeartModel({ rest: 56, max: 184, seed: seed + 7 });
   while (s < total) {
     t += 1000;
     const k = Math.min(paces.length - 1, Math.floor(s / 1000));
@@ -115,6 +116,9 @@ export function generateCity2SurfJournal({ seed = 2026, startedAt = CITY2SURF_ST
     s = Math.min(total, s + v);
     const p = sampleCourse(pts, cum, s);
     const ahead = sampleCourse(pts, cum, Math.min(total, s + 15));
+    const behind = sampleCourse(pts, cum, Math.max(0, s - 25));
+    const gradePct = ((sampleCourse(pts, cum, Math.min(total, s + 25)).ele - behind.ele) / 50) * 100;
+    const bpm = heart.step(1, 'run', v, gradePct);
     const heading = bearing(p.lat, p.lon, ahead.lat, ahead.lon);
 
     const ha = 3 + Math.abs(gaussian(rand)) * 1.2;
@@ -145,6 +149,7 @@ export function generateCity2SurfJournal({ seed = 2026, startedAt = CITY2SURF_ST
       sv: 24 + Math.floor(rand() * 9),
       seg: 0,
     });
+    lines.push({ type: 'hr', t, bpm });
   }
   lines.push({ type: 'state', t, state: 'idle', reason: 'stop', seg: 0 });
   lines.push({ type: 'end', t });

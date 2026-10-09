@@ -3,7 +3,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { activity as activityProfile } from '../activities.js';
 import { haversine } from '../geo/geo.js';
-import { SyntheticRoute } from './synthetic.js';
+import { HeartModel, SyntheticRoute } from './synthetic.js';
 
 const Native = registerPlugin('LocaleTracker');
 
@@ -34,6 +34,8 @@ function nativeTracker() {
     },
     deleteJournal: (workoutId) => Native.deleteJournal({ workoutId }),
     setKeepScreenOn: (enabled) => Native.setKeepScreenOn({ enabled }),
+    getWatchStatus: () => Native.getWatchStatus(),
+    requestBackgroundLocation: () => Native.requestBackgroundLocation(),
     requestIgnoreBatteryOptimizations: () => Native.requestIgnoreBatteryOptimizations(),
     openAppSettings: () => Native.openAppSettings(),
     openLocationSettings: () => Native.openLocationSettings(),
@@ -60,6 +62,8 @@ function simTracker() {
   let warmTimer = null;
   let headingTimer = null;
   let route = null;
+  let heart = null;
+  let prevAlt = null;
   let simClock = 0;
   let anchor = null;
 
@@ -87,6 +91,7 @@ function simTracker() {
     hasBarometer: true,
     satsUsed: 21,
     satsVisible: 34,
+    hr: st.hr,
     last: st.last,
   });
   function setState(next, reason) {
@@ -103,6 +108,13 @@ function simTracker() {
     delete p._trueDist;
     const act = activityProfile(st.activity);
     st.last = { t: p.t, lat: p.lat, lon: p.lon, accuracy: p.ha, altitude: p.af, speed: p.sp, bearing: p.br };
+    // Simulated watch heart rate.
+    const grade = prevAlt == null ? 0 : ((p.af - prevAlt) / Math.max(0.5, p.sp)) * 100;
+    prevAlt = p.af;
+    const bpm = heart.step(1, st.activity, st.state === 'paused' ? 0 : p.sp, grade);
+    st.hr = bpm;
+    if (st.state !== 'paused') append(st.workoutId, { type: 'hr', t: p.t, bpm });
+    emit('hr', { bpm, t: p.t });
     if (st.state !== 'paused') {
       st.seq++;
       append(st.workoutId, { type: 'pt', s: st.seq, ...p, seg: st.segment, ...(st.state === 'autopaused' ? { p: 1 } : {}) });
@@ -140,6 +152,8 @@ function simTracker() {
       clearInterval(warmTimer);
       simClock = Date.now();
       route = new SyntheticRoute({ activity, ...START, seed: Date.now() % 1000 });
+      heart = new HeartModel({ seed: Date.now() % 997 });
+      prevAlt = null;
       st = { ...idleState(), workoutId, activity, startedAt: simClock };
       anchor = null;
       if (!resume) {
@@ -231,6 +245,12 @@ function simTracker() {
       return { deleted: true };
     },
     async setKeepScreenOn() {},
+    async getWatchStatus() {
+      return { supported: true, connected: true, watches: [{ name: 'Simulated watch', nearby: true }], backgroundLocation: true };
+    },
+    async requestBackgroundLocation() {
+      return { granted: true };
+    },
     async requestIgnoreBatteryOptimizations() {},
     async openAppSettings() {},
     async openLocationSettings() {},

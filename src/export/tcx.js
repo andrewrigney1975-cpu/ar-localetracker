@@ -1,9 +1,10 @@
 import { activity } from '../activities.js';
+import { estimateCalories } from '../stats/physio.js';
 import { computeSplits } from '../stats/summary.js';
 import { esc, fixed, iso } from './xml.js';
 
-/** Garmin Training Center XML v2. One lap per 1 km split. */
-export function toTCX(workout, track) {
+/** Garmin Training Center XML v2. One lap per 1 km split; heart rate and calories when available. */
+export function toTCX(workout, track, { profile } = {}) {
   const sport = activity(workout.activity).tcxSport;
   const total = track.n ? track.dist[track.n - 1] : 0;
   let splits = computeSplits(track, 1000, workout.summary?.hasBarometer);
@@ -31,7 +32,9 @@ export function toTCX(workout, track) {
     lines.push(`        <TotalTimeSeconds>${fixed(lap.time, 1)}</TotalTimeSeconds>`);
     lines.push(`        <DistanceMeters>${fixed(lap.endDistance - lap.startDistance, 1)}</DistanceMeters>`);
     lines.push(`        <MaximumSpeed>${fixed(lap.maxSpeed, 2)}</MaximumSpeed>`);
-    lines.push('        <Calories>0</Calories>');
+    lines.push(`        <Calories>${lapCalories(track, from, i, workout, profile)}</Calories>`);
+    if (lap.avgHr != null) lines.push(`        <AverageHeartRateBpm><Value>${Math.round(lap.avgHr)}</Value></AverageHeartRateBpm>`);
+    if (lap.maxHr != null) lines.push(`        <MaximumHeartRateBpm><Value>${Math.round(lap.maxHr)}</Value></MaximumHeartRateBpm>`);
     lines.push('        <Intensity>Active</Intensity>');
     lines.push('        <TriggerMethod>Distance</TriggerMethod>');
     if (i > from) {
@@ -46,6 +49,9 @@ export function toTCX(workout, track) {
         const ele = fixed(track.alt[k], 1);
         if (ele != null) lines.push(`            <AltitudeMeters>${ele}</AltitudeMeters>`);
         lines.push(`            <DistanceMeters>${fixed(track.dist[k], 1)}</DistanceMeters>`);
+        if (track.hr && Number.isFinite(track.hr[k])) {
+          lines.push(`            <HeartRateBpm><Value>${Math.round(track.hr[k])}</Value></HeartRateBpm>`);
+        }
         const speed = fixed(track.speed[k], 2);
         if (speed != null) lines.push(`            <Extensions><ns3:TPX><ns3:Speed>${speed}</ns3:Speed></ns3:TPX></Extensions>`);
         lines.push('          </Trackpoint>');
@@ -63,4 +69,14 @@ export function toTCX(workout, track) {
   lines.push('  </Activities>');
   lines.push('</TrainingCenterDatabase>');
   return lines.join('\n') + '\n';
+}
+
+/** Calories for track indices [from, to); 0 without a complete profile. */
+function lapCalories(track, from, to, workout, profile) {
+  if (!profile || to - from < 2) return 0;
+  const slice = {};
+  for (const [k, v] of Object.entries(track)) slice[k] = ArrayBuffer.isView(v) ? v.subarray(from, to) : v;
+  slice.n = to - from;
+  const est = estimateCalories(slice, workout.activity, profile, workout.startedAt);
+  return est ? Math.round(est.kcal) : 0;
 }

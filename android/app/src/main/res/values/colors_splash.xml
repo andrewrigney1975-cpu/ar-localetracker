@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Splash screen background (the launcher icon itself has a transparent background). -->
+    <color name="splash_background">#0D1217</color>
+</resources>

@@ -59,6 +59,7 @@ export function markerInfoHTML({ title, sample, units }) {
     ['Longitude', formatCoord(sample.lon, 'lon')],
     ['Altitude', formatAltitude(sample.alt, units)],
   ];
+  if (Number.isFinite(sample.hr)) rows.push(['Heart rate', `${Math.round(sample.hr)} bpm`]);
   if (sample.extra) rows.push(...sample.extra);
   return `
     <h3><span>${escapeHtml(title)}</span><button data-close aria-label="Close">×</button></h3>

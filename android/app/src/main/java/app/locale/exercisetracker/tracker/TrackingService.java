@@ -64,6 +64,8 @@ public class TrackingService extends Service {
     private static final long NOTIFICATION_INTERVAL_MS = 5000;
     private static final long SNAPSHOT_INTERVAL_MS = 10000;
     private static final long GNSS_EMIT_INTERVAL_MS = 2000;
+    private static final long WEAR_PUSH_INTERVAL_MS = 2000;
+    private static final long HR_FRESH_MS = 15000;
     /** Wake lock is held in short leases, renewed on every fix, so it can never leak. */
     private static final long WAKE_LEASE_MS = 10 * 60 * 1000;
 
@@ -113,6 +115,9 @@ public class TrackingService extends Service {
     private long slowSinceRealtime;
     private int fastFixes;
     private int satsUsed;
+    private int lastHr;
+    private long lastHrAt;
+    private long lastWearPushMs;
     private int satsVisible;
     private double meanCn0;
     private long lastNotificationMs;
@@ -269,6 +274,11 @@ public class TrackingService extends Service {
             put(meta, "sdk", android.os.Build.VERSION.SDK_INT);
             journal.append(meta, true);
         }
+        WearListenerService.clearStartPrompt(this);
+        synchronized (this) {
+            lastHr = 0;
+            lastHrAt = 0;
+        }
         wakeLock.acquire(WAKE_LEASE_MS);
         registerSensors();
         setState(State.RECORDING, resume ? "restored" : "start");
@@ -356,6 +366,7 @@ public class TrackingService extends Service {
         JSObject ev = snapshot();
         ev.put("reason", reason);
         TrackerHub.emit("state", ev);
+        pushWearStatus(true);
     }
 
     // ---- Location ---------------------------------------------------------------------------
@@ -430,6 +441,55 @@ public class TrackingService extends Service {
 
         if (nowMs - lastNotificationMs >= NOTIFICATION_INTERVAL_MS) updateNotification(false);
         if (nowMs - lastSnapshotMs >= SNAPSHOT_INTERVAL_MS) saveSnapshot();
+        pushWearStatus(false);
+    }
+
+    // ---- Watch ------------------------------------------------------------------------------
+
+    /** Heart-rate sample from the watch (any thread). Journaled while recording. */
+    void onHeartRate(long t, int bpm) {
+        if (bpm < 25 || bpm > 240 || t <= 0) return;
+        handler.post(() -> {
+            if (state == State.IDLE) return;
+            synchronized (this) {
+                if (t >= lastHrAt) {
+                    lastHr = bpm;
+                    lastHrAt = t;
+                }
+            }
+            if (state != State.PAUSED && journal != null) {
+                JSONObject line = new JSONObject();
+                put(line, "type", "hr");
+                put(line, "t", t);
+                put(line, "bpm", bpm);
+                journal.append(line, false);
+            }
+            JSObject ev = new JSObject();
+            ev.put("bpm", bpm);
+            ev.put("t", t);
+            TrackerHub.emit("hr", ev);
+        });
+    }
+
+    /** Send the current status to the watch, throttled unless forced. */
+    void pushWearStatus(boolean force) {
+        long now = System.currentTimeMillis();
+        if (!force && now - lastWearPushMs < WEAR_PUSH_INTERVAL_MS) return;
+        lastWearPushMs = now;
+        JSONObject o = new JSONObject();
+        synchronized (this) {
+            put(o, "state", stateName(state));
+            put(o, "workoutId", workoutId);
+            put(o, "activity", profile.id);
+            put(o, "startedAt", startedAt);
+            put(o, "elapsedMs", elapsedMs());
+            put(o, "distance", distanceM);
+            put(o, "units", units);
+            put(o, "t", now);
+            if (lastLocation != null && lastLocation.hasSpeed()) put(o, "speed", (double) lastLocation.getSpeed());
+            if (now - lastHrAt < HR_FRESH_MS) put(o, "hr", lastHr);
+        }
+        WearSync.send(this, WearSync.PATH_STATUS, o);
     }
 
     private float derivedSpeed(Location loc) {
@@ -599,6 +659,7 @@ public class TrackingService extends Service {
         o.put("hasBarometer", pressureSensor != null);
         o.put("satsUsed", satsUsed);
         o.put("satsVisible", satsVisible);
+        if (System.currentTimeMillis() - lastHrAt < HR_FRESH_MS) o.put("hr", lastHr);
         if (lastLocation != null) o.put("last", LocaleTrackerPlugin.locationToJs(lastLocation, lastFusedAlt));
         return o;
     }
@@ -668,6 +729,9 @@ public class TrackingService extends Service {
         } else {
             title = profile.label + " · Recording";
             text = distText;
+        }
+        if (s != State.IDLE && override == null && System.currentTimeMillis() - lastHrAt < HR_FRESH_MS) {
+            text = text + " · ♥ " + lastHr;
         }
 
         Notification.Builder b = new Notification.Builder(this, CHANNEL_ID)

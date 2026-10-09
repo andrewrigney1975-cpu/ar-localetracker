@@ -2,7 +2,9 @@ import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
 import { settings, updateSettings } from '../settings.js';
 import { tracker } from '../tracker/client.js';
-import { Disposer } from '../ui/dom.js';
+import { maxHeartRate } from '../stats/physio.js';
+import { Disposer, escapeHtml } from '../ui/dom.js';
+import { toast } from '../ui/toast.js';
 import { App } from '@capacitor/app';
 
 const MAP_STYLE_LABELS = { streets: 'Streets', light: 'Light', dark: 'Dark', topo: 'Topo' };
@@ -17,11 +19,22 @@ export async function mount(root) {
   const d = new Disposer();
   const render = async () => {
     const s = settings();
-    const [caps, perms, workouts] = await Promise.all([
+    const [caps, perms, workouts, watch] = await Promise.all([
       tracker.getCapabilities().catch(() => null),
       tracker.checkPermissions().catch(() => null),
       listWorkouts().catch(() => []),
+      tracker.getWatchStatus().catch(() => null),
     ]);
+    const p = s.profile;
+    const imperial = s.units === 'imperial';
+    const weightShown = p.weightKg ? Math.round(imperial ? p.weightKg * 2.20462 : p.weightKg) : '';
+    const estMax = maxHeartRate({ ...p, maxHr: null });
+    const watchName = watch?.watches?.[0]?.name;
+    const watchText = !watch?.supported
+      ? 'Wear OS not available on this phone'
+      : watchName
+        ? `${escapeHtml(watchName)} · ${watch.connected ? 'connected' : 'not nearby'}`
+        : 'Install Locale on your Wear OS watch';
     root.innerHTML = `
       <div class="screen">
         <header class="topbar"><h1>Settings</h1></header>
@@ -35,6 +48,28 @@ export async function mount(root) {
                 ${segmented('theme', [['system', 'Auto'], ['light', 'Light'], ['dark', 'Dark']], s.theme)}</div>
               <label class="setting"><span class="text">Keep screen on<small>While the live workout screen is open</small></span>
                 <input type="checkbox" class="switch" data-toggle="keepScreenOn" ${s.keepScreenOn ? 'checked' : ''} /></label>
+            </div>
+
+            <div class="section-title">Profile</div>
+            <div class="card settings-group">
+              <div class="setting"><div class="text">Sex<small>Used for calories and cardio load</small></div>
+                ${segmented('profile.sex', [['male', 'Male'], ['female', 'Female']], p.sex)}</div>
+              <label class="setting"><span class="text">Birth year</span>
+                <input class="num-input" type="number" inputmode="numeric" min="1900" max="2025" data-profile="birthYear" value="${p.birthYear ?? ''}" placeholder="1985" /></label>
+              <label class="setting"><span class="text">Weight</span>
+                <span class="input-unit"><input class="num-input" type="number" inputmode="decimal" min="20" max="300" step="0.5" data-profile="weight" value="${weightShown}" placeholder="${imperial ? '165' : '75'}" />${imperial ? 'lb' : 'kg'}</span></label>
+              <label class="setting"><span class="text">Resting heart rate<small>Optional · default 60</small></span>
+                <span class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="30" max="120" data-profile="restingHr" value="${p.restingHr ?? ''}" placeholder="60" />bpm</span></label>
+              <label class="setting"><span class="text">Max heart rate<small>Optional · ${estMax ? `estimated ${estMax} from age` : 'estimated from age'}</small></span>
+                <span class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="120" max="230" data-profile="maxHr" value="${p.maxHr ?? ''}" placeholder="${estMax ?? '185'}" />bpm</span></label>
+            </div>
+
+            <div class="section-title">Watch</div>
+            <div class="card settings-group">
+              <div class="setting"><div class="text">Wear OS watch<small>${watchText}</small></div>
+                <span class="${watch?.connected ? 'status-ok' : 'status-bad'}">${watch?.connected ? 'Ready' : 'Offline'}</span></div>
+              <div class="setting"><div class="text">Start from watch<small>${watch?.backgroundLocation ? 'Workouts can start from the watch while Locale is closed' : 'Needs location "Allow all the time". Without it, the watch asks you to tap a notification on the phone.'}</small></div>
+                ${watch?.backgroundLocation ? '<span class="status-ok">Allowed</span>' : '<button class="btn ghost" data-act="bglocation">Allow</button>'}</div>
             </div>
 
             <div class="section-title">Auto-pause</div>
@@ -80,11 +115,39 @@ export async function mount(root) {
     root.querySelectorAll('[data-seg]').forEach((group) =>
       group.querySelectorAll('button').forEach((b) =>
         b.addEventListener('click', async () => {
-          await updateSettings({ [group.dataset.seg]: b.dataset.v });
+          const key = group.dataset.seg;
+          if (key.startsWith('profile.')) await updateSettings({ profile: { ...settings().profile, [key.slice(8)]: b.dataset.v } });
+          else await updateSettings({ [key]: b.dataset.v });
           render();
         })
       )
     );
+    root.querySelectorAll('[data-profile]').forEach((input) =>
+      input.addEventListener('change', async () => {
+        const raw = input.value.trim();
+        let v = raw === '' ? null : Number(raw);
+        if (v != null && (!Number.isFinite(v) || v < Number(input.min) || v > Number(input.max))) {
+          toast(`Enter a value between ${input.min} and ${input.max}`);
+          input.value = '';
+          v = null;
+        }
+        const field = input.dataset.profile;
+        const profile = { ...settings().profile };
+        if (field === 'weight') profile.weightKg = v == null ? null : imperial ? Math.round((v / 2.20462) * 10) / 10 : v;
+        else profile[field] = v == null ? null : Math.round(v);
+        await updateSettings({ profile });
+        if (field === 'birthYear' || field === 'maxHr') render();
+      })
+    );
+    root.querySelector('[data-act="bglocation"]')?.addEventListener('click', async () => {
+      try {
+        const res = await tracker.requestBackgroundLocation();
+        if (!res.granted) toast(`Choose "Allow all the time" for Locale's location permission`);
+      } catch (e) {
+        toast(e?.message ?? 'Allow location access first');
+      }
+      render();
+    });
     root.querySelector('[data-toggle="keepScreenOn"]').addEventListener('change', (e) => updateSettings({ keepScreenOn: e.target.checked }));
     root.querySelector('[data-toggle="satellite3d"]').addEventListener('change', (e) => updateSettings({ satellite3d: e.target.checked }));
     root.querySelectorAll('[data-autopause]').forEach((c) =>

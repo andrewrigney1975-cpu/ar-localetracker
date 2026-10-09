@@ -42,13 +42,15 @@ import org.json.JSONException;
     name = "LocaleTracker",
     permissions = {
         @Permission(alias = "location", strings = { Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION }),
-        @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS })
+        @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS }),
+        @Permission(alias = "backgroundLocation", strings = { Manifest.permission.ACCESS_BACKGROUND_LOCATION })
     }
 )
 public class LocaleTrackerPlugin extends Plugin {
     private static final long HEADING_EMIT_MS = 200;
 
     private volatile boolean inForeground = true;
+    private static volatile boolean appVisible = false;
     private FusedLocationProviderClient fused;
     private LocationManager locationManager;
     private SensorManager sensorManager;
@@ -78,12 +80,14 @@ public class LocaleTrackerPlugin extends Plugin {
     @Override
     protected void handleOnPause() {
         inForeground = false;
+        appVisible = false;
         unregisterHeading();
     }
 
     @Override
     protected void handleOnResume() {
         inForeground = true;
+        appVisible = true;
         if (headingRequested) registerHeading();
     }
 
@@ -92,6 +96,54 @@ public class LocaleTrackerPlugin extends Plugin {
         TrackerHub.setListener(null);
         stopWarmupInternal();
         unregisterHeading();
+    }
+
+    /** True while the app's activity is resumed (used to decide if a watch start can run directly). */
+    static boolean isAppVisible() {
+        return appVisible;
+    }
+
+    // ---- Watch ------------------------------------------------------------------------------
+
+    @PluginMethod
+    public void getWatchStatus(PluginCall call) {
+        com.google.android.gms.wearable.Wearable.getCapabilityClient(getContext())
+            .getCapability(WearSync.CAPABILITY_WEAR, com.google.android.gms.wearable.CapabilityClient.FILTER_ALL)
+            .addOnCompleteListener(task -> {
+                JSObject o = new JSObject();
+                JSArray watches = new JSArray();
+                boolean reachable = false;
+                if (task.isSuccessful()) {
+                    for (com.google.android.gms.wearable.Node n : task.getResult().getNodes()) {
+                        JSObject w = new JSObject();
+                        w.put("name", n.getDisplayName());
+                        w.put("nearby", n.isNearby());
+                        watches.put(w);
+                        reachable |= n.isNearby();
+                    }
+                }
+                o.put("supported", task.isSuccessful());
+                o.put("watches", watches);
+                o.put("connected", reachable);
+                o.put("backgroundLocation", getPermissionState("backgroundLocation") == PermissionState.GRANTED);
+                call.resolve(o);
+            });
+    }
+
+    @PluginMethod
+    public void requestBackgroundLocation(PluginCall call) {
+        if (getPermissionState("location") != PermissionState.GRANTED) {
+            call.reject("Grant location access first", "permission");
+            return;
+        }
+        requestPermissionForAlias("backgroundLocation", call, "backgroundLocationResult");
+    }
+
+    @com.getcapacitor.annotation.PermissionCallback
+    private void backgroundLocationResult(PluginCall call) {
+        JSObject o = new JSObject();
+        o.put("granted", getPermissionState("backgroundLocation") == PermissionState.GRANTED);
+        call.resolve(o);
     }
 
     // ---- Capabilities & system settings -----------------------------------------------------

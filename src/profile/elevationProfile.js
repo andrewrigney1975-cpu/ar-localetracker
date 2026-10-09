@@ -4,7 +4,8 @@ import { sampleAtDistance } from '../geo/process.js';
 import { cssVar } from '../ui/dom.js';
 import { altitudeUnit, altitudeValue, distanceValue } from '../units.js';
 
-const PAD = { l: 46, r: 12, t: 14, b: 22 };
+const PAD_BASE = { l: 46, r: 12, t: 14, b: 22 };
+const HR_COLOR = '#e5484d';
 
 export class ElevationProfile {
   /**
@@ -25,6 +26,9 @@ export class ElevationProfile {
     this.ctx = this.canvas.getContext('2d');
     this.total = track.n ? track.dist[track.n - 1] : 0;
     this.computeRange();
+    this.computeHrRange();
+    // Leave room for a right-hand heart-rate axis when there is HR data.
+    this.pad = { ...PAD_BASE, r: this.hrMin != null ? 40 : PAD_BASE.r };
 
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(container);
@@ -67,6 +71,77 @@ export class ElevationProfile {
     this.altMax = mid + span * 0.6;
   }
 
+  computeHrRange() {
+    this.hrMin = null;
+    this.hrMax = null;
+    const hr = this.track.hr;
+    if (!hr) return;
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = 0; i < hr.length; i++) {
+      if (!Number.isFinite(hr[i])) continue;
+      if (hr[i] < lo) lo = hr[i];
+      if (hr[i] > hi) hi = hr[i];
+    }
+    if (!Number.isFinite(lo)) return;
+    this.hrMin = Math.floor((lo - 5) / 10) * 10;
+    this.hrMax = Math.ceil((hi + 5) / 10) * 10;
+    // Centered ~10-sample moving average for drawing; the cursor readout uses raw values.
+    const n = hr.length;
+    const w = 5;
+    this.hrSmooth = new Float32Array(n).fill(NaN);
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      let c = 0;
+      for (let k = Math.max(0, i - w); k <= Math.min(n - 1, i + w); k++) {
+        if (Number.isFinite(hr[k])) {
+          sum += hr[k];
+          c++;
+        }
+      }
+      if (c) this.hrSmooth[i] = sum / c;
+    }
+  }
+
+  yHr(bpm) {
+    return this.pad.t + (1 - (bpm - this.hrMin) / (this.hrMax - this.hrMin)) * (this.h - this.pad.t - this.pad.b);
+  }
+
+  drawHeartRate(step) {
+    const { ctx, track } = this;
+    if (this.hrMin == null) return;
+    ctx.save();
+    ctx.strokeStyle = HR_COLOR;
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let pen = false;
+    for (let i = 0; i < track.n; i += step) {
+      const h = this.hrSmooth[i];
+      if (!Number.isFinite(h)) {
+        pen = false;
+        continue;
+      }
+      const x = this.x(track.dist[i]);
+      const y = this.yHr(h);
+      if (pen) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+      pen = true;
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = HR_COLOR;
+    ctx.font = '600 10px "Google Sans Variable", system-ui, Roboto, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const xr = this.w - this.pad.r + 6;
+    ctx.fillText(`${this.hrMax}`, xr, this.yHr(this.hrMax));
+    ctx.fillText(`${this.hrMin}`, xr, this.yHr(this.hrMin));
+    ctx.fillText('♥', xr, (this.yHr(this.hrMax) + this.yHr(this.hrMin)) / 2);
+    ctx.restore();
+  }
+
   resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const w = this.container.clientWidth;
@@ -81,15 +156,15 @@ export class ElevationProfile {
   }
 
   x(d) {
-    return PAD.l + (this.total > 0 ? d / this.total : 0) * (this.w - PAD.l - PAD.r);
+    return this.pad.l + (this.total > 0 ? d / this.total : 0) * (this.w - this.pad.l - this.pad.r);
   }
 
   y(a) {
-    return PAD.t + (1 - (a - this.altMin) / (this.altMax - this.altMin)) * (this.h - PAD.t - PAD.b);
+    return this.pad.t + (1 - (a - this.altMin) / (this.altMax - this.altMin)) * (this.h - this.pad.t - this.pad.b);
   }
 
   distAtX(px) {
-    const f = (px - PAD.l) / (this.w - PAD.l - PAD.r);
+    const f = (px - this.pad.l) / (this.w - this.pad.l - this.pad.r);
     return Math.max(0, Math.min(1, f)) * this.total;
   }
 
@@ -125,29 +200,29 @@ export class ElevationProfile {
     for (const tv of ticks) {
       const m = this.units === 'imperial' ? tv / 3.28084 : tv;
       const yy = Math.round(this.y(m)) + 0.5;
-      if (yy < PAD.t - 2 || yy > h - PAD.b + 2) continue;
+      if (yy < this.pad.t - 2 || yy > h - this.pad.b + 2) continue;
       ctx.beginPath();
-      ctx.moveTo(PAD.l, yy);
-      ctx.lineTo(w - PAD.r, yy);
+      ctx.moveTo(this.pad.l, yy);
+      ctx.lineTo(w - this.pad.r, yy);
       ctx.stroke();
-      ctx.fillText(`${Math.round(tv)}${altitudeUnit(this.units)}`, PAD.l - 6, yy);
+      ctx.fillText(`${Math.round(tv)}${altitudeUnit(this.units)}`, this.pad.l - 6, yy);
     }
 
     // Split ticks along the x axis.
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const splitCount = Math.floor(this.total / this.splitLen);
-    const every = Math.max(1, Math.ceil(splitCount / Math.max(1, Math.floor((w - PAD.l) / 34))));
+    const every = Math.max(1, Math.ceil(splitCount / Math.max(1, Math.floor((w - this.pad.l) / 34))));
     for (let k = every; k <= splitCount; k += every) {
       const xx = Math.round(this.x(k * this.splitLen)) + 0.5;
       ctx.beginPath();
-      ctx.moveTo(xx, h - PAD.b);
-      ctx.lineTo(xx, h - PAD.b + 4);
+      ctx.moveTo(xx, h - this.pad.b);
+      ctx.lineTo(xx, h - this.pad.b + 4);
       ctx.stroke();
-      ctx.fillText(String(k), xx, h - PAD.b + 6);
+      ctx.fillText(String(k), xx, h - this.pad.b + 6);
     }
     ctx.textAlign = 'left';
-    ctx.fillText(this.units === 'imperial' ? 'mi' : 'km', 6, h - PAD.b + 6);
+    ctx.fillText(this.units === 'imperial' ? 'mi' : 'km', 6, h - this.pad.b + 6);
 
     if (track.n < 2) return;
 
@@ -157,10 +232,10 @@ export class ElevationProfile {
     ctx.moveTo(this.x(track.dist[0]), this.y(track.alt[0]));
     for (let i = step; i < track.n; i += step) ctx.lineTo(this.x(track.dist[i]), this.y(track.alt[i]));
     ctx.lineTo(this.x(track.dist[track.n - 1]), this.y(track.alt[track.n - 1]));
-    ctx.lineTo(this.x(this.total), h - PAD.b);
-    ctx.lineTo(this.x(0), h - PAD.b);
+    ctx.lineTo(this.x(this.total), h - this.pad.b);
+    ctx.lineTo(this.x(0), h - this.pad.b);
     ctx.closePath();
-    const grad = ctx.createLinearGradient(0, PAD.t, 0, h - PAD.b);
+    const grad = ctx.createLinearGradient(0, this.pad.t, 0, h - this.pad.b);
     grad.addColorStop(0, withAlpha(accent, 0.45));
     grad.addColorStop(1, withAlpha(accent, 0.04));
     ctx.fillStyle = grad;
@@ -175,6 +250,8 @@ export class ElevationProfile {
     ctx.lineJoin = 'round';
     ctx.stroke();
 
+    this.drawHeartRate(step);
+
     // Cursor.
     if (this.cursor != null) {
       const s = sampleAtDistance(track, this.cursor);
@@ -184,8 +261,8 @@ export class ElevationProfile {
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
-      ctx.moveTo(Math.round(cx) + 0.5, PAD.t - 6);
-      ctx.lineTo(Math.round(cx) + 0.5, h - PAD.b);
+      ctx.moveTo(Math.round(cx) + 0.5, this.pad.t - 6);
+      ctx.lineTo(Math.round(cx) + 0.5, h - this.pad.b);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.beginPath();
@@ -196,11 +273,12 @@ export class ElevationProfile {
       ctx.strokeStyle = surface;
       ctx.stroke();
 
-      const label = `${Math.round(altitudeValue(s.alt, this.units))} ${altitudeUnit(this.units)} · ${distanceValue(this.cursor, this.units).toFixed(2)}`;
+      const hrText = Number.isFinite(s.hr) ? ` · ♥ ${Math.round(s.hr)}` : '';
+      const label = `${Math.round(altitudeValue(s.alt, this.units))} ${altitudeUnit(this.units)} · ${distanceValue(this.cursor, this.units).toFixed(2)}${hrText}`;
       ctx.font = '600 11px "Google Sans Variable", system-ui, Roboto, sans-serif';
       const tw = ctx.measureText(label).width + 12;
-      const lx = Math.min(Math.max(cx - tw / 2, PAD.l), w - PAD.r - tw);
-      const ly = Math.max(2, Math.min(cy - 28, h - PAD.b - 22));
+      const lx = Math.min(Math.max(cx - tw / 2, this.pad.l), w - this.pad.r - tw);
+      const ly = Math.max(2, Math.min(cy - 28, h - this.pad.b - 22));
       ctx.fillStyle = surface;
       roundRect(ctx, lx, ly, tw, 18, 6);
       ctx.fill();

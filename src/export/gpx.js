@@ -28,8 +28,10 @@ export function toGPX(workout, track) {
       lines.push(`        <time>${iso(track.t[i])}</time>`);
       const speed = fixed(track.speed[i], 2);
       const course = fixed(track.course[i], 1);
+      const hr = track.hr && Number.isFinite(track.hr[i]) ? Math.round(track.hr[i]) : null;
       lines.push(
         '        <extensions><gpxtpx:TrackPointExtension>' +
+          (hr != null ? `<gpxtpx:hr>${hr}</gpxtpx:hr>` : '') +
           (speed != null ? `<gpxtpx:speed>${speed}</gpxtpx:speed>` : '') +
           (course != null ? `<gpxtpx:course>${course}</gpxtpx:course>` : '') +
           '</gpxtpx:TrackPointExtension></extensions>'

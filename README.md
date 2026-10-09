@@ -54,6 +54,17 @@ course map and is not a real recording.</sub>
 - **Crash-safe recording:** every fix goes to an on-disk journal. A workout survives the
   app being killed, and interrupted workouts can be saved or continued.
 
+### Wear OS watch (Pixel Watch and other Wear OS 5+ watches)
+- **Start, pause, resume and stop** phone workouts from the watch app or its tile. Stop
+  needs a second tap.
+- **Live heart rate** from the watch, read through Wear OS Health Services and streamed to
+  the phone about every 3 s. It's saved into the workout recording, so every GPS point
+  has a heart rate.
+- **Watch screen:** elapsed time, distance, pace or speed, and heart rate. The workout
+  also shows on the watch face as an ongoing activity.
+- **Starting with the phone in your pocket** needs location set to "Allow all the time"
+  (Settings → Watch). Without it, the watch asks you to tap a notification on the phone.
+
 ### Review
 - **Stats:**
   - distance
@@ -63,6 +74,14 @@ course map and is not a real recording.</sub>
   - climb, descent and net vertical
   - min and max altitude
 - **Ski extras:** runs, lifts, ski vertical, lift time and max run speed.
+- **Effort**, when you've filled in the profile (sex, birth year, weight):
+  - average and max heart rate
+  - **calories**: Keytel 2005 heart-rate equation, or ACSM/MET from speed and slope
+    without heart rate
+  - **cardio load** (Banister TRIMP)
+  - time in heart-rate zones
+- **Heart-rate line** on the elevation profile, with heart rate per split and in the
+  marker popovers. GPX, TCX and CSV exports include heart rate.
 - **Splits** per km or mile, with pace, elevation change and fastest/slowest bars.
 - **Map:**
   - MapLibre with free OpenFreeMap streets, light or dark styles, or OpenTopoMap topo.
@@ -116,6 +135,19 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 You can also open `android/` in Android Studio and press **Run**.
 
+### Install on a Wear OS watch
+
+```sh
+gradlew.bat :wear:assembleDebug
+adb -s <watch-serial> install -r wear/build/outputs/apk/debug/wear-debug.apk
+```
+
+The watch app uses the phone app's application ID and must be signed with the same key.
+Debug builds from one machine already are. To enable debugging on the watch:
+1. Settings → System → About → Versions: tap **Build number** 7 times.
+2. Settings → Developer options: enable **ADB debugging** and **Wireless debugging**.
+3. Run `adb pair <ip:port>` with the code shown, then `adb connect <ip:port>`.
+
 > The Gradle wrapper is pinned to 9.1, because Android Studio's bundled JDK 25 is too new
 > for the Gradle 8.x that Capacitor generates. `android/local.properties` (gitignored)
 > must point `sdk.dir` at your Android SDK.
@@ -139,9 +171,13 @@ src/
   map/       MapLibre map view        profile/  elevation side view
   view3d/    Three.js 3D view, satellite imagery
   seed/      City2Surf sample workout (course data + generator)
+  stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live, history, detail, settings
 android/app/src/main/java/app/locale/exercisetracker/tracker/
   LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
+  WearListenerService  WearSync          (watch link)
+android/wear/            Wear OS companion app (Kotlin, Compose for Wear OS)
+  MainActivity  HeartRateService  PhoneLink  PhoneListenerService  LocaleTileService
 tests/       Vitest suites
 docs/        screenshots
 ```

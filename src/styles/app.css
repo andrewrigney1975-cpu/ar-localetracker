@@ -963,6 +963,38 @@ main#view {
   font-size: clamp(3rem, 17vw, 5rem);
 }
 
+.hero-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hero-hr {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.4rem, 7vw, 2.2rem);
+  font-weight: 700;
+}
+
+.hero-hr[hidden] {
+  display: none;
+}
+
+.hero-hr span {
+  font-size: 0.7em;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.hero-hr small {
+  font-size: 0.45em;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
 .metric.wide {
   grid-column: 1 / -1;
 }
@@ -1231,6 +1263,62 @@ main#view {
 
 .stat.feature .value {
   font-size: 2.2rem;
+}
+
+.zones {
+  margin-top: 10px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.zones-title {
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.zone-row {
+  display: grid;
+  grid-template-columns: 7.5em 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.zone-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.zone-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+}
+
+.zone-time {
+  min-width: 3.4em;
+  text-align: right;
+  color: var(--text-dim);
+}
+
+.effort-hint {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.effort-hint a {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .mini-profile {
@@ -1572,6 +1660,25 @@ main#view {
 
 .setting.stack .segmented {
   width: 100%;
+}
+
+.num-input {
+  width: 92px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  text-align: right;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.input-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
 }
 
 .setting .text {

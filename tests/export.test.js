@@ -62,3 +62,30 @@ describe('exporters', () => {
     for (const f of EXPORT_FORMATS) expect(renderExport(f.id, workout, track).content.length).toBeGreaterThan(100);
   });
 });
+
+describe('exporters with heart rate', () => {
+  const { text: hrText } = generateJournal({ activity: 'run', seconds: 600, heartRate: true });
+  const { track: hrTrack, info: hrInfo } = processJournal(parseJournal(hrText));
+  const hrWorkout = { ...workout, summary: computeSummary(hrTrack, hrInfo) };
+  const profile = { birthYear: 1985, sex: 'female', weightKg: 62 };
+
+  it('GPX carries gpxtpx:hr before speed (schema order)', () => {
+    const gpx = renderExport('gpx', hrWorkout, hrTrack).content;
+    expect(XMLValidator.validate(gpx)).toBe(true);
+    expect(gpx).toMatch(/<gpxtpx:hr>\d+<\/gpxtpx:hr><gpxtpx:speed>/);
+  });
+
+  it('TCX has trackpoint HR, lap averages and calories with a profile', () => {
+    const tcx = renderExport('tcx', hrWorkout, hrTrack, { profile }).content;
+    expect(XMLValidator.validate(tcx)).toBe(true);
+    expect(tcx).toContain('<HeartRateBpm><Value>');
+    expect(tcx).toContain('<AverageHeartRateBpm>');
+    expect(tcx).toMatch(/<Calories>[1-9]\d*<\/Calories>/);
+  });
+
+  it('CSV has an hr_bpm column', () => {
+    const rows = renderExport('csv', hrWorkout, hrTrack).content.trim().split('\n');
+    expect(rows[0].endsWith(',hr_bpm')).toBe(true);
+    expect(rows[1].split(',').pop()).toMatch(/^\d+$/);
+  });
+});
