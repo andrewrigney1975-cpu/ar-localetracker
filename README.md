@@ -274,6 +274,14 @@ workouts started from the watch or a widget get an auto goal too.
   usual day and time, and how often its goal was hit. You can **Rename** it (Locale then
   says "your usual lake loop") or **Forget** it, which leaves its workouts out of
   learning. **Restore** undoes forgetting.
+- **History → Select:** pick two or more workouts of one activity and **Mark as
+  routine** with a name. A routine you mark counts from those two workouts, with no
+  need for 5 workouts of history, 3 repeats or a recent one. Later workouts on the same
+  route join it. In Settings it shows as "Marked by you", where **Remove** turns it
+  back into ordinary learning.
+- **Workout names:** a workout that belongs to a routine is named after it ("Lake loop"
+  instead of "Morning Run"), and follows the routine if you rename it. Only automatic
+  names change; a name you typed is kept.
 
 The thresholds were tuned with `scripts/evaluate-goals.mjs`. It replays generated
 histories in date order and predicts each workout from the earlier ones only. On

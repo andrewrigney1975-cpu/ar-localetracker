@@ -5,6 +5,7 @@
 // fixture that RoutineMatcherTest replays; keep predictGoal() and the Java port in step.
 
 import { makeProjection } from '../geo/geo.js';
+import { defaultName } from '../services/buildWorkout.js';
 
 export const MODEL_VERSION = 1;
 const DAY_MS = 86400000;
@@ -28,6 +29,7 @@ export const T = {
   routineMinRecent: 2,
   routineRecentDays: 60,
   routineMaxCv: 0.12,
+  userRoutineMinCount: 2,
   bucketMinCount: 4,
   bucketMaxCv: 0.1,
   timeSigmaMin: 75,
@@ -233,8 +235,28 @@ export function goalFor(distances, imperial) {
   return Math.round(value * unit * 10) / 10;
 }
 
-function clusterRoutes(fs) {
-  let clusters = [];
+function medoidOf(members) {
+  if (members.length <= 2) return members[0];
+  let best = members[0];
+  let bestSum = Infinity;
+  for (const m of members) {
+    let sum = 0;
+    for (const o of members) if (o !== m) sum += routeDistance(m.signature, o.signature);
+    if (sum < bestSum) {
+      bestSum = sum;
+      best = m;
+    }
+  }
+  return best;
+}
+
+/**
+ * Group workouts by route. `seeds` are routines the user marked: their workouts stay
+ * together whatever the geometry, and other workouts on the same route join them.
+ */
+function clusterRoutes(fs, seeds = []) {
+  const pinned = new Set(seeds.flatMap((sd) => sd.members.map((m) => m.id)));
+  const free = fs.filter((f) => !pinned.has(f.id));
   const assign = (f, list) => {
     let best = null;
     let bestD = Infinity;
@@ -247,34 +269,24 @@ function clusterRoutes(fs) {
     }
     return best;
   };
-  for (const f of fs) {
+  const seeded = () => seeds.map((sd) => ({ medoid: medoidOf(sd.members), members: [...sd.members], user: sd }));
+  const clusters = seeded();
+  for (const f of free) {
     const c = assign(f, clusters);
     if (c) c.members.push(f);
     else clusters.push({ medoid: f, members: [f] });
   }
-  const medoidOf = (members) => {
-    if (members.length <= 2) return members[0];
-    let best = members[0];
-    let bestSum = Infinity;
-    for (const m of members) {
-      let sum = 0;
-      for (const o of members) if (o !== m) sum += routeDistance(m.signature, o.signature);
-      if (sum < bestSum) {
-        bestSum = sum;
-        best = m;
-      }
-    }
-    return best;
-  };
   // One reassignment pass against the settled medoids.
-  const medoids = clusters.map((c) => ({ medoid: medoidOf(c.members), members: [] }));
-  for (const f of fs) {
-    const c = assign(f, medoids);
+  const settled = seeded();
+  for (const c of clusters.slice(seeds.length)) settled.push({ medoid: medoidOf(c.members), members: [] });
+  for (const f of free) {
+    const c = assign(f, settled);
     if (c) c.members.push(f);
-    else medoids.push({ medoid: f, members: [f] });
+    else settled.push({ medoid: f, members: [f] });
   }
-  clusters = medoids.filter((c) => c.members.length);
-  return clusters;
+  return settled
+    .filter((c) => c.members.length)
+    .map((c) => ({ ...c, members: c.user ? [...c.members].sort((a, b) => a.at - b.at || String(a.id).localeCompare(String(b.id))) : c.members }));
 }
 
 function routineName(members, loop) {
@@ -306,9 +318,11 @@ function hitStats(fs, routineId) {
 
 /**
  * @param {object[]} workouts  stored workout records
- * @param {{now?: number, excluded?: string[], names?: Record<string,string>}} [opts]
+ * @param {{now?: number, excluded?: string[], names?: Record<string,string>,
+ *   user?: {id:string, name:string, activity:string, workoutIds:string[]}[]}} [opts]
+ *   user: routines the user marked from History (see clusterRoutes)
  */
-export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], names = {} } = {}) {
+export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], names = {}, user = [] } = {}) {
   const ex = new Set(excluded);
   const all = workouts
     .filter((w) => isUsable(w, ex) && w.startedAt <= now)
@@ -321,9 +335,13 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
     const recentWindow = fs.filter((f) => now - f.at <= T.activityWindowDays * DAY_MS);
     const routines = [];
     const inRoutine = new Set();
-    for (const c of clusterRoutes(fs)) {
+    const seeds = user
+      .filter((u) => u.activity === act)
+      .map((u) => ({ id: u.id, name: u.name, members: fs.filter((f) => u.workoutIds.includes(f.id)) }))
+      .filter((sd) => sd.members.length);
+    for (const c of clusterRoutes(fs, seeds)) {
       const ms = c.members;
-      const id = ms[0].id;
+      const id = c.user ? c.user.id : ms[0].id;
       const dists = ms.map((m) => m.distance);
       const loop = ms.filter((m) => m.loop).length * 2 >= ms.length;
       const recent = ms.filter((m) => now - m.at <= T.routineRecentDays * DAY_MS).length;
@@ -332,7 +350,7 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
       const suppressed = recentPredictions >= T.minPredictionsForFeedback && recentHits / recentPredictions < T.minHitRate;
       const r = {
         id,
-        name: names[id] || routineName(ms, loop),
+        name: c.user ? c.user.name : names[id] || routineName(ms, loop),
         count: ms.length,
         weight: round4(ms.reduce((s, m) => s + weight(m), 0)),
         lastAt: ms[ms.length - 1].at,
@@ -350,7 +368,11 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
         suppressed,
         workoutIds: ms.map((m) => m.id),
       };
-      r.eligible = !suppressed && r.count >= T.routineMinCount && recent >= T.routineMinRecent && r.cv <= T.routineMaxCv;
+      // A routine the user marked needs no convincing beyond two workouts.
+      r.eligible = c.user
+        ? !suppressed && r.count >= T.userRoutineMinCount
+        : !suppressed && r.count >= T.routineMinCount && recent >= T.routineMinRecent && r.cv <= T.routineMaxCv;
+      if (c.user) r.user = true;
       // Members of eligible routines are explained, and so are those of a suppressed routine
       // the user has stopped doing (a stale habit). A suppressed routine that is still being
       // done sometimes is a coin flip against another one, so it keeps competing as "others".
@@ -382,7 +404,8 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
     }
     activities[act] = {
       usable: recentWindow.length,
-      ready: recentWindow.length >= T.activityMinWorkouts,
+      // Marking a routine is enough to start predicting it.
+      ready: recentWindow.length >= T.activityMinWorkouts || routines.some((r) => r.user && r.eligible),
       routines: routines.sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id)),
       others,
       buckets,
@@ -392,6 +415,42 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
 }
 
 const round4 = (v) => Math.round(v * 1e4) / 1e4;
+
+// ---- Workout labels --------------------------------------------------------------------------
+
+/** "weekday evening route" → "Weekday evening route". */
+export const displayName = (name) => (name ? name[0].toUpperCase() + name.slice(1) : name);
+
+/**
+ * Name changes that label workouts with their routine. A workout that still has its
+ * automatic name ("Morning Run") and belongs to an eligible routine takes the routine's
+ * name, and remembers it in `routineLabel` so a renamed routine renames it again and a
+ * workout that leaves every routine gets its automatic name back. Names the user typed
+ * (anything else) are never touched; editing a name clears `routineLabel`.
+ * @returns {{id:string, patch:{name:string, routineLabel:string|null}}[]}
+ */
+export function routineLabels(model, workouts) {
+  const label = new Map();
+  for (const a of Object.values(model?.activities ?? {})) {
+    for (const r of a.routines) {
+      if (!r.eligible) continue;
+      for (const id of r.workoutIds) label.set(id, { routineId: r.id, name: displayName(r.name) });
+    }
+  }
+  const out = [];
+  for (const w of workouts) {
+    if (String(w.id).startsWith('sample-')) continue;
+    const auto = defaultName(w.activity, w.startedAt);
+    const target = label.get(w.id);
+    const labelled = Boolean(w.routineLabel);
+    if (target && (labelled || w.name === auto)) {
+      if (w.name !== target.name || w.routineLabel !== target.routineId) out.push({ id: w.id, patch: { name: target.name, routineLabel: target.routineId } });
+    } else if (!target && labelled) {
+      out.push({ id: w.id, patch: { name: auto, routineLabel: null } });
+    }
+  }
+  return out;
+}
 
 // ---- Prediction (ported to RoutineMatcher.java) ----------------------------------------------
 

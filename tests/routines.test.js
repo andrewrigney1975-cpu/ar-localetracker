@@ -12,6 +12,7 @@ import {
   distanceToPolyline,
   goalFor,
   localTime,
+  routineLabels,
   predictGoal,
   resample,
   routeDistance,
@@ -197,6 +198,82 @@ describe('learning routines', () => {
     const last = coin[coin.length - 1];
     const p = predictGoal(m, { activity: 'run', now: last.startedAt + 7 * DAY, tzOffset: TZ, lat: HOME.lat, lon: HOME.lon });
     expect(p.goalM).toBeNull();
+  });
+});
+
+describe('routines the user marked', () => {
+  const rand = rng(21);
+  const loop = () => loopRoute(PARK, 6000, 80, rand);
+  // Two Wednesday-evening park loops: too few for Locale to learn on its own.
+  const marked = [
+    record('m1', loop(), 6020, at(2026, 8, 2, 18, 0)),
+    record('m2', loop(), 5980, at(2026, 8, 9, 18, 5)),
+  ];
+  const user = [{ id: 'u1', name: 'park loop', activity: 'run', workoutIds: ['m1', 'm2'] }];
+  const now = at(2026, 8, 10, 12, 0);
+
+  it('is a routine from two workouts, and predicts before the usual five', () => {
+    expect(buildRoutineModel(marked, { now }).activities.run.ready).toBe(false);
+    const m = buildRoutineModel(marked, { now, user });
+    const r = m.activities.run.routines.find((x) => x.id === 'u1');
+    expect(r).toMatchObject({ user: true, eligible: true, count: 2, name: 'park loop', goal: { metric: 6000 } });
+    expect(m.activities.run.ready).toBe(true);
+    const p = predictGoal(m, { activity: 'run', now: at(2026, 8, 16, 18, 0), tzOffset: TZ, lat: PARK.lat, lon: PARK.lon });
+    expect(p).toMatchObject({ goalM: 6000, source: 'route', routineId: 'u1', name: 'park loop' });
+  });
+
+  it('takes in later workouts on the same route, and keeps its own together', () => {
+    const later = record('m3', loop(), 6010, at(2026, 8, 16, 18, 2));
+    // A different route the user put in the routine anyway stays in it.
+    const odd = record('m4', outAndBack(PARK, 6000, 200, rand), 6000, at(2026, 8, 3, 7, 0));
+    const elsewhere = record('m5', loopRoute(HOME, 6000, 10, rand), 6000, at(2026, 8, 17, 18, 0));
+    const m = buildRoutineModel([...marked, later, odd, elsewhere], {
+      now: at(2026, 8, 20, 12, 0),
+      user: [{ ...user[0], workoutIds: ['m1', 'm2', 'm4'] }],
+    });
+    const r = m.activities.run.routines.find((x) => x.id === 'u1');
+    expect(r.workoutIds.sort()).toEqual(['m1', 'm2', 'm3', 'm4']);
+  });
+
+  it('only counts workouts of its own activity', () => {
+    const m = buildRoutineModel(marked, { now, user: [{ ...user[0], activity: 'walk' }] });
+    expect(m.activities.run.routines.some((x) => x.user)).toBe(false);
+  });
+});
+
+describe('workout names from routines', () => {
+  const rand = rng(22);
+  const loop = () => loopRoute(PARK, 6000, 80, rand);
+  const named = (id, startedAt, extra = {}) => ({ ...record(id, loop(), 6000, startedAt), name: 'Evening Run', ...extra });
+  const ws = [
+    named('a', at(2026, 8, 2, 18, 0)),
+    named('b', at(2026, 8, 9, 18, 0), { name: 'Race prep' }),
+    named('c', at(2026, 8, 16, 18, 0)),
+  ];
+  const user = [{ id: 'u1', name: 'park loop', activity: 'run', workoutIds: ['a', 'b'] }];
+  const now = at(2026, 8, 20, 12, 0);
+
+  it('names workouts with an automatic name after their routine, and leaves typed names alone', () => {
+    const m = buildRoutineModel(ws, { now, user });
+    expect(routineLabels(m, ws)).toEqual([
+      { id: 'a', patch: { name: 'Park loop', routineLabel: 'u1' } },
+      { id: 'c', patch: { name: 'Park loop', routineLabel: 'u1' } },
+    ]);
+  });
+
+  it('follows a renamed routine, and restores the automatic name when the routine goes', () => {
+    const labelled = ws.map((w) => (w.id === 'b' ? w : { ...w, name: 'Park loop', routineLabel: 'u1' }));
+    const renamed = buildRoutineModel(labelled, { now, user: [{ ...user[0], name: 'Centennial loop' }] });
+    expect(routineLabels(renamed, labelled).map((c) => c.patch.name)).toEqual(['Centennial loop', 'Centennial loop']);
+    // Without the marked routine, two loops are too few to learn (and three would move the
+    // label to the learned routine instead).
+    const gone = buildRoutineModel(labelled, { now, excluded: ['b'] });
+    expect(routineLabels(gone, labelled)).toEqual([
+      { id: 'a', patch: { name: 'Evening Run', routineLabel: null } },
+      { id: 'c', patch: { name: 'Evening Run', routineLabel: null } },
+    ]);
+    // Already labelled and up to date: nothing to do, so a rebuild settles.
+    expect(routineLabels(buildRoutineModel(labelled, { now, user }), labelled)).toEqual([]);
   });
 });
 

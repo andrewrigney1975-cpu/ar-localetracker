@@ -31,17 +31,15 @@ function routinesHTML(model, s) {
   const learning = [];
   for (const id of ACTIVITY_IDS) {
     const a = model?.activities?.[id];
-    if (s.voice.goalMode[id] !== 'auto') continue;
-    if (!a?.ready) {
-      learning.push(`${ACTIVITIES[id].label}: ${a?.usable ?? 0} of ${model?.need ?? 5}`);
-      continue;
-    }
-    for (const r of a.routines.filter((x) => x.eligible || x.suppressed)) {
+    // Routines you marked are listed even with auto goals off: they still name workouts.
+    const auto = s.voice.goalMode[id] === 'auto';
+    if (auto && !a?.ready) learning.push(`${ACTIVITIES[id].label}: ${a?.usable ?? 0} of ${model?.need ?? 5}`);
+    for (const r of (a?.routines ?? []).filter((x) => (auto && a.ready && (x.eligible || x.suppressed)) || x.user)) {
       const goal = Math.round((r.goal[imperial ? 'imperial' : 'metric'] / (imperial ? 1609.344 : 1000)) * 10) / 10;
       const hit = r.predictions ? ` · goal hit ${r.hits} of ${r.predictions}` : '';
       rows.push(`<div class="setting" data-activity="${id}"><span class="act-label">${ACTIVITIES[id].icon}<span class="text">${escapeHtml(r.name[0].toUpperCase() + r.name.slice(1))}
-          <small>${goal} ${unit} · ${r.count} times · ${usualDays(r.weekdays)} ~${clock(r.startMin)}${hit}${r.suppressed ? ' · paused: recent goals missed' : ''}</small></span></span>
-          <span class="voice-kinds"><button class="chip" data-rename="${escapeHtml(r.id)}">Rename</button><button class="chip" data-forget="${escapeHtml(r.id)}">Forget</button></span></div>`);
+          <small>${r.user ? 'Marked by you · ' : ''}${goal} ${unit} · ${r.count} times · ${usualDays(r.weekdays)} ~${clock(r.startMin)}${hit}${r.suppressed ? ' · paused: recent goals missed' : ''}</small></span></span>
+          <span class="voice-kinds"><button class="chip" data-rename="${escapeHtml(r.id)}">Rename</button><button class="chip" data-forget="${escapeHtml(r.id)}">${r.user ? 'Remove' : 'Forget'}</button></span></div>`);
     }
   }
   const excluded = s.routines.excluded.length;
@@ -290,10 +288,15 @@ export async function mount(root) {
         });
         if (name == null) return;
         const routines = settings().routines;
-        const names = { ...routines.names };
-        if (name) names[r.id] = name;
-        else delete names[r.id];
-        await updateSettings({ routines: { ...routines, names } });
+        if (r.user) {
+          if (!name) return;
+          await updateSettings({ routines: { ...routines, user: routines.user.map((u) => (u.id === r.id ? { ...u, name } : u)) } });
+        } else {
+          const names = { ...routines.names };
+          if (name) names[r.id] = name;
+          else delete names[r.id];
+          await updateSettings({ routines: { ...routines, names } });
+        }
         await rebuildRoutineModel();
         render();
       })
@@ -302,6 +305,20 @@ export async function mount(root) {
       b.addEventListener('click', async () => {
         const r = findRoutine(b.dataset.forget);
         if (!r) return;
+        if (r.user) {
+          const sure = await confirmDialog({
+            title: 'Remove this routine?',
+            message: `"${r.name}" stops being a routine you marked. Its ${r.count} workouts go back to automatic learning and lose its name, unless you renamed them.`,
+            confirmLabel: 'Remove',
+            danger: true,
+          });
+          if (!sure) return;
+          const routines = settings().routines;
+          await updateSettings({ routines: { ...routines, user: routines.user.filter((u) => u.id !== r.id) } });
+          await rebuildRoutineModel();
+          render();
+          return;
+        }
         const ok = await confirmDialog({
           title: 'Forget this routine?',
           message: `Locale stops predicting "${r.name}" and leaves its ${r.count} workouts out of learning. The workouts themselves are kept.`,
