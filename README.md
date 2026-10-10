@@ -3,7 +3,8 @@
 Locale is a GPS workout tracker for Android 16+ covering **walking, running, cycling and
 snow skiing**. It records reliably in the background with the screen off. A **Wear OS
 companion** lets you start and stop workouts from your watch and adds live heart rate.
-Home-screen widgets start a workout in one tap. A **Live** mode shows your position,
+Home-screen widgets start a workout in one tap, and **voice announcements** call out
+your splits, time and goal progress as you go. A **Live** mode shows your position,
 altitude, speed and heading without recording anything.
 Afterwards you can review each workout as stats, heart-rate effort (calories, cardio load,
 zones), splits, an interactive map with an elevation side view, or a 3D plot over
@@ -36,6 +37,11 @@ sensors.
   <img src="docs/screenshots/live-position.png" width="250" alt="Live position screen: coordinates, barometric altitude, speed, compass heading and a map, with nothing recorded">
 </p>
 <p align="center">
+  <img src="docs/screenshots/voice-settings.png" width="250" alt="Voice announcement settings: Splits, Time and Goal per activity, time interval, lower or pause other audio, and a Test button">
+  &nbsp;
+  <img src="docs/screenshots/voice-live.png" width="250" alt="Live workout screen showing the last spoken announcement as a caption under the controls">
+</p>
+<p align="center">
   <img src="docs/screenshots/watch-home.png" width="200" alt="Pixel Watch: Locale start screen with Start Run and Start Walk">
   &nbsp;
   <img src="docs/screenshots/watch-workout.png" width="200" alt="Pixel Watch: workout in progress with elapsed time, distance, pace, heart rate, pause and stop">
@@ -43,7 +49,8 @@ sensors.
 
 <sub>The phone screenshots show the built-in sample workout, a simulated run of the Sydney
 City2Surf (Hyde Park to Bondi via Heartbreak Hill at 6:18/km, with simulated heart rate).
-It is generated from the course map and is not a real recording. The watch screenshots
+It is generated from the course map and is not a real recording. The voice screenshots
+come from the browser simulator. The watch screenshots
 are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</sub>
 
 ## Features
