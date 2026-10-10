@@ -263,7 +263,7 @@ main#view {
 
 .tabbar {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   padding: 4px calc(var(--safe-right) + 8px) calc(var(--safe-bottom) + 4px) calc(var(--safe-left) + 8px);
   background: var(--surface);
   border-top: 1px solid var(--border);
@@ -373,7 +373,8 @@ main#view {
   font-weight: 550;
 }
 
-.chip[aria-pressed='true'] {
+.chip[aria-pressed='true'],
+.chip[aria-checked='true'] {
   background: var(--text);
   color: var(--bg);
   border-color: var(--text);
@@ -2038,4 +2039,250 @@ main#view {
 
 .about a {
   color: inherit;
+}
+
+/* ==========================================================================
+   Edit workout: activity picker
+   ========================================================================== */
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dialog .chip-row .chip[aria-checked='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+.dialog .field-hint {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+}
+
+/* ==========================================================================
+   Insights
+   ========================================================================== */
+.insights .filter-row {
+  padding-bottom: 4px;
+}
+
+.insights .chip {
+  flex: none;
+}
+
+.date-range {
+  display: flex;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+
+.date-range[hidden],
+.split-toggle[hidden] {
+  display: none;
+}
+
+.date-range label {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.date-range input {
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.split-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0 4px;
+  font-weight: 550;
+}
+
+.insights-totals {
+  margin-top: 12px;
+}
+
+.insights .metric-row {
+  margin-top: 16px;
+}
+
+.chart-card {
+  position: relative;
+  padding: 12px 0 8px;
+  margin-top: 4px;
+}
+
+.chart-title {
+  padding: 0 14px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--text-dim);
+}
+
+.chart-empty {
+  padding: 32px 14px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 6px 14px 0;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.chart-legend i,
+.chart-tip i,
+.report-table .key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+
+.chart-body {
+  display: flex;
+  padding-top: 8px;
+}
+
+.chart-axis {
+  flex: none;
+}
+
+.chart-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-right: 6px;
+}
+
+.chart-body svg {
+  display: block;
+  font-family: var(--font-num);
+}
+
+.chart-scroll .grid {
+  stroke: var(--surface-3);
+  stroke-width: 1;
+}
+
+.chart-body .tick {
+  fill: var(--text-faint);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-scroll .hit {
+  fill: transparent;
+}
+
+.chart-scroll .hit.on {
+  fill: color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.chart-tip {
+  position: absolute;
+  top: 8px;
+  min-width: 150px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  font-size: 0.82rem;
+  pointer-events: none;
+}
+
+.chart-tip[hidden] {
+  display: none;
+}
+
+.chart-tip .tip-head {
+  font-weight: 650;
+  margin-bottom: 4px;
+}
+
+.chart-tip div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-tip b {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-tip .tip-total {
+  color: var(--text-dim);
+}
+
+.table-scroll {
+  overflow-x: auto;
+  margin: 0 -4px;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.report-table th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  font-weight: 650;
+  text-align: right;
+  padding: 6px;
+}
+
+.report-table td {
+  padding: 9px 6px;
+  border-top: 1px solid var(--border);
+  text-align: right;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.report-table th:first-child,
+.report-table td:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--bg);
+}
+
+.report-table tr.group-total td {
+  font-weight: 650;
+}
+
+.report-table tr.sub td {
+  border-top: 0;
+  padding-top: 3px;
+  color: var(--text-dim);
+}
+
+.report-table tr.sub td:first-child {
+  padding-left: 14px;
 }
