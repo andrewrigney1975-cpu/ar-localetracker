@@ -115,6 +115,10 @@ public class LocaleTrackerPlugin extends Plugin {
         TrackerHub.setListener(null);
         stopWarmupInternal();
         unregisterHeading();
+        if (previewSpeaker != null) {
+            previewSpeaker.shutdown();
+            previewSpeaker = null;
+        }
     }
 
     /** True while the app's activity is resumed (used to decide if a watch start can run directly). */
@@ -123,6 +127,21 @@ public class LocaleTrackerPlugin extends Plugin {
     }
 
     // ---- Watch ------------------------------------------------------------------------------
+
+    /** Settings → "Test voice": speaks a sample announcement outside a workout. */
+    private Speaker previewSpeaker;
+
+    @PluginMethod
+    public void speak(PluginCall call) {
+        String text = call.getString("text");
+        if (text == null || text.isEmpty()) {
+            call.reject("Nothing to say", "args");
+            return;
+        }
+        if (previewSpeaker == null) previewSpeaker = new Speaker(getContext(), call.getBoolean("duck", true));
+        previewSpeaker.speak(text);
+        call.resolve();
+    }
 
     @PluginMethod
     public void getWatchStatus(PluginCall call) {

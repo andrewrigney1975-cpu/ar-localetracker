@@ -15,6 +15,17 @@ export const DEFAULT_SETTINGS = {
   satellite3d: true,
   smooth3d: true,
   coordFormat: 'decimal',
+  /** Spoken announcements during a workout, each kind on or off per activity. */
+  voice: {
+    splits: { walk: true, run: true, cycle: false, ski: false },
+    time: { walk: false, run: false, cycle: false, ski: false },
+    goal: { walk: false, run: false, cycle: false, ski: false },
+    intervalMin: 10,
+    /** Goal distance per activity in metres, set on the start screen. */
+    goalM: { walk: 5000, run: 10000, cycle: 40000, ski: 20000 },
+    /** Lower other audio while speaking (true) or pause it (false). */
+    duck: true,
+  },
   /** For calories, heart-rate zones and cardio load. Weight in kg. */
   profile: { birthYear: null, sex: null, weightKg: null, restingHr: null, maxHr: null },
 };
@@ -33,6 +44,7 @@ export async function loadSettings() {
         autoPause: { ...DEFAULT_SETTINGS.autoPause, ...saved.autoPause },
         liveSpeedMode: { ...DEFAULT_SETTINGS.liveSpeedMode, ...saved.liveSpeedMode },
         profile: { ...DEFAULT_SETTINGS.profile, ...saved.profile },
+        voice: mergeVoice(saved.voice),
       };
     }
   } catch {
@@ -40,6 +52,18 @@ export async function loadSettings() {
   }
   applyTheme();
   return current;
+}
+
+function mergeVoice(saved = {}) {
+  const d = DEFAULT_SETTINGS.voice;
+  return {
+    ...d,
+    ...saved,
+    splits: { ...d.splits, ...saved.splits },
+    time: { ...d.time, ...saved.time },
+    goal: { ...d.goal, ...saved.goal },
+    goalM: { ...d.goalM, ...saved.goalM },
+  };
 }
 
 export function settings() {

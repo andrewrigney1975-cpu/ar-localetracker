@@ -6,6 +6,7 @@ import { maxHeartRate } from '../stats/physio.js';
 import { Disposer, escapeHtml } from '../ui/dom.js';
 import { toast } from '../ui/toast.js';
 import { App } from '@capacitor/app';
+import { INTERVAL_OPTIONS, spokenAverage, spokenDistance } from '../voice/coach.js';
 
 const MAP_STYLE_LABELS = { streets: 'Streets', light: 'Light', dark: 'Dark', topo: 'Topo' };
 
@@ -93,6 +94,22 @@ export async function mount(root) {
               }).join('')}
             </div>
 
+            <div class="section-title">Voice announcements</div>
+            <div class="card settings-group">
+              ${ACTIVITY_IDS.map((id) => {
+                const a = ACTIVITIES[id];
+                const chip = (kind, label) => `<button class="chip" data-voice="${kind}" data-activity="${id}" aria-pressed="${Boolean(s.voice[kind][id])}">${label}</button>`;
+                return `<div class="setting" data-activity="${id}"><span class="act-label">${a.icon}<span class="text">${a.label}</span></span>
+                  <span class="voice-kinds">${chip('splits', 'Splits')}${chip('time', 'Time')}${chip('goal', 'Goal')}</span></div>`;
+              }).join('')}
+              <div class="setting stack"><div class="text">Time announcements<small>Every few minutes of active time, with distance and average pace or speed</small></div>
+                ${segmented('voice.intervalMin', INTERVAL_OPTIONS.map((m) => [m, `${m} min`]), s.voice.intervalMin)}</div>
+              <div class="setting"><div class="text">Other audio<small>Music and podcasts while Locale speaks</small></div>
+                ${segmented('voice.duck', [['true', 'Lower'], ['false', 'Pause']], String(s.voice.duck))}</div>
+              <div class="setting"><div class="text">Splits every ${imperial ? 'mile' : 'kilometre'}; goal at 25, 50, 75 and 100%<small>Set the goal distance on the start screen</small></div>
+                <button class="btn ghost" data-act="voicetest">Test</button></div>
+            </div>
+
             <div class="section-title">Maps</div>
             <div class="card settings-group">
               <div class="setting stack"><div class="text">Map style</div>
@@ -131,6 +148,8 @@ export async function mount(root) {
         b.addEventListener('click', async () => {
           const key = group.dataset.seg;
           if (key.startsWith('profile.')) await updateSettings({ profile: { ...settings().profile, [key.slice(8)]: b.dataset.v } });
+          else if (key === 'voice.intervalMin') await updateSettings({ voice: { ...settings().voice, intervalMin: Number(b.dataset.v) } });
+          else if (key === 'voice.duck') await updateSettings({ voice: { ...settings().voice, duck: b.dataset.v === 'true' } });
           else await updateSettings({ [key]: b.dataset.v });
           render();
         })
@@ -174,6 +193,20 @@ export async function mount(root) {
     root.querySelectorAll('[data-autopause]').forEach((c) =>
       c.addEventListener('change', () => updateSettings({ autoPause: { ...settings().autoPause, [c.dataset.autopause]: c.checked } }))
     );
+    root.querySelectorAll('[data-voice]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const { voice: kind, activity } = b.dataset;
+        const voice = settings().voice;
+        const on = !voice[kind][activity];
+        await updateSettings({ voice: { ...voice, [kind]: { ...voice[kind], [activity]: on } } });
+        b.setAttribute('aria-pressed', String(on));
+      })
+    );
+    root.querySelector('[data-act="voicetest"]').addEventListener('click', () => {
+      const unit = imperial ? 1609.344 : 1000;
+      const text = `${spokenDistance(5 * unit, imperial)}. Split time 6 minutes 12 seconds. ${spokenAverage(5 * unit, 5 * 378000, { pace: true, imperial })}`;
+      tracker.speak(text, settings().voice.duck).catch((e) => toast(e?.message ?? 'Text-to-speech is not available'));
+    });
     root.querySelector('[data-act="battery"]')?.addEventListener('click', () => tracker.requestIgnoreBatteryOptimizations());
     root.querySelector('[data-act="appsettings"]').addEventListener('click', () => tracker.openAppSettings());
     if (tracker.isNative) {

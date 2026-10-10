@@ -132,6 +132,10 @@ public class TrackingService extends Service {
 
     private final AltitudeFusion altitude = new AltitudeFusion();
 
+    // Voice announcements (tracker thread; the coach's counters are read under `this`).
+    private VoiceCoach coach;
+    private Speaker speaker;
+
     // ---- Lifecycle --------------------------------------------------------------------------
 
     @Override
@@ -162,6 +166,7 @@ public class TrackingService extends Service {
         unregisterSensors();
         if (wakeLock.isHeld()) wakeLock.release();
         if (journal != null) journal.close();
+        if (speaker != null) speaker.shutdown();
         thread.quitSafely();
         super.onDestroy();
     }
@@ -250,12 +255,21 @@ public class TrackingService extends Service {
             profile = ActivityProfile.forId(activityId);
             autoPause = ap;
             units = "imperial".equals(u) ? "imperial" : "metric";
+            coach = new VoiceCoach(PhoneSettings.voice(this, profile.id));
             if (resume && id.equals(prefs.getString("workoutId", null))) {
                 startedAt = prefs.getLong("startedAt", System.currentTimeMillis());
                 elapsedBaseMs = prefs.getLong("elapsedBaseMs", 0);
                 distanceM = Double.longBitsToDouble(prefs.getLong("distanceBits", 0));
                 segment = prefs.getInt("segment", 0) + 1;
                 seq = prefs.getLong("seq", 0);
+                if (prefs.contains("vSplits")) {
+                    coach.splitsDone = prefs.getInt("vSplits", 0);
+                    coach.lastSplitMs = prefs.getLong("vSplitMs", 0);
+                    coach.intervalsDone = prefs.getLong("vIntervals", 0);
+                    coach.goalMask = prefs.getInt("vGoal", 0);
+                } else {
+                    coach.syncTo(distanceM, elapsedBaseMs);
+                }
             } else {
                 startedAt = System.currentTimeMillis();
                 elapsedBaseMs = 0;
@@ -295,6 +309,7 @@ public class TrackingService extends Service {
             lastHr = 0;
             lastHrAt = 0;
         }
+        if (coach.enabled() && speaker == null) speaker = new Speaker(this, coach.cfg.duck);
         wakeLock.acquire(WAKE_LEASE_MS);
         registerSensors();
         setState(State.RECORDING, resume ? "restored" : "start");
@@ -352,6 +367,10 @@ public class TrackingService extends Service {
         stopLocationUpdates();
         unregisterSensors();
         if (wakeLock.isHeld()) wakeLock.release();
+        if (speaker != null) {
+            speaker.shutdown();
+            speaker = null;
+        }
         stopForeground(STOP_FOREGROUND_REMOVE);
         boolean saved = finalizeNatively(id);
         if (cb != null) cb.onStopped(id, count, saved);
@@ -468,7 +487,10 @@ public class TrackingService extends Service {
             seq++;
             journal.append(pointJson(loc, gnssAlt, fusedAlt), false);
             if (autoPause) handleAutoPause(speed, nowRt);
-            if (state == State.RECORDING) accumulateDistance(loc, speed);
+            if (state == State.RECORDING) {
+                accumulateDistance(loc, speed);
+                announce();
+            }
         }
 
         JSObject ev = snapshot();
@@ -481,6 +503,20 @@ public class TrackingService extends Service {
             lastWidgetUpdateMs = nowMs;
             LocaleWidgets.updateAll(this); // distance; the chronometer ticks on its own
         }
+    }
+
+    /** Splits, time and goal announcements; only while actually recording (not paused). */
+    private void announce() {
+        String text;
+        synchronized (this) {
+            if (coach == null) return;
+            text = coach.onProgress(distanceM, elapsedMs());
+        }
+        if (text == null) return;
+        if (speaker != null) speaker.speak(text);
+        JSObject ev = new JSObject();
+        ev.put("text", text);
+        TrackerHub.emit("announce", ev); // shown as a caption on the live screen
     }
 
     // ---- Watch ------------------------------------------------------------------------------
@@ -718,6 +754,10 @@ public class TrackingService extends Service {
                 .putLong("distanceBits", Double.doubleToLongBits(distanceM))
                 .putInt("segment", segment)
                 .putLong("seq", seq)
+                .putInt("vSplits", coach != null ? coach.splitsDone : 0)
+                .putLong("vSplitMs", coach != null ? coach.lastSplitMs : 0)
+                .putLong("vIntervals", coach != null ? coach.intervalsDone : 0)
+                .putInt("vGoal", coach != null ? coach.goalMask : 0)
                 .apply();
         }
         if (journal != null) journal.flush();

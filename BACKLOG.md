@@ -96,7 +96,9 @@ implementation notes for whoever picks it up.
 
 ---
 
-## 4. Voice announcements
+## 4. Voice announcements: ✅ done (October 2026)
+
+> Implemented natively in `VoiceCoach.java` (triggers and phrases) and `Speaker.java` (TextToSpeech, transient audio focus that ducks or pauses), called from `TrackingService` on each fix while recording. Coach state is saved in the snapshot prefs, so a restarted service doesn't repeat itself. `src/voice/coach.js` mirrors it for the browser simulator (Web Speech) and writes a shared fixture that `VoiceCoachTest` replays. Settings → Voice announcements: Splits / Time / Goal per activity, interval, Lower or Pause other audio, Test. The goal distance is picked on the start screen; "goal reached" at 100% is included. Watch vibration was not added.
 
 **Request:** spoken updates during a workout, in three independently configurable kinds.
 
