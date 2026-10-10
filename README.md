@@ -116,7 +116,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   also shows on the watch face as an ongoing activity.
 - **Starting with the phone in your pocket** needs location set to "Allow all the time"
   (Settings → Watch). Without it, the watch asks you to tap a notification on the phone.
-- **Pull to refresh** on the Track screen picks up workouts recorded from the watch, a
+- **Pull to refresh** on the Track and History screens picks up workouts recorded from the watch, a
   widget or the notification while the app wasn't open, and shows one still in progress.
   The list also refreshes by itself whenever you come back to the app.
 
