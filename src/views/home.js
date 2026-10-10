@@ -1,10 +1,13 @@
 import { ACTIVITIES, ACTIVITY_IDS, activity } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
+import { syncWorkouts } from '../services/sync.js';
 import { settings } from '../settings.js';
 import { tracker } from '../tracker/client.js';
 import { Disposer, escapeHtml, on } from '../ui/dom.js';
 import { icons } from '../ui/icons.js';
+import { pullToRefresh } from '../ui/pullRefresh.js';
 import { routeThumbSVG } from '../ui/thumb.js';
+import { toast } from '../ui/toast.js';
 import { formatDate, formatDistance, formatDuration } from '../units.js';
 
 export function workoutItemHTML(w, units) {
@@ -92,6 +95,13 @@ export async function mount(root) {
   await Promise.all([renderActive(), renderRecent()]);
   d.add(on(window, 'workouts-changed', renderRecent));
   d.add(tracker.on('state', renderActive));
+  // Pull down to pick up workouts recorded from the watch, a widget or the notification.
+  d.add(
+    pullToRefresh(root.querySelector('.body'), async () => {
+      const [{ imported }] = await Promise.all([syncWorkouts(), renderActive()]);
+      if (!imported) toast('Workouts are up to date');
+    })
+  );
   const timer = setInterval(renderActive, 5000);
   d.add(() => clearInterval(timer));
   return () => d.dispose();
