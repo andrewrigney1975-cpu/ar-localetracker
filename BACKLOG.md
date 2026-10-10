@@ -170,7 +170,9 @@ implementation notes for whoever picks it up.
 
 ---
 
-## 6. Live position mode (no recording)
+## 6. Live position mode (no recording): ✅ done (October 2026)
+
+> Implemented as the yellow **Live** tile on Home → `views/position.js` + `map/positionMap.js`; the native warm-up now carries barometric/MSL altitude and stops in the background.
 
 **Request:** a "Live" mode that uses GPS and the barometer to find and display where you
 are, without recording a workout.

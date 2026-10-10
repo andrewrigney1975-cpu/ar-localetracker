@@ -539,7 +539,8 @@ public class LocaleTrackerPlugin extends Plugin {
             }
             azimuth = (azimuth + 360f) % 360f;
             float delta = Math.abs(azimuth - lastHeading);
-            if (Math.min(delta, 360f - delta) < 1f) return;
+            // Send changes of 1° or more, plus a heartbeat every 2 s so late listeners get a value.
+            if (Math.min(delta, 360f - delta) < 1f && now - lastHeadingEmit < 2000) return;
             lastHeading = azimuth;
             lastHeadingEmit = now;
             JSObject ev = new JSObject();
@@ -562,7 +563,9 @@ public class LocaleTrackerPlugin extends Plugin {
     public void startHeading(PluginCall call) {
         headingRequested = true;
         registerHeading();
-        call.resolve();
+        JSObject o = new JSObject();
+        if (lastHeading >= 0) o.put("heading", Math.round(lastHeading * 10) / 10.0);
+        call.resolve(o);
     }
 
     @PluginMethod

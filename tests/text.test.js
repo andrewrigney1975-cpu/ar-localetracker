@@ -53,3 +53,21 @@ describe('workout share text', () => {
     expect(smsUri('a b·c\nd')).toBe('sms:?body=a%20b%C2%B7c%0Ad');
   });
 });
+
+describe('location sharing and coordinate formats', () => {
+  it('builds a location message with a map link', async () => {
+    const { locationShareText } = await import('../src/export/text.js');
+    expect(locationShareText({ lat: -33.87312, lon: 151.21113, accuracy: 4.6, altitude: 31.6 })).toBe(
+      ['My location: -33.873120, 151.211130', '±5 m · altitude 32 m', 'https://maps.google.com/?q=-33.873120,151.211130'].join('\n')
+    );
+    expect(locationShareText({ lat: 1, lon: 2 }).split('\n')).toHaveLength(2);
+  });
+
+  it('formats degrees, minutes and seconds with carries', async () => {
+    const { formatDMS } = await import('../src/units.js');
+    expect(formatDMS(-33.87312, 'lat')).toBe(`33°52'23.2" S`);
+    expect(formatDMS(151.21113, 'lon')).toBe(`151°12'40.1" E`);
+    expect(formatDMS(10.999999, 'lat')).toBe(`11°00'00.0" N`); // 59.99..." carries
+    expect(formatDMS(NaN, 'lat')).toBe('–');
+  });
+});

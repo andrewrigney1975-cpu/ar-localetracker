@@ -54,6 +54,24 @@ export function workoutShareText(workout, { units = 'metric', calories = null, f
   return lines.join('\n');
 }
 
+/**
+ * Plain-text current location for sharing, e.g.
+ *
+ *   My location: -33.873120, 151.211130
+ *   ±5 m · altitude 32 m
+ *   https://maps.google.com/?q=-33.873120,151.211130
+ */
+export function locationShareText({ lat, lon, accuracy, altitude }, { units = 'metric' } = {}) {
+  const ll = `${lat.toFixed(6)},${lon.toFixed(6)}`;
+  const details = [];
+  if (Number.isFinite(accuracy)) details.push(`±${Math.round(accuracy)} m`);
+  if (Number.isFinite(altitude)) details.push(`altitude ${formatAltitude(altitude, units)}`);
+  const lines = [`My location: ${lat.toFixed(6)}, ${lon.toFixed(6)}`];
+  if (details.length) lines.push(details.join(' · '));
+  lines.push(`https://maps.google.com/?q=${ll}`);
+  return lines.join('\n');
+}
+
 /** `sms:` URI that opens the default messaging app with the text pre-filled. */
 export function smsUri(text) {
   return `sms:?body=${encodeURIComponent(text)}`;

@@ -191,9 +191,27 @@ function simTracker() {
     async startWarmup() {
       clearInterval(warmTimer);
       let acc = 40;
+      let k = 0;
       warmTimer = setInterval(() => {
         acc = Math.max(4, acc * 0.7);
-        emit('point', { state: 'idle', last: { t: Date.now(), lat: START.lat, lon: START.lon, accuracy: acc, altitude: START.alt, speed: 0 } });
+        k++;
+        // A slowly wandering fix with barometric altitude, like a phone held still outdoors.
+        const alt = START.alt + Math.sin(k / 9) * 0.4;
+        emit('point', {
+          state: 'idle',
+          last: {
+            t: Date.now(),
+            lat: START.lat + Math.sin(k / 7) * 0.00002,
+            lon: START.lon + Math.cos(k / 11) * 0.00002,
+            accuracy: acc,
+            altitude: alt,
+            altitudeAccuracy: 3 + acc / 10,
+            altitudeSource: 'barometer',
+            pressure: Math.round(1013.25 * Math.pow(1 - alt / 44330, 5.255) * 100) / 100,
+            speed: 0.2 + Math.abs(Math.sin(k / 5)) * 0.3,
+            bearing: (k * 13) % 360,
+          },
+        });
         emit('gnss', { satsUsed: Math.round(30 - acc / 2), satsVisible: 34, cn0: 32 });
       }, 1000);
     },
@@ -202,6 +220,7 @@ function simTracker() {
     },
     async startHeading() {
       clearInterval(headingTimer);
+      setTimeout(() => emit('heading', { heading: 40, accuracy: 3 }), 0);
       let h = 40;
       headingTimer = setInterval(() => {
         h = (h + (Math.random() - 0.5) * 6 + 360) % 360;

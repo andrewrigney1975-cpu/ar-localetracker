@@ -81,6 +81,19 @@ export function formatCoord(value, axis) {
   return `${Math.abs(value).toFixed(5)}° ${hemi}`;
 }
 
+/** Degrees, minutes, seconds, e.g. 33°52'23.2" S. */
+export function formatDMS(value, axis) {
+  if (value == null || !Number.isFinite(value)) return '–';
+  const hemi = axis === 'lat' ? (value >= 0 ? 'N' : 'S') : value >= 0 ? 'E' : 'W';
+  // Round to 0.1" first so 59.96" carries into the next minute.
+  let tenths = Math.round(Math.abs(value) * 36000);
+  const deg = Math.floor(tenths / 36000);
+  tenths -= deg * 36000;
+  const min = Math.floor(tenths / 600);
+  const sec = (tenths - min * 600) / 10;
+  return `${deg}°${String(min).padStart(2, '0')}'${sec.toFixed(1).padStart(4, '0')}" ${hemi}`;
+}
+
 const CARDINALS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
 
 export function headingCardinal(deg) {

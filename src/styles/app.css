@@ -20,6 +20,7 @@
   --run: #f2672e;
   --cycle: #2f7df6;
   --ski: #8a63f0;
+  --live: #f5c518;
   --accent: var(--run);
   --on-accent: #ffffff;
 
@@ -71,6 +72,7 @@
 [data-activity='run'] { --accent: var(--run); }
 [data-activity='cycle'] { --accent: var(--cycle); }
 [data-activity='ski'] { --accent: var(--ski); }
+[data-activity='live'] { --accent: var(--live); --on-accent: #1b1d1f; }
 
 /* ==========================================================================
    Base
@@ -468,6 +470,10 @@ main#view {
   margin-bottom: 12px;
 }
 
+.banner[hidden] {
+  display: none;
+}
+
 .banner.warn {
   --accent: var(--warn);
 }
@@ -798,6 +804,24 @@ main#view {
 
 .activity-tile:active {
   transform: scale(0.98);
+}
+
+.live-tile {
+  grid-column: 1 / -1;
+  min-height: 0;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  align-content: center;
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.live-tile small {
+  opacity: 0.75;
+}
+
+.live-tile::before {
+  background: rgb(0 0 0 / 0.06);
 }
 
 .gps-chip {
@@ -1588,6 +1612,124 @@ main#view {
 }
 
 /* 3D */
+.live-pos {
+  display: grid;
+  gap: 10px;
+  padding-bottom: calc(var(--safe-bottom) + 16px);
+}
+
+.live-pos .banner {
+  margin-bottom: 0;
+}
+
+.live-pos .live-status {
+  padding: 0;
+}
+
+.pos-coords {
+  border: 0;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+
+.pos-coords label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pos-coords .value {
+  display: grid !important;
+  gap: 2px;
+  justify-content: start !important;
+  font-size: clamp(1.3rem, 6.5vw, 1.8rem) !important;
+}
+
+.fmt-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.pos-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pos-grid .metric {
+  min-height: 104px;
+}
+
+.pos-grid .metric .value {
+  font-size: clamp(1.5rem, 7.5vw, 2.1rem);
+}
+
+.metric-sub {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--text-dim);
+}
+
+.pos-map-card {
+  position: relative;
+  height: 230px;
+  overflow: hidden;
+}
+
+.pos-map-card .pos-map {
+  position: absolute;
+  inset: 0;
+}
+
+.pos-map-recenter {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.pos-map-recenter.visible {
+  display: grid;
+}
+
+.pos-map-recenter svg {
+  width: 20px;
+  height: 20px;
+}
+
+.pos-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 6px rgb(59 130 246 / 0.25), 0 1px 4px rgb(0 0 0 / 0.4);
+}
+
+.pos-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+.pos-actions .btn {
+  padding: 0 10px;
+}
+
 .view3d {
   position: absolute;
   inset: 0;

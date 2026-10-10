@@ -41,12 +41,19 @@ export async function mount(root) {
                 <span><strong>${a.label}</strong><small>${settings().autoPause[id] ? 'Auto-pause on' : 'Auto-pause off'}</small></span>
               </button>`;
             }).join('')}
+            <button class="activity-tile live-tile" data-activity="live" data-live>
+              ${icons.locate}
+              <span><strong>Live</strong><small>Position, altitude, speed and heading. Nothing is recorded.</small></span>
+            </button>
           </div>
           <div data-slot="recent"></div>
         </div>
       </div>
     </div>`;
 
+  root.querySelector('[data-live]').addEventListener('click', () => {
+    location.hash = '#/position';
+  });
   root.querySelectorAll('[data-go]').forEach((b) =>
     b.addEventListener('click', () => {
       location.hash = `#/live/${b.dataset.go}`;

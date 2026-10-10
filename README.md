@@ -30,6 +30,8 @@ sensors.
   <img src="docs/screenshots/splits.png" width="250" alt="Per-kilometre splits with pace, elevation change, heart rate and time">
   &nbsp;
   <img src="docs/screenshots/share.png" width="250" alt="Share sheet: text summary with Text message and Other apps buttons, and file export formats">
+  &nbsp;
+  <img src="docs/screenshots/live-position.png" width="250" alt="Live position screen: coordinates, barometric altitude, speed, compass heading and a map, with nothing recorded">
 </p>
 <p align="center">
   <img src="docs/screenshots/watch-home.png" width="200" alt="Pixel Watch: Locale start screen with Start Run and Start Walk">
@@ -50,6 +52,16 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Controls:** start, pause, resume and **hold-to-stop**, so a gloved hand can't end a
   workout by accident.
 - **Auto-pause:** optional, set separately for each activity.
+- **Live position mode:** the yellow **Live** tile shows where you are without recording
+  anything:
+  - coordinates, as decimal or degrees-minutes-seconds
+  - GPS accuracy and satellites
+  - barometric altitude with vertical accuracy and air pressure
+  - speed, and heading from the compass or GPS
+  - a live map with an accuracy circle
+  - **Copy**, **Share** and **Hold**
+
+  Sensors stop as soon as you leave the screen.
 - **Home-screen widgets:**
   - **1×1:** your last-used activity
   - **2×1:** run and walk
@@ -217,7 +229,7 @@ docs/        screenshots
 ```
 
 See [PLAN.md](PLAN.md) for the design and decisions, and [BACKLOG.md](BACKLOG.md) for
-planned features: voice announcements, 3D smoothing and a live position mode.
+planned features: voice announcements and 3D smoothing.
 
 ## Credits
 

@@ -21,6 +21,7 @@ route('/settings', () => import('./views/settings.js'), { tabs: true });
 route('/live', () => import('./views/live.js'));
 route('/live/:activity', () => import('./views/live.js'));
 route('/workout/:id', () => import('./views/detail.js'));
+route('/position', () => import('./views/position.js'));
 
 const TABS = [
   { path: '/', label: 'Track', icon: icons.home },
