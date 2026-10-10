@@ -29,10 +29,13 @@ export function predictionRecord(g) {
   return p;
 }
 
-/** Build a workout record + processed track from journal text. */
-export function buildWorkout(text, idOverride) {
+/**
+ * Build a workout record + processed track from journal text. `activityOverride` re-processes
+ * a journal as another activity (the user changed the type after recording).
+ */
+export function buildWorkout(text, idOverride, activityOverride) {
   const journal = parseJournal(text);
-  const { track, info } = processJournal(journal);
+  const { track, info } = processJournal(journal, activityOverride);
   const id = idOverride ?? journal.meta?.workoutId ?? newWorkoutId();
   const summary = computeSummary(track, info);
   const workout = {
@@ -52,4 +55,34 @@ export function buildWorkout(text, idOverride) {
   const prediction = predictionRecord(journal.goal);
   if (prediction) workout.prediction = prediction;
   return { workout, track, journal };
+}
+
+/**
+ * The record and track for `w` as another activity. With the raw journal the workout is
+ * re-processed with the new activity's filters (accuracy gate, speed limits, moving
+ * threshold); without one (imports, the sample) only the summary is recomputed, which
+ * adds or drops the ski runs and lifts. Name, notes and goal stay; a default name follows
+ * the new activity.
+ */
+export function rebuildAsActivity(w, activityId, { rawText = null, track = null } = {}) {
+  let next;
+  let nextTrack;
+  if (rawText != null) {
+    const built = buildWorkout(rawText, w.id, activityId);
+    nextTrack = built.track;
+    next = { ...w, activity: activityId, summary: built.workout.summary, preview: built.workout.preview, activeIntervals: built.workout.activeIntervals };
+  } else {
+    nextTrack = track;
+    const info = {
+      activity: activityId,
+      startedAt: w.startedAt,
+      endedAt: w.endedAt,
+      activeSeconds: w.summary.duration,
+      hasBarometer: w.summary.hasBarometer,
+    };
+    next = { ...w, activity: activityId, summary: computeSummary(track, info) };
+  }
+  if (w.name === defaultName(w.activity, w.startedAt)) next.name = defaultName(activityId, w.startedAt);
+  next.updatedAt = Date.now();
+  return { workout: next, track: nextTrack };
 }
