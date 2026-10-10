@@ -15,8 +15,11 @@ export const DEFAULT_SETTINGS = {
   satellite3d: true,
   smooth3d: true,
   coordFormat: 'decimal',
-  /** Learned routines: user names by routine id, and workouts left out of learning. */
-  routines: { names: {}, excluded: [] },
+  /**
+   * Learned routines: user names by routine id, workouts left out of learning, and
+   * routines the user marked in History ({id, name, activity, workoutIds}).
+   */
+  routines: { names: {}, excluded: [], user: [] },
   /** Spoken announcements during a workout, each kind on or off per activity. */
   voice: {
     splits: { walk: true, run: true, cycle: false, ski: false },

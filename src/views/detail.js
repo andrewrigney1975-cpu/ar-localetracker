@@ -165,6 +165,8 @@ export async function mount(root, params, query, ctx) {
     });
     if (!result) return;
     const { activity: nextActivity, ...patch } = result;
+    // A name the user typed replaces the routine's label for good (see routineLabels).
+    if (patch.name !== w.name) patch.routineLabel = null;
     if (nextActivity !== w.activity) {
       // Untouched name: let changeActivity rename a default one ("Morning Walk" → "Morning Run").
       if (patch.name === w.name) delete patch.name;

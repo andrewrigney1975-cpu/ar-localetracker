@@ -2286,3 +2286,73 @@ main#view {
 .report-table tr.sub td:first-child {
   padding-left: 14px;
 }
+
+/* ==========================================================================
+   History: select workouts to mark as a routine
+   ========================================================================== */
+.btn.small {
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: 0.9rem;
+}
+
+.screen.selecting {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.tabbar.behind {
+  display: none;
+}
+
+.select-hint {
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+}
+
+.select-hint[hidden],
+.selection-bar[hidden] {
+  display: none;
+}
+
+.selecting .workout-item {
+  position: relative;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  transition: outline-color 0.12s;
+}
+
+.selecting .workout-item::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  box-sizing: border-box;
+}
+
+.selecting .workout-item[aria-checked='true'] {
+  outline-color: var(--accent);
+}
+
+.selecting .workout-item[aria-checked='true']::after {
+  border-color: var(--accent);
+  background: var(--accent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E")
+    center / 14px no-repeat;
+}
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px calc(var(--safe-right) + 16px) calc(var(--safe-bottom) + 10px) calc(var(--safe-left) + 16px);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
