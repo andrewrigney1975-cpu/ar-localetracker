@@ -3,6 +3,8 @@
 Locale is a GPS workout tracker for Android 16+ covering **walking, running, cycling and
 snow skiing**. It records reliably in the background with the screen off. A **Wear OS
 companion** lets you start and stop workouts from your watch and adds live heart rate.
+Home-screen widgets start a workout in one tap. A **Live** mode shows your position,
+altitude, speed and heading without recording anything.
 Afterwards you can review each workout as stats, heart-rate effort (calories, cardio load,
 zones), splits, an interactive map with an elevation side view, or a 3D plot over
 satellite imagery. Then you can export it as **FIT** (for Strava and Garmin Connect),
@@ -211,11 +213,11 @@ src/
   db/        storage facade: SQLite on Android (nativeStore), IndexedDB in the browser
              (idbStore), track codec, one-time migration
   export/    FIT, GPX, TCX, KML, GeoJSON, CSV
-  map/       MapLibre map view        profile/  elevation side view
+  map/       MapLibre workout map, Live position map    profile/  elevation side view
   view3d/    Three.js 3D view, satellite imagery
   seed/      City2Surf sample workout (course data + generator)
   stats/physio.js  heart-rate zones, TRIMP, calories
-  views/     home, live, history, detail, settings
+  views/     home, live (workout), position (Live mode), history, detail, settings
 android/app/src/main/java/app/locale/exercisetracker/tracker/
   LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
   WearListenerService  WearSync          (watch link)
