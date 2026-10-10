@@ -140,7 +140,9 @@ implementation notes for whoever picks it up.
 
 ---
 
-## 5. Smooth data points in the 3D view
+## 5. Smooth data points in the 3D view: ✅ done (October 2026)
+
+> Implemented in `src/view3d/smooth.js`: a centred 10 s time-weighted average (integral of the interpolated signal, so uneven fix spacing doesn't add zig-zag) of position, altitude and speed, per segment. Arrows and markers are placed on the smoothed line by distance. **Smooth** chip on the 3D view plus a Settings switch. Distance resampling and Catmull-Rom splines below were not needed.
 
 **Request:** draw a smooth route in the 3D view instead of a jagged one.
 

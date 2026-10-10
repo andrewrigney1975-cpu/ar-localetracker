@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   mapStyle: 'streets',
   exaggeration: 'auto',
   satellite3d: true,
+  smooth3d: true,
   coordFormat: 'decimal',
   /** For calories, heart-rate zones and cardio load. Weight in kg. */
   profile: { birthYear: null, sex: null, weightKg: null, restingHr: null, maxHr: null },
