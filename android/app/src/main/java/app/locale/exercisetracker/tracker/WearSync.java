@@ -19,6 +19,8 @@ final class WearSync {
     static final String CAPABILITY_WEAR = "locale_wear";
     static final String PATH_STATUS = "/locale/status";
     static final String PATH_ERROR = "/locale/error";
+    /** {kind, text}: the watch vibrates a pattern per kind and shows the text. */
+    static final String PATH_ANNOUNCE = "/locale/announce";
 
     private static final String TAG = "LocaleWear";
     private static final long NODE_CACHE_MS = 60_000;

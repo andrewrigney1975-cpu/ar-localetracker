@@ -25,6 +25,8 @@ export const DEFAULT_SETTINGS = {
     goalMode: { walk: 'auto', run: 'auto', cycle: 'auto', ski: 'off' },
     /** Say the goal when it is chosen. */
     confirmGoal: true,
+    /** Vibrate a paired watch with each announcement (a pattern per kind). */
+    watchBuzz: true,
     intervalMin: 10,
     /** Goal distance per activity in metres, set on the start screen. */
     goalM: { walk: 5000, run: 10000, cycle: 40000, ski: 20000 },

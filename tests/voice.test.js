@@ -103,6 +103,27 @@ describe('voice triggers', () => {
     );
   });
 
+  it('reports the kind of each announcement for the watch buzz (the most important wins)', () => {
+    const c = new VoiceCoach(cfg({ splits: true, time: true, intervalMin: 5, goal: true, goalM: 4000 }));
+    c.onProgress(500, 180000);
+    expect(c.lastKind).toBeNull();
+    c.onProgress(1000, 299000);
+    expect(c.lastKind).toBe('goal'); // 1 km split and 25% of the goal at once
+    c.onProgress(1500, 300000);
+    expect(c.lastKind).toBe('time');
+    c.onProgress(2000, 420000);
+    expect(c.lastKind).toBe('goal');
+    c.onProgress(3000, 590000);
+    expect(c.lastKind).toBe('goal');
+    c.onProgress(3500, 595000);
+    expect(c.lastKind).toBeNull();
+    c.onProgress(4000, 599000);
+    expect(c.lastKind).toBe('goal-reached');
+    const s = new VoiceCoach(cfg({ splits: true }));
+    s.onProgress(1000, 300000);
+    expect(s.lastKind).toBe('split');
+  });
+
   it('stays quiet when every kind is off, but keeps counting', () => {
     const c = new VoiceCoach(cfg({}));
     expect(c.enabled).toBe(false);

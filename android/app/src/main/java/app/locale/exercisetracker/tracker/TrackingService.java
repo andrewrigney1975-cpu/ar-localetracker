@@ -561,15 +561,14 @@ public class TrackingService extends Service {
     /** Splits, time and goal announcements; only while actually recording (not paused). */
     private void announce() {
         String text;
+        String kind;
         synchronized (this) {
             if (coach == null) return;
             text = coach.onProgress(distanceM, elapsedMs());
+            kind = coach.lastKind;
         }
         if (text == null) return;
-        if (speaker != null) speaker.speak(text);
-        JSObject ev = new JSObject();
-        ev.put("text", text);
-        TrackerHub.emit("announce", ev); // shown as a caption on the live screen
+        say(text, kind);
     }
 
     // ---- Goal (manual, or predicted from learned routines) -----------------------------------
@@ -621,7 +620,7 @@ public class TrackingService extends Service {
         }
         routeGuard = "route".equals(source) && signature != null && signature.length() > 1 ? new RouteGuard(signature) : null;
         journalGoal();
-        if (coach.cfg.confirmGoal) say(VoiceCoach.goalConfirmation(m, coach.cfg.imperial, source, name));
+        if (coach.cfg.confirmGoal) say(VoiceCoach.goalConfirmation(m, coach.cfg.imperial, source, name), "goal-set");
         TrackerHub.emit("goal", goalJs());
         saveSnapshot();
         updateNotification(true);
@@ -638,7 +637,7 @@ public class TrackingService extends Service {
             goalOffRoute = true;
         }
         journalGoal();
-        say(VoiceCoach.OFF_ROUTE_PHRASE);
+        say(VoiceCoach.OFF_ROUTE_PHRASE, "off-route");
         TrackerHub.emit("goal", goalJs());
         saveSnapshot();
         pushWearStatus(true);
@@ -688,11 +687,20 @@ public class TrackingService extends Service {
         }
     }
 
-    private void say(String text) {
+    /** Speak, caption on the live screen, and buzz the watch with a pattern for the kind. */
+    private void say(String text, String kind) {
         if (speaker != null) speaker.speak(text);
         JSObject ev = new JSObject();
         ev.put("text", text);
+        ev.put("kind", kind);
         TrackerHub.emit("announce", ev);
+        if (coach != null && coach.cfg.watchBuzz) {
+            JSONObject o = new JSONObject();
+            put(o, "kind", kind);
+            put(o, "text", text);
+            put(o, "t", System.currentTimeMillis());
+            WearSync.send(this, WearSync.PATH_ANNOUNCE, o);
+        }
     }
 
     // ---- Watch ------------------------------------------------------------------------------

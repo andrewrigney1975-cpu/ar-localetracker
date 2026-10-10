@@ -39,7 +39,8 @@ function nativeTracker() {
     },
     deleteJournal: (workoutId) => Native.deleteJournal({ workoutId }),
     setKeepScreenOn: (enabled) => Native.setKeepScreenOn({ enabled }),
-    speak: (text, duck = true) => Native.speak({ text, duck }),
+    /** Speak a sample; `buzz` (an announcement kind) also vibrates a paired watch. */
+    speak: (text, duck = true, buzz = null) => Native.speak({ text, duck, ...(buzz ? { buzz } : {}) }),
     getWatchStatus: () => Native.getWatchStatus(),
     pinWidget: (size) => Native.pinWidget({ size }),
     requestBackgroundLocation: () => Native.requestBackgroundLocation(),

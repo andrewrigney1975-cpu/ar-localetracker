@@ -26,6 +26,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import android.os.SystemClock
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -192,6 +194,7 @@ private fun ActiveScreen(
                 fontWeight = FontWeight.SemiBold,
             )
             if (error != null) Message(error, MaterialTheme.colorScheme.error)
+            else AnnouncementCaption()
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilledIconButton(
@@ -225,6 +228,34 @@ private fun ActiveScreen(
         }
     }
 }
+
+/** The phone's last announcement, for a few seconds after the watch buzzes. */
+@Composable
+private fun AnnouncementCaption() {
+    val last by PhoneLink.announcement.collectAsStateWithLifecycle()
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(last) {
+        val at = last?.second ?: return@LaunchedEffect
+        val left = CAPTION_MS - (SystemClock.elapsedRealtime() - at)
+        if (left <= 0) return@LaunchedEffect
+        visible = true
+        delay(left)
+        visible = false
+    }
+    if (visible && last != null) {
+        Text(
+            last!!.first,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFFD7DEE4),
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 6.dp),
+        )
+    }
+}
+
+private const val CAPTION_MS = 8_000L
 
 @Composable
 private fun Metric(text: String) {

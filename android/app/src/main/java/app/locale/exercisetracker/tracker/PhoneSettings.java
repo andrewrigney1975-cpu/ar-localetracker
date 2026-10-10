@@ -38,6 +38,7 @@ final class PhoneSettings {
         c.goal = "set".equals(mode);
         c.autoGoal = "auto".equals(mode);
         c.confirmGoal = v.optBoolean("confirmGoal", true);
+        c.watchBuzz = v.optBoolean("watchBuzz", true);
         c.intervalMin = v.optInt("intervalMin", 10);
         JSONObject goals = v.optJSONObject("goalM");
         double defGoal = "walk".equals(activity) ? 5000 : "cycle".equals(activity) ? 40000 : "ski".equals(activity) ? 20000 : 10000;

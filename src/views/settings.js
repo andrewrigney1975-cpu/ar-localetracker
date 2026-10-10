@@ -155,6 +155,8 @@ export async function mount(root) {
                 ${segmented('voice.intervalMin', INTERVAL_OPTIONS.map((m) => [m, `${m} min`]), s.voice.intervalMin)}</div>
               <div class="setting"><div class="text">Other audio<small>Music and podcasts while Locale speaks</small></div>
                 ${segmented('voice.duck', [['true', 'Lower'], ['false', 'Pause']], String(s.voice.duck))}</div>
+              <label class="setting"><span class="text">Vibrate the watch<small>A buzz on your Wear OS watch with each announcement: two taps for a split, one for time, three for a goal milestone</small></span>
+                <input type="checkbox" class="switch" data-toggle="watchBuzz" ${s.voice.watchBuzz ? 'checked' : ''} /></label>
               <label class="setting"><span class="text">Say the goal at the start<small>For example "Goal 4.7 kilometres, your usual Saturday morning loop"</small></span>
                 <input type="checkbox" class="switch" data-toggle="confirmGoal" ${s.voice.confirmGoal ? 'checked' : ''} /></label>
               <div class="setting"><div class="text">Splits every ${imperial ? 'mile' : 'kilometre'}; goal at 25, 50, 75 and 100%<small>Auto goal: learned from your usual routes and times. Set goal: the distance chosen on the start screen. Tap a goal chip to switch.</small></div>
@@ -264,6 +266,9 @@ export async function mount(root) {
         render();
       })
     );
+    root.querySelector('[data-toggle="watchBuzz"]').addEventListener('change', (e) =>
+      updateSettings({ voice: { ...settings().voice, watchBuzz: e.target.checked } })
+    );
     root.querySelector('[data-toggle="confirmGoal"]').addEventListener('change', (e) =>
       updateSettings({ voice: { ...settings().voice, confirmGoal: e.target.checked } })
     );
@@ -318,7 +323,8 @@ export async function mount(root) {
     root.querySelector('[data-act="voicetest"]').addEventListener('click', () => {
       const unit = imperial ? 1609.344 : 1000;
       const text = `${spokenDistance(5 * unit, imperial)}. Split time 6 minutes 12 seconds. ${spokenAverage(5 * unit, 5 * 378000, { pace: true, imperial })}`;
-      tracker.speak(text, settings().voice.duck).catch((e) => toast(e?.message ?? 'Text-to-speech is not available'));
+      const v = settings().voice;
+      tracker.speak(text, v.duck, v.watchBuzz ? 'split' : null).catch((e) => toast(e?.message ?? 'Text-to-speech is not available'));
     });
     root.querySelector('[data-act="battery"]')?.addEventListener('click', () => tracker.requestIgnoreBatteryOptimizations());
     root.querySelector('[data-act="appsettings"]').addEventListener('click', () => tracker.openAppSettings());
