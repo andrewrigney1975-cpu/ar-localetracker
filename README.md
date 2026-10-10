@@ -10,7 +10,8 @@ altitude, speed and heading without recording anything.
 Afterwards you can review each workout as stats, heart-rate effort (calories, cardio load,
 zones), splits, an interactive map with an elevation side view, or a 3D plot over
 satellite imagery. Then you can export it as **FIT** (for Strava and Garmin Connect),
-GPX, TCX, KML, GeoJSON or CSV.
+GPX, TCX, KML, GeoJSON or CSV. **Insights** reports your totals and averages by day, week,
+month, quarter or year, per activity, and exports them as CSV or JSON.
 
 The app is written in HTML5, vanilla JavaScript and CSS3, and packaged with
 [Capacitor](https://capacitorjs.com/). A small Java plugin handles background GPS and
@@ -43,6 +44,13 @@ sensors.
   <img src="docs/screenshots/voice-live.png" width="250" alt="Live workout screen showing the last spoken announcement as a caption under the controls">
 </p>
 <p align="center">
+  <img src="docs/screenshots/insights.png" width="250" alt="Insights: date range, grouping and activity filters, with totals for workouts, distance, activity time, speed, pace, heart rate, cardio load and calories">
+  &nbsp;
+  <img src="docs/screenshots/insights-split.png" width="250" alt="Insights: monthly distance stacked by activity, with a tooltip for July and a table broken down by activity">
+  &nbsp;
+  <img src="docs/screenshots/insights-weekly.png" width="250" alt="Insights: weekly cardio load for the last 3 months stacked by activity, with a tooltip for one week">
+</p>
+<p align="center">
   <img src="docs/screenshots/watch-home.png" width="200" alt="Pixel Watch: Locale start screen with Start Run and Start Walk">
   &nbsp;
   <img src="docs/screenshots/watch-workout.png" width="200" alt="Pixel Watch: workout in progress with elapsed time, distance, pace, heart rate, pause and stop">
@@ -51,7 +59,8 @@ sensors.
 <sub>The phone screenshots show the built-in sample workout, a simulated run of the Sydney
 City2Surf (Hyde Park to Bondi via Heartbreak Hill at 6:18/km, with simulated heart rate).
 It is generated from the course map and is not a real recording. The voice screenshots
-come from the browser simulator. The watch screenshots
+come from the browser simulator. The Insights screenshots use a year of generated
+workouts in the browser build. The watch screenshots
 are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</sub>
 
 ## Features
@@ -162,6 +171,9 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - **Smooth** route: a 10-second time-weighted average removes GPS noise and altitude
     bounce from the drawn line (display only; stats and exports use the raw track).
     Toggle it on the 3D view or in Settings.
+- **Edit** a workout's name, notes and **activity type**. Recorded the wrong one? Changing
+  it re-processes the original GPS recording with the new activity's filters, and an
+  automatic name like "Morning Run" follows.
 - **Share as text:** a short summary (distance, time, pace or speed, climb, heart rate,
   calories) by **SMS** with one tap, or to any app through the Android share sheet.
 - **Export** through the Android share sheet as:
@@ -169,6 +181,19 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
     Includes per-km laps, heart rate, climb and calories. The encoder is written from the
     FIT protocol spec and checked in tests with Garmin's official FIT SDK.
   - GPX, TCX, KML (3D in Google Earth), GeoJSON or CSV.
+
+### Insights
+- **Date range:** last 30 days, 3 months, 12 months, this year, all time, or custom dates.
+- **Grouping:** daily, weekly (from Monday), monthly, every 3 months (calendar quarters)
+  or yearly.
+- **Activity:** all together, one activity, or all with each activity shown separately.
+- **Metrics:** distance, average speed and pace (over moving time), activity time,
+  average heart rate (max too in exports), cardio load and calories. Totals sit at the top; the chart
+  shows the metric you pick (tap a bar for its values), and a table lists every period.
+- **Export** the report as **CSV** (one row per period, or per period and activity) or
+  **JSON** (with totals) through the Android share sheet. Values are SI units.
+- Calories and cardio load need the profile in Settings. They are worked out from each
+  workout's full recording and cached on the device until the workout or profile changes.
 
 ### General
 - **Units:** metric by default, imperial in Settings.
@@ -325,9 +350,11 @@ src/
   view3d/    Three.js 3D view, satellite imagery, display smoothing
   seed/      City2Surf sample workout (course data + generator)
   stats/physio.js  heart-rate zones, TRIMP, calories
-  views/     home, live (workout), position (Live mode), history, detail, settings
+  views/     home, live (workout), position (Live mode), history, detail, insights,
+             settings
   voice/     announcement triggers and phrases (mirrored natively in VoiceCoach)
-  insights/  learned routines and goal prediction (matcher mirrored in RoutineMatcher)
+  insights/  learned routines and goal prediction (matcher mirrored in RoutineMatcher);
+             date-based reports with CSV/JSON export, calorie and load cache
 android/app/src/main/java/app/locale/exercisetracker/tracker/
   LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
   WearListenerService  WearSync          (watch link)

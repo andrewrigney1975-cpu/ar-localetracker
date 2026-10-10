@@ -1,8 +1,9 @@
-import { activity as activityProfile } from '../activities.js';
+import { ACTIVITIES, ACTIVITY_IDS, activity as activityProfile } from '../activities.js';
 import { deleteWorkout, getTrack, getWorkout, updateWorkout } from '../db/workouts.js';
 import { EXPORT_FORMATS, renderExport } from '../export/index.js';
 import { navigate } from '../router.js';
 import { workoutShareText, smsUri } from '../export/text.js';
+import { changeActivity } from '../services/workoutService.js';
 import { openSms, shareFile, shareText } from '../services/share.js';
 import { settings, updateSettings } from '../settings.js';
 import { estimateCalories, loadLabel, profileComplete, trimp, ZONES, zoneSeconds } from '../stats/physio.js';
@@ -53,7 +54,7 @@ export async function mount(root, params, query, ctx) {
       <header class="topbar">
         <button class="icon-btn" data-act="back" aria-label="Back">${icons.back}</button>
         <h1 data-ref="title"></h1>
-        <button class="icon-btn" data-act="edit" aria-label="Rename or add notes">${icons.edit}</button>
+        <button class="icon-btn" data-act="edit" aria-label="Edit name, activity or notes">${icons.edit}</button>
         <button class="icon-btn" data-act="export" aria-label="Share">${icons.share}</button>
         <button class="icon-btn" data-act="delete" aria-label="Delete">${icons.trash}</button>
       </header>
@@ -137,17 +138,51 @@ export async function mount(root, params, query, ctx) {
       dlg.innerHTML = `
         <h2>Edit workout</h2>
         <label class="field"><span>Name</span><input type="text" maxlength="80" autofocus /></label>
+        <div class="field"><span>Activity</span>
+          <div class="chip-row" role="radiogroup" aria-label="Activity">
+            ${ACTIVITY_IDS.map((id) => `<button class="chip" role="radio" data-a="${id}" data-activity="${id}">${ACTIVITIES[id].icon}${ACTIVITIES[id].label}</button>`).join('')}
+          </div>
+        </div>
+        <p class="field-hint" data-ref="activity-hint" hidden>The workout will be re-processed as a <b></b>. Distance and times may change slightly.</p>
         <label class="field"><span>Notes</span><textarea maxlength="2000"></textarea></label>
         <div class="actions"><button class="btn ghost" data-v="cancel">Cancel</button><button class="btn primary" data-v="save">Save</button></div>`;
       const input = dlg.querySelector('input');
       const notes = dlg.querySelector('textarea');
+      const hint = dlg.querySelector('[data-ref="activity-hint"]');
+      let picked = w.activity;
+      const pick = (id) => {
+        picked = id;
+        dlg.querySelectorAll('[data-a]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.a === id)));
+        hint.hidden = id === w.activity;
+        hint.querySelector('b').textContent = ACTIVITIES[id].label.toLowerCase();
+      };
+      dlg.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => pick(b.dataset.a)));
+      pick(w.activity);
       input.value = w.name;
       notes.value = w.notes ?? '';
       dlg.querySelector('[data-v="cancel"]').addEventListener('click', () => close(null));
-      dlg.querySelector('[data-v="save"]').addEventListener('click', () => close({ name: input.value.trim() || w.name, notes: notes.value.trim() }));
+      dlg.querySelector('[data-v="save"]').addEventListener('click', () => close({ name: input.value.trim() || w.name, notes: notes.value.trim(), activity: picked }));
     });
     if (!result) return;
-    w = await updateWorkout(w.id, result);
+    const { activity: nextActivity, ...patch } = result;
+    if (nextActivity !== w.activity) {
+      // Untouched name: let changeActivity rename a default one ("Morning Walk" → "Morning Run").
+      if (patch.name === w.name) delete patch.name;
+      try {
+        w = await changeActivity(w, nextActivity);
+      } catch (e) {
+        console.error(e);
+        toast(`Could not change the activity: ${e?.message ?? e}`);
+        return;
+      }
+      // The whole view depends on the activity (colours, speed vs pace, ski stats).
+      w = await updateWorkout(w.id, patch);
+      window.dispatchEvent(new CustomEvent('workouts-changed'));
+      toast(`Changed to ${ACTIVITIES[nextActivity].label.toLowerCase()}`);
+      navigate(`/workout/${encodeURIComponent(w.id)}?tab=${tab}`, { replace: true });
+      return;
+    }
+    w = await updateWorkout(w.id, patch);
     renderHead();
     if (tab === 'summary') showTab('summary');
     window.dispatchEvent(new CustomEvent('workouts-changed'));

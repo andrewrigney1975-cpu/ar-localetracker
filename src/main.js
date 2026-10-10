@@ -15,6 +15,7 @@ import { icons } from './ui/icons.js';
 
 route('/', () => import('./views/home.js'), { tabs: true });
 route('/history', () => import('./views/history.js'), { tabs: true });
+route('/insights', () => import('./views/insights.js'), { tabs: true });
 route('/settings', () => import('./views/settings.js'), { tabs: true });
 route('/live', () => import('./views/live.js'));
 route('/live/:activity', () => import('./views/live.js'));
@@ -24,6 +25,7 @@ route('/position', () => import('./views/position.js'));
 const TABS = [
   { path: '/', label: 'Track', icon: icons.home },
   { path: '/history', label: 'History', icon: icons.history },
+  { path: '/insights', label: 'Insights', icon: icons.insights },
   { path: '/settings', label: 'Settings', icon: icons.settings },
 ];
 

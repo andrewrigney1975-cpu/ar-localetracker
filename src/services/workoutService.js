@@ -1,10 +1,10 @@
 // Turns finished native journals into stored workouts.
 
-import { currentBackend, hasWorkout, saveWorkout } from '../db/workouts.js';
-import { buildWorkout } from './buildWorkout.js';
+import { currentBackend, getRawJournal, getTrack, hasWorkout, saveWorkout } from '../db/workouts.js';
+import { buildWorkout, rebuildAsActivity } from './buildWorkout.js';
 import { tracker } from '../tracker/client.js';
 
-export { buildWorkout, defaultName, newWorkoutId } from './buildWorkout.js';
+export { buildWorkout, defaultName, newWorkoutId, rebuildAsActivity } from './buildWorkout.js';
 
 /**
  * After a stop on Android, TrackingService processes and stores the workout itself (SQLite).
@@ -31,6 +31,18 @@ export async function finalizeJournal(workoutId, { keepEmpty = false } = {}) {
   await saveWorkout(workout, track, text);
   await tracker.deleteJournal(workoutId);
   return workout;
+}
+
+/** Change a stored workout's activity type (see rebuildAsActivity). */
+export async function changeActivity(w, activityId) {
+  if (w.activity === activityId) return w;
+  const rawText = await getRawJournal(w.id).catch(() => null);
+  const track = rawText != null ? null : await getTrack(w.id);
+  if (rawText == null && !track) throw new Error('Workout track not found');
+  const rebuilt = rebuildAsActivity(w, activityId, { rawText, track });
+  if (rawText != null && rebuilt.track.n < 2) throw new Error('Not enough GPS points to re-process');
+  await saveWorkout(rebuilt.workout, rebuilt.track, rawText);
+  return rebuilt.workout;
 }
 
 /**
