@@ -291,6 +291,17 @@ public class LocaleTrackerPlugin extends Plugin {
             .putExtra(TrackingService.EXTRA_AUTO_PAUSE, Boolean.TRUE.equals(call.getBoolean("autoPause", false)))
             .putExtra(TrackingService.EXTRA_UNITS, call.getString("units", "metric"))
             .putExtra(TrackingService.EXTRA_RESUME, Boolean.TRUE.equals(call.getBoolean("resume", false)));
+        // Goal chosen on the start screen for this workout only, and the warm-up fix so an
+        // auto goal can be decided straight away.
+        Double goalM = call.getDouble("goalM");
+        if (goalM != null && goalM > 0) i.putExtra(TrackingService.EXTRA_GOAL_M, goalM.doubleValue());
+        JSObject fix = call.getObject("fix");
+        if (fix != null && fix.has("lat") && fix.has("lon")) {
+            i.putExtra(TrackingService.EXTRA_FIX_LAT, fix.optDouble("lat"))
+                .putExtra(TrackingService.EXTRA_FIX_LON, fix.optDouble("lon"))
+                .putExtra(TrackingService.EXTRA_FIX_T, fix.optLong("t"))
+                .putExtra(TrackingService.EXTRA_FIX_ACC, fix.optDouble("accuracy", 999));
+        }
         try {
             getContext().startForegroundService(i);
         } catch (RuntimeException e) {

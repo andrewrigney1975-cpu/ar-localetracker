@@ -80,6 +80,7 @@ public final class WorkoutBuilder {
         final List<double[]> states = new ArrayList<>(); // [t, active(1/0)]
         final List<double[]> hr = new ArrayList<>(); // [t, bpm]
         JSONObject end;
+        JSONObject goal;
     }
 
     private static Double num(JSONObject o, String k) {
@@ -138,6 +139,9 @@ public final class WorkoutBuilder {
                 }
                 case "end":
                     j.end = o;
+                    break;
+                case "goal":
+                    if (o.optDouble("goalM", 0) > 0) j.goal = o;
                     break;
                 default:
                     break;
@@ -933,6 +937,19 @@ public final class WorkoutBuilder {
         return part + " " + Profile.of(activity).label;
     }
 
+    /** Mirrors predictionRecord() in buildWorkout.js. */
+    static JSONObject predictionRecord(JSONObject g) throws JSONException {
+        if (g == null || !(g.optDouble("goalM", 0) > 0)) return null;
+        JSONObject p = new JSONObject();
+        p.put("goalM", g.getDouble("goalM"));
+        p.put("source", g.optString("source", "manual"));
+        p.put("routineId", g.has("routineId") && !g.isNull("routineId") ? g.getString("routineId") : JSONObject.NULL);
+        if (!g.optString("name", "").isEmpty()) p.put("name", g.getString("name"));
+        if (g.has("confidence")) p.put("confidence", g.getDouble("confidence"));
+        if (g.optBoolean("offRoute", false)) p.put("offRoute", true);
+        return p;
+    }
+
     /** Build the stored workout record and track from journal text. */
     public static Built build(String text, String idOverride) throws JSONException {
         Journal journal = parse(text);
@@ -956,6 +973,8 @@ public final class WorkoutBuilder {
         w.put("activeIntervals", iv);
         w.put("summary", summary(p.track, p.info));
         w.put("preview", previewPolyline(p.track, 120));
+        JSONObject prediction = predictionRecord(journal.goal);
+        if (prediction != null) w.put("prediction", prediction);
         return new Built(w, p.track);
     }
 }

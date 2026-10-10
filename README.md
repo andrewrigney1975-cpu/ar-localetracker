@@ -4,7 +4,8 @@ Locale is a GPS workout tracker for Android 16+ covering **walking, running, cyc
 snow skiing**. It records reliably in the background with the screen off. A **Wear OS
 companion** lets you start and stop workouts from your watch and adds live heart rate.
 Home-screen widgets start a workout in one tap, and **voice announcements** call out
-your splits, time and goal progress as you go. A **Live** mode shows your position,
+your splits, time and goal progress as you go. Locale **learns your routines**, and
+sets the goal distance for a workout on its own once it knows them. A **Live** mode shows your position,
 altitude, speed and heading without recording anything.
 Afterwards you can review each workout as stats, heart-rate effort (calories, cardio load,
 zones), splits, an interactive map with an elevation side view, or a 3D plot over
@@ -98,6 +99,8 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 
   Each kind is on or off per activity (Settings → Voice announcements). Music is lowered
   or paused while Locale speaks, and nothing is said while paused.
+- **Auto goals:** the goal distance is predicted from your routines; see
+  [Auto goals](#auto-goals-how-locale-learns-your-routines).
 - **Lock-screen notification** with pause, resume and stop. It shows as an Android 16
   Live Update.
 - **Crash-safe recording:** every fix goes to an on-disk journal. A workout survives the
@@ -167,6 +170,81 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   IndexedDB data migrates automatically on first launch, verified per track by CRC-32.
   A workout stopped from the watch, a widget or the notification is processed and saved
   natively right away. The browser build keeps IndexedDB.
+
+## Auto goals: how Locale learns your routines
+
+Most people repeat a few workouts, such as a Saturday morning loop of the lake or a
+run along the river after work on Tuesdays and Thursdays. Locale notices these
+**routines** and uses them to set the goal distance for you, so you hear "25 percent of
+your goal" without setting anything up.
+
+### What it does
+- **When you start a workout**, Locale works out which routine you are probably doing.
+  It decides at the first good GPS fix, or from the time of day if there is no fix
+  after 90 seconds. If it is confident, it sets the goal and tells you:
+  *"Goal 4.7 kilometres, your usual Saturday morning loop."*
+- **During the workout** it announces 25%, 50%, 75% and "Goal reached" at 100%, along
+  with your distance and average pace or speed.
+- **If you leave the usual route**, meaning more than 250 m from it for over 2 minutes,
+  it says *"Off your usual route. Goal announcements paused."* Splits and time
+  announcements carry on.
+- **If it isn't sure, it says nothing.** It never guesses between two equally likely
+  routines, and it never sets a goal at a place it doesn't know.
+- **Afterwards**, the workout summary shows the goal and whether you finished within 10%
+  of it. The watch shows goal progress as a ring round the screen.
+
+### How it learns
+1. **It looks at your saved workouts**, on the phone only, nothing is sent anywhere.
+   For each workout it reads the activity, the local weekday and start time, where it
+   started and finished, the shape of the route, and the distance and time taken. The
+   built-in sample and very short workouts (under 500 m or 3 minutes) are left out.
+2. **It groups workouts that are the same routine.** That means the same activity, a
+   start within 300 m, distances within 12%, and routes that overlap. Two routes overlap
+   when they stay, on average, within 120 m or 4% of the distance of each other. A loop
+   run the other way round counts as the same route.
+3. **It describes each routine:**
+   - how often you do it, with recent workouts counting more (each 60 days halves the
+     weight)
+   - the usual weekday and start time
+   - the usual distance and how much it varies
+   - a name such as "Saturday morning loop" or "weekday evening route"
+4. **It works out the goal:** the usual (median) distance, rounded to 0.1 km or mi. If
+   your distances cluster around a round number, such as 4.9–5.1 km, the goal is that
+   number: "5 kilometres".
+5. **It checks it has enough history first.** Auto goals start once an activity has 5
+   workouts in the last 6 months. A routine counts once it has 3 workouts, 2 of them in
+   the last 60 days, with distances that vary by no more than about 12%.
+6. **It picks one routine when you start.** Each routine that starts near you is scored
+   on how often you do it, how close you are to its usual start time, and whether today
+   is its usual day. Workouts from the same spot that fit no routine count against the
+   leader. A routine wins only with a clear lead: at least 70% of the score, and well
+   ahead of the next. Before a GPS fix, Locale can fall back to your usual distance for
+   that time of week, such as "weekend morning walks".
+7. **It learns from its mistakes.** Each workout keeps the goal it was given. If a
+   routine's recent auto goals mostly missed (fewer than half of the last 5 within 10%),
+   that routine is paused. If you also stopped doing it, its workouts are set aside, so
+   a new habit can take over quickly.
+
+The model is rebuilt whenever your workout list changes, including when you come back
+to the app after recording from the watch. The phone's tracking service reads it, so
+workouts started from the watch or a widget get an auto goal too.
+
+### Your controls
+- **Settings → Voice announcements:** each activity's goal chip cycles between
+  **Auto goal** (the default; ski is Off), **Set goal** (a distance you choose on the
+  start screen) and **Off**. You can also turn off "Say the goal at the start".
+- **Start screen:** shows the auto goal and the routine it came from, or "learning · 3
+  of 5 runs". Use − or + to set a different goal for this workout only.
+- **Settings → Learned routines:** each routine's distance, how often you do it, the
+  usual day and time, and how often its goal was hit. You can **Rename** it (Locale then
+  says "your usual lake loop") or **Forget** it, which leaves its workouts out of
+  learning. **Restore** undoes forgetting.
+
+The thresholds were tuned with `scripts/evaluate-goals.mjs`. It replays generated
+histories in date order and predicts each workout from the earlier ones only. On
+typical routines, 100% of auto goals landed within 10% of the actual distance, and
+histories of random one-off workouts got no goals at all. The design and numbers are in
+[docs/plans/goal-prediction.md](docs/plans/goal-prediction.md).
 
 ## Getting started
 
@@ -239,11 +317,13 @@ src/
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, settings
   voice/     announcement triggers and phrases (mirrored natively in VoiceCoach)
+  insights/  learned routines and goal prediction (matcher mirrored in RoutineMatcher)
 android/app/src/main/java/app/locale/exercisetracker/tracker/
   LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
   WearListenerService  WearSync          (watch link)
   LocaleWidgets  Widget1x1/2x1/2x2Provider  (home-screen widgets)
   VoiceCoach  Speaker                        (voice announcements, text-to-speech)
+  RoutineMatcher  RouteGuard                 (auto goals from learned routines)
 android/app/src/main/java/app/locale/exercisetracker/store/
   WorkoutStore (SQLite)  LocaleStorePlugin  TrackCodec  WorkoutBuilder (JS processing port)
 android/wear/            Wear OS companion app (Kotlin, Compose for Wear OS)

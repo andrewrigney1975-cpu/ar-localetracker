@@ -19,6 +19,16 @@ export function defaultName(activityId, startedAt) {
   return `${part} ${activityProfile(activityId).label}`;
 }
 
+/** The goal used for this workout, as stored on the record (goal-prediction feedback). */
+export function predictionRecord(g) {
+  if (!g || !(g.goalM > 0)) return null;
+  const p = { goalM: g.goalM, source: g.source ?? 'manual', routineId: g.routineId ?? null };
+  if (g.name) p.name = g.name;
+  if (Number.isFinite(g.confidence)) p.confidence = g.confidence;
+  if (g.offRoute) p.offRoute = true;
+  return p;
+}
+
 /** Build a workout record + processed track from journal text. */
 export function buildWorkout(text, idOverride) {
   const journal = parseJournal(text);
@@ -39,5 +49,7 @@ export function buildWorkout(text, idOverride) {
     summary,
     preview: previewPolyline(track),
   };
+  const prediction = predictionRecord(journal.goal);
+  if (prediction) workout.prediction = prediction;
   return { workout, track, journal };
 }

@@ -1242,6 +1242,30 @@ main#view {
   color: var(--text-dim);
 }
 
+.goal-line {
+  margin: 12px 4px 0;
+  font-size: 0.88rem;
+}
+
+.goal-sub {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  max-width: 190px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goal-reset {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.72rem;
+}
+
 .voice-kinds {
   display: flex;
   gap: 6px;

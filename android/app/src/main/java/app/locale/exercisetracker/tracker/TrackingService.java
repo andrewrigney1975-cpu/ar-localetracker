@@ -56,6 +56,16 @@ public class TrackingService extends Service {
     static final String EXTRA_AUTO_PAUSE = "autoPause";
     static final String EXTRA_UNITS = "units";
     static final String EXTRA_RESUME = "resume";
+    static final String EXTRA_GOAL_M = "goalM";
+    static final String EXTRA_FIX_LAT = "fixLat";
+    static final String EXTRA_FIX_LON = "fixLon";
+    static final String EXTRA_FIX_T = "fixT";
+    static final String EXTRA_FIX_ACC = "fixAcc";
+
+    /** Auto goal: decide at the first fix this accurate, or without location after the timeout. */
+    private static final double GOAL_FIX_ACCURACY_M = 30;
+    private static final long GOAL_TIMEOUT_MS = 90_000;
+    private static final long GOAL_FIX_MAX_AGE_MS = 120_000;
 
     private static final String CHANNEL_ID = "tracking";
     private static final int NOTIFICATION_ID = 1001;
@@ -136,6 +146,17 @@ public class TrackingService extends Service {
     private VoiceCoach coach;
     private Speaker speaker;
 
+    // Goal for this workout (manual, or predicted from learned routines).
+    private boolean goalPending;
+    private double goalM;
+    private String goalSource;
+    private String goalRoutineId;
+    private String goalName;
+    private double goalConfidence;
+    private boolean goalOffRoute;
+    private RouteGuard routeGuard;
+    private final Runnable goalTimeout = () -> decideGoal(Double.NaN, Double.NaN);
+
     // ---- Lifecycle --------------------------------------------------------------------------
 
     @Override
@@ -202,7 +223,15 @@ public class TrackingService extends Service {
                 : PhoneSettings.autoPause(this, act == null ? "run" : act);
             String u = intent.hasExtra(EXTRA_UNITS) ? intent.getStringExtra(EXTRA_UNITS) : PhoneSettings.units(this);
             boolean resume = intent.getBooleanExtra(EXTRA_RESUME, false);
-            handler.post(() -> startWorkout(id, act, ap, u, resume));
+            GoalStart gs = new GoalStart();
+            gs.goalM = intent.getDoubleExtra(EXTRA_GOAL_M, 0);
+            if (intent.hasExtra(EXTRA_FIX_LAT)) {
+                gs.fixLat = intent.getDoubleExtra(EXTRA_FIX_LAT, Double.NaN);
+                gs.fixLon = intent.getDoubleExtra(EXTRA_FIX_LON, Double.NaN);
+                gs.fixT = intent.getLongExtra(EXTRA_FIX_T, 0);
+                gs.fixAcc = intent.getDoubleExtra(EXTRA_FIX_ACC, 999);
+            }
+            handler.post(() -> startWorkout(id, act, ap, u, resume, gs));
         } else if (ACTION_PAUSE.equals(action)) {
             handler.post(this::pauseWorkout);
         } else if (ACTION_RESUME.equals(action)) {
@@ -211,6 +240,15 @@ public class TrackingService extends Service {
             handler.post(() -> stopWorkout(null));
         }
         return START_STICKY;
+    }
+
+    /** Goal inputs from the start screen: a manual goal, and the warm-up fix. */
+    static final class GoalStart {
+        double goalM;
+        double fixLat = Double.NaN;
+        double fixLon = Double.NaN;
+        long fixT;
+        double fixAcc = 999;
     }
 
     /** Same format as the web app's newWorkoutId(). */
@@ -244,7 +282,7 @@ public class TrackingService extends Service {
         handler.post(() -> stopWorkout(cb));
     }
 
-    private void startWorkout(String id, String activityId, boolean ap, String u, boolean resume) {
+    private void startWorkout(String id, String activityId, boolean ap, String u, boolean resume, GoalStart gs) {
         if (id == null) return;
         synchronized (this) {
             if (state != State.IDLE) {
@@ -270,6 +308,7 @@ public class TrackingService extends Service {
                 } else {
                     coach.syncTo(distanceM, elapsedBaseMs);
                 }
+                restoreGoal();
             } else {
                 startedAt = System.currentTimeMillis();
                 elapsedBaseMs = 0;
@@ -313,6 +352,8 @@ public class TrackingService extends Service {
         wakeLock.acquire(WAKE_LEASE_MS);
         registerSensors();
         setState(State.RECORDING, resume ? "restored" : "start");
+        if (!resume) startGoal(gs);
+        else if (goalPending) handler.postDelayed(goalTimeout, GOAL_TIMEOUT_MS);
         requestLocationUpdates(Priority.PRIORITY_HIGH_ACCURACY);
     }
 
@@ -323,7 +364,7 @@ public class TrackingService extends Service {
             return;
         }
         startWorkout(id, prefs.getString("activity", "run"), prefs.getBoolean("autoPause", false),
-            prefs.getString("units", "metric"), true);
+            prefs.getString("units", "metric"), true, null);
     }
 
     private void pauseWorkout() {
@@ -353,6 +394,14 @@ public class TrackingService extends Service {
             return;
         }
         setState(State.IDLE, "stop");
+        handler.removeCallbacks(goalTimeout);
+        goalPending = false;
+        routeGuard = null;
+        synchronized (this) {
+            goalM = 0;
+            goalSource = null;
+            goalOffRoute = false;
+        }
         String id = workoutId;
         long count = seq;
         JSONObject end = new JSONObject();
@@ -487,8 +536,12 @@ public class TrackingService extends Service {
             seq++;
             journal.append(pointJson(loc, gnssAlt, fusedAlt), false);
             if (autoPause) handleAutoPause(speed, nowRt);
+            if (goalPending && loc.hasAccuracy() && loc.getAccuracy() <= GOAL_FIX_ACCURACY_M) {
+                decideGoal(loc.getLatitude(), loc.getLongitude());
+            }
             if (state == State.RECORDING) {
                 accumulateDistance(loc, speed);
+                checkRoute(loc);
                 announce();
             }
         }
@@ -517,6 +570,129 @@ public class TrackingService extends Service {
         JSObject ev = new JSObject();
         ev.put("text", text);
         TrackerHub.emit("announce", ev); // shown as a caption on the live screen
+    }
+
+    // ---- Goal (manual, or predicted from learned routines) -----------------------------------
+
+    private void startGoal(GoalStart gs) {
+        goalPending = false;
+        routeGuard = null;
+        if (gs != null && gs.goalM > 0) {
+            applyGoal(gs.goalM, "manual", null, null, 1, null);
+        } else if (coach.cfg.goal && coach.cfg.goalM > 0) {
+            applyGoal(coach.cfg.goalM, "manual", null, null, 1, null);
+        } else if (coach.cfg.autoGoal) {
+            goalPending = true;
+            boolean freshFix = gs != null && !Double.isNaN(gs.fixLat) && gs.fixAcc <= GOAL_FIX_ACCURACY_M
+                && System.currentTimeMillis() - gs.fixT <= GOAL_FIX_MAX_AGE_MS;
+            if (freshFix) decideGoal(gs.fixLat, gs.fixLon);
+            else handler.postDelayed(goalTimeout, GOAL_TIMEOUT_MS);
+        }
+    }
+
+    /** Auto goal: ask the routine model once, with a good fix or (after the timeout) without one. */
+    private void decideGoal(double lat, double lon) {
+        if (!goalPending || state == State.IDLE) return;
+        goalPending = false;
+        handler.removeCallbacks(goalTimeout);
+        int tz = -java.util.TimeZone.getDefault().getOffset(startedAt) / 60000;
+        RoutineMatcher.Prediction p = new RoutineMatcher(PhoneSettings.routineModel(this))
+            .predict(profile.id, startedAt, tz, lat, lon, coach.cfg.imperial);
+        if (!p.hasGoal()) {
+            Log.i(TAG, "No auto goal: " + p.reason);
+            JSObject ev = new JSObject();
+            ev.put("reason", p.reason);
+            TrackerHub.emit("goal", ev);
+            saveSnapshot();
+            return;
+        }
+        applyGoal(p.goalM, p.source, p.routineId, p.name, p.confidence, p.signature);
+    }
+
+    private void applyGoal(double m, String source, String routineId, String name, double confidence, org.json.JSONArray signature) {
+        synchronized (this) {
+            coach.setGoal(m, distanceM);
+            goalM = m;
+            goalSource = source;
+            goalRoutineId = routineId;
+            goalName = name;
+            goalConfidence = confidence;
+            goalOffRoute = false;
+        }
+        routeGuard = "route".equals(source) && signature != null && signature.length() > 1 ? new RouteGuard(signature) : null;
+        journalGoal();
+        if (coach.cfg.confirmGoal) say(VoiceCoach.goalConfirmation(m, coach.cfg.imperial, source, name));
+        TrackerHub.emit("goal", goalJs());
+        saveSnapshot();
+        updateNotification(true);
+        pushWearStatus(true);
+    }
+
+    /** Left the routine's route: stop goal milestones (splits and time carry on). */
+    private void checkRoute(Location loc) {
+        if (routeGuard == null || !loc.hasAccuracy() || loc.getAccuracy() > 50) return;
+        if (!routeGuard.onFix(loc.getLatitude(), loc.getLongitude(), elapsedMs())) return;
+        routeGuard = null;
+        synchronized (this) {
+            coach.pauseGoal();
+            goalOffRoute = true;
+        }
+        journalGoal();
+        say(VoiceCoach.OFF_ROUTE_PHRASE);
+        TrackerHub.emit("goal", goalJs());
+        saveSnapshot();
+        pushWearStatus(true);
+    }
+
+    private void journalGoal() {
+        if (journal == null) return;
+        JSONObject line = new JSONObject();
+        put(line, "type", "goal");
+        put(line, "t", System.currentTimeMillis());
+        put(line, "goalM", goalM);
+        put(line, "source", goalSource);
+        if (goalRoutineId != null) put(line, "routineId", goalRoutineId);
+        if (goalName != null) put(line, "name", goalName);
+        put(line, "confidence", goalConfidence);
+        if (goalOffRoute) put(line, "offRoute", true);
+        journal.append(line, true);
+    }
+
+    private synchronized JSObject goalJs() {
+        JSObject o = new JSObject();
+        o.put("goalM", goalM);
+        o.put("source", goalSource);
+        if (goalName != null) o.put("name", goalName);
+        if (goalOffRoute) o.put("offRoute", true);
+        return o;
+    }
+
+    /** After a service restart: the goal and its state come back from the snapshot. */
+    private void restoreGoal() {
+        goalPending = prefs.getBoolean("gPending", false);
+        double m = Double.longBitsToDouble(prefs.getLong("gGoalBits", 0));
+        if (m <= 0) return;
+        goalM = m;
+        goalSource = prefs.getString("gSource", "manual");
+        goalRoutineId = prefs.getString("gRoutine", null);
+        goalName = prefs.getString("gName", null);
+        goalConfidence = Double.longBitsToDouble(prefs.getLong("gConfBits", 0));
+        goalOffRoute = prefs.getBoolean("gOffRoute", false);
+        int mask = coach.goalMask;
+        coach.setGoal(m, 0);
+        coach.goalMask = mask;
+        if (goalOffRoute) coach.pauseGoal();
+        else if ("route".equals(goalSource) && goalRoutineId != null) {
+            org.json.JSONArray sig = RoutineMatcher.signatureOf(PhoneSettings.routineModel(this), profile.id, goalRoutineId);
+            if (sig != null && sig.length() > 1) routeGuard = new RouteGuard(sig);
+        }
+    }
+
+    private void say(String text) {
+        if (speaker != null) speaker.speak(text);
+        JSObject ev = new JSObject();
+        ev.put("text", text);
+        TrackerHub.emit("announce", ev);
     }
 
     // ---- Watch ------------------------------------------------------------------------------
@@ -563,6 +739,7 @@ public class TrackingService extends Service {
             put(o, "t", now);
             if (lastLocation != null && lastLocation.hasSpeed()) put(o, "speed", (double) lastLocation.getSpeed());
             if (now - lastHrAt < HR_FRESH_MS) put(o, "hr", lastHr);
+            if (goalM > 0 && !goalOffRoute) put(o, "goalM", goalM);
         }
         WearSync.send(this, WearSync.PATH_STATUS, o);
     }
@@ -736,6 +913,7 @@ public class TrackingService extends Service {
         o.put("satsVisible", satsVisible);
         if (System.currentTimeMillis() - lastHrAt < HR_FRESH_MS) o.put("hr", lastHr);
         if (lastLocation != null) o.put("last", LocaleTrackerPlugin.locationToJs(lastLocation, lastFusedAlt));
+        if (goalM > 0) o.put("goal", goalJs());
         return o;
     }
 
@@ -758,6 +936,13 @@ public class TrackingService extends Service {
                 .putLong("vSplitMs", coach != null ? coach.lastSplitMs : 0)
                 .putLong("vIntervals", coach != null ? coach.intervalsDone : 0)
                 .putInt("vGoal", coach != null ? coach.goalMask : 0)
+                .putBoolean("gPending", goalPending)
+                .putLong("gGoalBits", Double.doubleToLongBits(goalM))
+                .putString("gSource", goalSource)
+                .putString("gRoutine", goalRoutineId)
+                .putString("gName", goalName)
+                .putLong("gConfBits", Double.doubleToLongBits(goalConfidence))
+                .putBoolean("gOffRoute", goalOffRoute)
                 .apply();
         }
         if (journal != null) journal.flush();
@@ -811,6 +996,10 @@ public class TrackingService extends Service {
         }
         if (s != State.IDLE && override == null && System.currentTimeMillis() - lastHrAt < HR_FRESH_MS) {
             text = text + " · ♥ " + lastHr;
+        }
+        if (s != State.IDLE && override == null && goalM > 0 && !goalOffRoute) {
+            text = text + " · Goal " + VoiceCoach.spokenNumber(goalM / ("imperial".equals(units) ? 1609.344 : 1000))
+                + ("imperial".equals(units) ? " mi" : " km");
         }
 
         Notification.Builder b = new Notification.Builder(this, CHANNEL_ID)

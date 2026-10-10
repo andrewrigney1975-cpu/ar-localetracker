@@ -25,7 +25,13 @@ final class VoiceCoach {
         boolean imperial;
         /** Lower other audio while speaking (true) or pause it (false). Not used for phrasing. */
         boolean duck = true;
+        /** Goal mode Auto: the goal comes from RoutineMatcher once it decides. */
+        boolean autoGoal;
+        /** Say the goal when it is chosen. */
+        boolean confirmGoal = true;
     }
+
+    static final String OFF_ROUTE_PHRASE = "Off your usual route. Goal announcements paused.";
 
     final Config cfg;
     private final double unit;
@@ -33,6 +39,7 @@ final class VoiceCoach {
     long lastSplitMs;
     long intervalsDone;
     int goalMask;
+    boolean goalPaused;
 
     VoiceCoach(Config cfg) {
         this.cfg = cfg;
@@ -40,7 +47,31 @@ final class VoiceCoach {
     }
 
     boolean enabled() {
-        return cfg.splits || cfg.time || (cfg.goal && cfg.goalM > 0);
+        return cfg.splits || cfg.time || (cfg.goal && cfg.goalM > 0) || cfg.autoGoal;
+    }
+
+    /** Set (or replace) the goal mid-workout; milestones already passed are not announced. */
+    void setGoal(double goalM, double distanceM) {
+        cfg.goal = true;
+        cfg.goalM = goalM;
+        goalMask = 0;
+        for (int q = 1; q <= 4; q++) if (distanceM >= (goalM * q) / 4) goalMask |= 1 << q;
+    }
+
+    /** Stop goal milestones (e.g. the user left their usual route); other kinds carry on. */
+    void pauseGoal() {
+        goalPaused = true;
+    }
+
+    /** "Goal 4.7 kilometres, your usual Saturday morning loop." (goalConfirmation in coach.js) */
+    static String goalConfirmation(double goalM, boolean imperial, String source, String name) {
+        String v = spokenNumber(goalM / (imperial ? MILE : KM));
+        boolean one = "1".equals(v);
+        String words = v + " " + (imperial ? (one ? "mile" : "miles") : (one ? "kilometre" : "kilometres"));
+        boolean named = name != null && !name.isEmpty();
+        if ("route".equals(source) && named) return "Goal " + words + ", your usual " + name + ".";
+        if ("time".equals(source) && named) return "Goal " + words + ", based on your " + name + ".";
+        return "Goal " + words + ".";
     }
 
     /** Mark everything already passed as announced (e.g. resuming without saved state). */
@@ -93,7 +124,7 @@ final class VoiceCoach {
                     reached = q;
                 }
             }
-            if (reached != 0 && cfg.goal) {
+            if (reached != 0 && cfg.goal && !goalPaused) {
                 String goal = spokenNumber(cfg.goalM / unit) + (cfg.imperial ? " mile goal" : " kilometre goal");
                 if (reached == 4) {
                     parts.add("Goal reached: " + goal + ", in " + spokenDuration(elapsedMs) + ".");

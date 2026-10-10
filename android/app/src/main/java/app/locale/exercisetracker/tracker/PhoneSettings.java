@@ -29,16 +29,24 @@ final class PhoneSettings {
         VoiceCoach.Config c = new VoiceCoach.Config();
         c.splits = flag(v, "splits", activity, "walk".equals(activity) || "run".equals(activity));
         c.time = flag(v, "time", activity, false);
-        c.goal = flag(v, "goal", activity, false);
+        JSONObject modes = v.optJSONObject("goalMode");
+        String mode = modes != null ? modes.optString(activity, "") : "";
+        if (mode.isEmpty()) {
+            // Before goal modes, `goal` was on/off per activity (on = a manual goal).
+            mode = flag(v, "goal", activity, false) ? "set" : "ski".equals(activity) ? "off" : "auto";
+        }
+        c.goal = "set".equals(mode);
+        c.autoGoal = "auto".equals(mode);
+        c.confirmGoal = v.optBoolean("confirmGoal", true);
         c.intervalMin = v.optInt("intervalMin", 10);
         JSONObject goals = v.optJSONObject("goalM");
         double defGoal = "walk".equals(activity) ? 5000 : "cycle".equals(activity) ? 40000 : "ski".equals(activity) ? 20000 : 10000;
-        c.goalM = goals != null ? goals.optDouble(activity, defGoal) : defGoal;
+        c.goalM = !c.goal ? 0 : goals != null ? goals.optDouble(activity, defGoal) : defGoal;
         c.duck = v.optBoolean("duck", true);
-        JSONObject modes = s.optJSONObject("liveSpeedMode");
-        String mode = modes != null ? modes.optString(activity, "") : "";
-        if (mode.isEmpty()) mode = "cycle".equals(activity) || "ski".equals(activity) ? "speed" : "pace";
-        c.pace = "pace".equals(mode);
+        JSONObject speedModes = s.optJSONObject("liveSpeedMode");
+        String speedMode = speedModes != null ? speedModes.optString(activity, "") : "";
+        if (speedMode.isEmpty()) speedMode = "cycle".equals(activity) || "ski".equals(activity) ? "speed" : "pace";
+        c.pace = "pace".equals(speedMode);
         c.imperial = "imperial".equals(s.optString("units"));
         return c;
     }
@@ -46,6 +54,17 @@ final class PhoneSettings {
     private static boolean flag(JSONObject v, String kind, String activity, boolean def) {
         JSONObject o = v.optJSONObject(kind);
         return o != null && o.has(activity) ? o.optBoolean(activity) : def;
+    }
+
+    /** The learned routine model written by src/insights/model.js, or null. */
+    static JSONObject routineModel(Context ctx) {
+        String raw = ctx.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE).getString("routines.v1", null);
+        if (raw == null) return null;
+        try {
+            return new JSONObject(raw);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     static boolean autoPause(Context ctx, String activity) {

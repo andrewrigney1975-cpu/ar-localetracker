@@ -15,11 +15,16 @@ export const DEFAULT_SETTINGS = {
   satellite3d: true,
   smooth3d: true,
   coordFormat: 'decimal',
+  /** Learned routines: user names by routine id, and workouts left out of learning. */
+  routines: { names: {}, excluded: [] },
   /** Spoken announcements during a workout, each kind on or off per activity. */
   voice: {
     splits: { walk: true, run: true, cycle: false, ski: false },
     time: { walk: false, run: false, cycle: false, ski: false },
-    goal: { walk: false, run: false, cycle: false, ski: false },
+    /** 'off' | 'set' (distance from the start screen) | 'auto' (predicted from routines). */
+    goalMode: { walk: 'auto', run: 'auto', cycle: 'auto', ski: 'off' },
+    /** Say the goal when it is chosen. */
+    confirmGoal: true,
     intervalMin: 10,
     /** Goal distance per activity in metres, set on the start screen. */
     goalM: { walk: 5000, run: 10000, cycle: 40000, ski: 20000 },
@@ -45,6 +50,7 @@ export async function loadSettings() {
         liveSpeedMode: { ...DEFAULT_SETTINGS.liveSpeedMode, ...saved.liveSpeedMode },
         profile: { ...DEFAULT_SETTINGS.profile, ...saved.profile },
         voice: mergeVoice(saved.voice),
+        routines: { ...DEFAULT_SETTINGS.routines, ...saved.routines },
       };
     }
   } catch {
@@ -56,12 +62,15 @@ export async function loadSettings() {
 
 function mergeVoice(saved = {}) {
   const d = DEFAULT_SETTINGS.voice;
+  const { goal: oldGoal, ...rest } = saved;
+  // Before goal modes, `goal` was on/off per activity: on becomes 'set', off becomes the default.
+  const migrated = oldGoal ? Object.fromEntries(Object.entries(oldGoal).filter(([, on]) => on).map(([a]) => [a, 'set'])) : {};
   return {
     ...d,
-    ...saved,
+    ...rest,
     splits: { ...d.splits, ...saved.splits },
     time: { ...d.time, ...saved.time },
-    goal: { ...d.goal, ...saved.goal },
+    goalMode: { ...d.goalMode, ...migrated, ...saved.goalMode },
     goalM: { ...d.goalM, ...saved.goalM },
   };
 }
