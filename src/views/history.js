@@ -1,8 +1,11 @@
 import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
+import { syncWorkouts } from '../services/sync.js';
 import { settings } from '../settings.js';
 import { Disposer, on } from '../ui/dom.js';
 import { icons } from '../ui/icons.js';
+import { pullToRefresh } from '../ui/pullRefresh.js';
+import { toast } from '../ui/toast.js';
 import { formatDistance, formatDuration } from '../units.js';
 import { workoutItemHTML } from './home.js';
 
@@ -61,5 +64,12 @@ export async function mount(root) {
   );
   await render();
   d.add(on(window, 'workouts-changed', render));
+  // Pull down to pick up workouts recorded from the watch, a widget or the notification.
+  d.add(
+    pullToRefresh(root.querySelector('.body'), async () => {
+      const { imported } = await syncWorkouts();
+      if (!imported) toast('Workouts are up to date');
+    })
+  );
   return () => d.dispose();
 }
