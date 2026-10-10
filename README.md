@@ -84,6 +84,13 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - barometer fused with GNSS altitude, for smooth climb figures
   - mean-sea-level altitude
   - GNSS satellite status
+- **Voice announcements**, spoken by the phone even with the screen off:
+  - **Splits:** every km or mile, with the split time and average pace or speed.
+  - **Time:** every 5, 10, 15 or 30 minutes of active time, with distance and average.
+  - **Goal:** at 25%, 50%, 75% and 100% of a goal distance set on the start screen.
+
+  Each kind is on or off per activity (Settings → Voice announcements). Music is lowered
+  or paused while Locale speaks, and nothing is said while paused.
 - **Lock-screen notification** with pause, resume and stop. It shows as an Android 16
   Live Update.
 - **Crash-safe recording:** every fix goes to an on-disk journal. A workout survives the
@@ -221,10 +228,12 @@ src/
   seed/      City2Surf sample workout (course data + generator)
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, settings
+  voice/     announcement triggers and phrases (mirrored natively in VoiceCoach)
 android/app/src/main/java/app/locale/exercisetracker/tracker/
   LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
   WearListenerService  WearSync          (watch link)
   LocaleWidgets  Widget1x1/2x1/2x2Provider  (home-screen widgets)
+  VoiceCoach  Speaker                        (voice announcements, text-to-speech)
 android/app/src/main/java/app/locale/exercisetracker/store/
   WorkoutStore (SQLite)  LocaleStorePlugin  TrackCodec  WorkoutBuilder (JS processing port)
 android/wear/            Wear OS companion app (Kotlin, Compose for Wear OS)
@@ -234,7 +243,7 @@ docs/        screenshots
 ```
 
 See [PLAN.md](PLAN.md) for the design and decisions, and [BACKLOG.md](BACKLOG.md) for
-planned features: voice announcements.
+the feature requests (all done so far).
 
 ## Credits
 

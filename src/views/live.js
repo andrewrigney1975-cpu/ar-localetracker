@@ -7,6 +7,7 @@ import { finalizeJournal, newWorkoutId, waitForNativeSave } from '../services/wo
 import { settings, updateSettings } from '../settings.js';
 import { verticalThreshold } from '../stats/summary.js';
 import { parseJournal } from '../tracker/journal.js';
+import { GOAL_STEPS } from '../voice/coach.js';
 import { tracker } from '../tracker/client.js';
 import { choiceDialog, confirmDialog } from '../ui/dialog.js';
 import { Disposer, el } from '../ui/dom.js';
@@ -115,6 +116,7 @@ export async function mount(root, params, _query, ctx) {
             <div class="metric wide coords"><label>Location</label><div class="value"><span data-ref="lat">–</span><span data-ref="lon">–</span></div></div>
           </div>
           <div>
+            <div class="goal-picker" data-ref="goal" hidden></div>
             <div class="live-controls" data-ref="controls"></div>
             <div class="live-hint" data-ref="hint"></div>
           </div>
@@ -234,7 +236,30 @@ export async function mount(root, params, _query, ctx) {
     return wrap;
   }
 
+  /** Goal distance for goal-based announcements, chosen before starting. */
+  function renderGoal() {
+    const v = settings().voice;
+    ref.goal.hidden = !(phase === 'ready' && v.goal[act.id]);
+    if (ref.goal.hidden) return;
+    const unitM = units === 'imperial' ? 1609.344 : 1000;
+    const step = GOAL_STEPS[act.id];
+    const value = Math.max(step, Math.round(v.goalM[act.id] / unitM / step) * step);
+    ref.goal.innerHTML = `
+      <button class="icon-btn" data-goal="-1" aria-label="Shorter goal" ${value <= step ? 'disabled' : ''}>−</button>
+      <span class="goal-value"><small>Goal</small><b>${value}<small>${distanceUnit(units)}</small></b></span>
+      <button class="icon-btn" data-goal="1" aria-label="Longer goal">+</button>`;
+    ref.goal.querySelectorAll('[data-goal]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const next = Math.max(step, value + Number(b.dataset.goal) * step);
+        const voice = settings().voice;
+        await updateSettings({ voice: { ...voice, goalM: { ...voice.goalM, [act.id]: next * unitM } } });
+        renderGoal();
+      })
+    );
+  }
+
   function renderControls() {
+    renderGoal();
     const c = ref.controls;
     c.replaceChildren();
     if (phase === 'ready') {
@@ -387,6 +412,19 @@ export async function mount(root, params, _query, ctx) {
       }
     })
   );
+  // Spoken announcements also show as a caption under the controls for a few seconds.
+  let captionTimer = 0;
+  d.add(
+    tracker.on('announce', (ev) => {
+      if (phase !== 'recording') return;
+      ref.hint.textContent = ev.text;
+      clearTimeout(captionTimer);
+      captionTimer = setTimeout(() => {
+        if (ref.hint.textContent === ev.text) ref.hint.textContent = '';
+      }, 10000);
+    })
+  );
+  d.add(() => clearTimeout(captionTimer));
   d.add(
     tracker.on('hr', (ev) => {
       heart = { bpm: ev.bpm, at: performance.now() };

@@ -1154,6 +1154,60 @@ main#view {
   letter-spacing: 0.04em;
 }
 
+.goal-picker {
+  margin-top: 6px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+}
+
+.goal-picker[hidden] {
+  display: none;
+}
+
+.goal-picker .icon-btn:disabled {
+  opacity: 0.4;
+}
+
+.goal-picker .icon-btn {
+  background: var(--surface-2);
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.goal-value {
+  display: grid;
+  justify-items: center;
+  min-width: 84px;
+  line-height: 1.1;
+}
+
+.goal-value > small {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.goal-value b {
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-value b small {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 3px;
+  color: var(--text-dim);
+}
+
+.voice-kinds {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
 .live-hint {
   text-align: center;
   font-size: 0.8rem;

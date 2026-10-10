@@ -4,6 +4,8 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { activity as activityProfile } from '../activities.js';
 import { haversine } from '../geo/geo.js';
 import { HeartModel, SyntheticRoute } from './synthetic.js';
+import { settings } from '../settings.js';
+import { VoiceCoach, voiceConfig } from '../voice/coach.js';
 
 const Native = registerPlugin('LocaleTracker');
 
@@ -34,6 +36,7 @@ function nativeTracker() {
     },
     deleteJournal: (workoutId) => Native.deleteJournal({ workoutId }),
     setKeepScreenOn: (enabled) => Native.setKeepScreenOn({ enabled }),
+    speak: (text, duck = true) => Native.speak({ text, duck }),
     getWatchStatus: () => Native.getWatchStatus(),
     pinWidget: (size) => Native.pinWidget({ size }),
     requestBackgroundLocation: () => Native.requestBackgroundLocation(),
@@ -67,6 +70,7 @@ function simTracker() {
   let prevAlt = null;
   let simClock = 0;
   let anchor = null;
+  let coach = null;
 
   function idleState() {
     return { state: 'idle', workoutId: null, activity: null, startedAt: 0, elapsedBase: 0, runningSince: 0, distance: 0, segment: 0, seq: 0, last: null };
@@ -129,6 +133,11 @@ function simTracker() {
           }
         }
       }
+      const text = st.state === 'recording' ? coach?.onProgress(st.distance, elapsed()) : null;
+      if (text) {
+        webSpeak(text);
+        emit('announce', { text });
+      }
     }
     emit('point', snapshot());
   }
@@ -157,6 +166,7 @@ function simTracker() {
       prevAlt = null;
       st = { ...idleState(), workoutId, activity, startedAt: simClock };
       anchor = null;
+      coach = new VoiceCoach(voiceConfig(settings(), activity));
       if (!resume) {
         localStorage.removeItem(JKEY(workoutId));
         append(workoutId, { type: 'meta', v: 1, workoutId, activity, startedAt: simClock, autoPause: false, hasBarometer: true, device: 'browser simulator' });
@@ -265,6 +275,9 @@ function simTracker() {
       return { deleted: true };
     },
     async setKeepScreenOn() {},
+    async speak(text) {
+      webSpeak(text);
+    },
     async pinWidget() {
       return { supported: false };
     },
@@ -283,6 +296,16 @@ function simTracker() {
       return () => listeners.get(event)?.delete(cb);
     },
   };
+}
+
+function webSpeak(text) {
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-GB';
+    speechSynthesis.speak(u);
+  } catch {
+    /* no Web Speech */
+  }
 }
 
 export const tracker = Capacitor.isNativePlatform() ? nativeTracker() : simTracker();
