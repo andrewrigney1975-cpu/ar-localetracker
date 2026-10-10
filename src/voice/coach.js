@@ -29,6 +29,7 @@ export function voiceConfig(s, activity) {
     imperial: s.units === 'imperial',
     autoGoal: mode === 'auto',
     confirmGoal: v.confirmGoal !== false,
+    watchBuzz: v.watchBuzz !== false,
   };
 }
 
@@ -41,6 +42,8 @@ export class VoiceCoach {
     this.intervalsDone = 0;
     this.goalMask = 0;
     this.goalPaused = false;
+    /** Kind of the last announcement (for the watch buzz): goal-reached | goal | split | time. */
+    this.lastKind = null;
   }
 
   get enabled() {
@@ -74,12 +77,14 @@ export class VoiceCoach {
     const { cfg, unit } = this;
     const parts = [];
     let saidDistance = false;
+    const kinds = new Set();
 
     const k = Math.floor(distanceM / unit);
     if (k > this.splitsDone) {
       if (cfg.splits) {
         parts.push(`${spokenDistance(k * unit, cfg.imperial)}. Split time ${spokenDuration((elapsedMs - this.lastSplitMs) / (k - this.splitsDone))}.`);
         saidDistance = true;
+        kinds.add('split');
       }
       this.splitsDone = k;
       this.lastSplitMs = elapsedMs;
@@ -92,6 +97,7 @@ export class VoiceCoach {
         if (cfg.time) {
           parts.push(`${capitalise(spokenDuration(j * intervalMs))}.${saidDistance ? '' : ` Distance ${spokenDistance(distanceM, cfg.imperial)}.`}`);
           saidDistance = true;
+          kinds.add('time');
         }
         this.intervalsDone = j;
       }
@@ -108,6 +114,7 @@ export class VoiceCoach {
       }
       if (reached && cfg.goal && !this.goalPaused) {
         const goal = `${spokenNumber(cfg.goalM / unit)} ${cfg.imperial ? 'mile' : 'kilometre'} goal`;
+        kinds.add(reached === 4 ? 'goal-reached' : 'goal');
         if (reached === 4) parts.push(`Goal reached: ${goal}, in ${spokenDuration(elapsedMs)}.`);
         else {
           const head = reached === 2 ? `Halfway to your ${goal}.` : `${reached * 25} percent of your ${goal}.`;
@@ -116,6 +123,7 @@ export class VoiceCoach {
       }
     }
 
+    this.lastKind = ['goal-reached', 'goal', 'split', 'time'].find((k) => kinds.has(k)) ?? null;
     if (!parts.length) return null;
     if (distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) parts.push(spokenAverage(distanceM, elapsedMs, cfg));
     return parts.join(' ');

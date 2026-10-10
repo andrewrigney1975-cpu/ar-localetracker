@@ -99,6 +99,16 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 
   Each kind is on or off per activity (Settings → Voice announcements). Music is lowered
   or paused while Locale speaks, and nothing is said while paused.
+- **Watch vibration** with each announcement, so you can feel it without listening:
+  - split: two taps
+  - time: one longer tap
+  - goal milestone: three taps
+  - goal reached: long, short, long
+  - goal set: one short tap
+  - off route: two long taps
+
+  The watch also shows the announcement's text for a few seconds. Settings → Voice
+  announcements → Vibrate the watch turns it off, and **Test** buzzes the watch too.
 - **Auto goals:** the goal distance is predicted from your routines; see
   [Auto goals](#auto-goals-how-locale-learns-your-routines).
 - **Lock-screen notification** with pause, resume and stop. It shows as an Android 16

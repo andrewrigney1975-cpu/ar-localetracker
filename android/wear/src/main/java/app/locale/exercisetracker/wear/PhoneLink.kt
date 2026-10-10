@@ -42,6 +42,12 @@ object PhoneLink {
     val error = MutableStateFlow<String?>(null)
     val heartRate = MutableStateFlow<Int?>(null)
     val phoneReachable = MutableStateFlow<Boolean?>(null)
+    /** Last spoken announcement from the phone, with SystemClock.elapsedRealtime() it arrived. */
+    val announcement = MutableStateFlow<Pair<String, Long>?>(null)
+
+    fun onAnnouncement(text: String) {
+        if (text.isNotEmpty()) announcement.value = text to SystemClock.elapsedRealtime()
+    }
 
     @Volatile private var pendingStartAt = 0L
 

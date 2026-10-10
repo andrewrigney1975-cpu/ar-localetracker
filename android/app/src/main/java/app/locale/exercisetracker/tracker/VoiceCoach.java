@@ -29,6 +29,8 @@ final class VoiceCoach {
         boolean autoGoal;
         /** Say the goal when it is chosen. */
         boolean confirmGoal = true;
+        /** Vibrate a paired watch with each announcement. */
+        boolean watchBuzz = true;
     }
 
     static final String OFF_ROUTE_PHRASE = "Off your usual route. Goal announcements paused.";
@@ -40,6 +42,8 @@ final class VoiceCoach {
     long intervalsDone;
     int goalMask;
     boolean goalPaused;
+    /** Kind of the last announcement (for the watch buzz): goal-reached | goal | split | time. */
+    String lastKind;
 
     VoiceCoach(Config cfg) {
         this.cfg = cfg;
@@ -90,6 +94,10 @@ final class VoiceCoach {
     String onProgress(double distanceM, long elapsedMs) {
         List<String> parts = new ArrayList<>();
         boolean saidDistance = false;
+        boolean kSplit = false;
+        boolean kTime = false;
+        boolean kGoal = false;
+        boolean kReached = false;
 
         int k = (int) Math.floor(distanceM / unit);
         if (k > splitsDone) {
@@ -97,6 +105,7 @@ final class VoiceCoach {
                 parts.add(spokenDistance(k * unit, cfg.imperial) + ". Split time "
                     + spokenDuration((double) (elapsedMs - lastSplitMs) / (k - splitsDone)) + ".");
                 saidDistance = true;
+                kSplit = true;
             }
             splitsDone = k;
             lastSplitMs = elapsedMs;
@@ -110,6 +119,7 @@ final class VoiceCoach {
                     parts.add(capitalise(spokenDuration(j * intervalMs)) + "."
                         + (saidDistance ? "" : " Distance " + spokenDistance(distanceM, cfg.imperial) + "."));
                     saidDistance = true;
+                    kTime = true;
                 }
                 intervalsDone = j;
             }
@@ -126,6 +136,8 @@ final class VoiceCoach {
             }
             if (reached != 0 && cfg.goal && !goalPaused) {
                 String goal = spokenNumber(cfg.goalM / unit) + (cfg.imperial ? " mile goal" : " kilometre goal");
+                if (reached == 4) kReached = true;
+                else kGoal = true;
                 if (reached == 4) {
                     parts.add("Goal reached: " + goal + ", in " + spokenDuration(elapsedMs) + ".");
                 } else {
@@ -135,6 +147,7 @@ final class VoiceCoach {
             }
         }
 
+        lastKind = kReached ? "goal-reached" : kGoal ? "goal" : kSplit ? "split" : kTime ? "time" : null;
         if (parts.isEmpty()) return null;
         if (distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) parts.add(spokenAverage(distanceM, elapsedMs, cfg.pace, cfg.imperial));
         return String.join(" ", parts);

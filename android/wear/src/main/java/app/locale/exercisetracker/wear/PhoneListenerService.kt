@@ -11,6 +11,10 @@ class PhoneListenerService : WearableListenerService() {
         when (event.path) {
             "/locale/status" -> PhoneLink.onStatus(this, body)
             "/locale/error" -> PhoneLink.error.value = body.optString("message", "Something went wrong on the phone")
+            "/locale/announce" -> {
+                Buzz.announce(this, body.optString("kind"))
+                PhoneLink.onAnnouncement(body.optString("text"))
+            }
         }
     }
 }

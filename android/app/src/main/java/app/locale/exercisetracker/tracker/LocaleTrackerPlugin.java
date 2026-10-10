@@ -140,6 +140,18 @@ public class LocaleTrackerPlugin extends Plugin {
         }
         if (previewSpeaker == null) previewSpeaker = new Speaker(getContext(), call.getBoolean("duck", true));
         previewSpeaker.speak(text);
+        String buzz = call.getString("buzz");
+        if (buzz != null) {
+            // Same message TrackingService sends with each announcement.
+            org.json.JSONObject o = new org.json.JSONObject();
+            try {
+                o.put("kind", buzz);
+                o.put("text", text);
+                o.put("t", System.currentTimeMillis());
+            } catch (org.json.JSONException ignored) {
+            }
+            WearSync.send(getContext(), WearSync.PATH_ANNOUNCE, o);
+        }
         call.resolve();
     }
 

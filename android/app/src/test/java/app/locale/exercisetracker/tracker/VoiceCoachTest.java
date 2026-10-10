@@ -61,6 +61,30 @@ public class VoiceCoachTest {
     }
 
     @Test
+    public void announcementKindsForTheWatchBuzz() {
+        VoiceCoach.Config cfg = new VoiceCoach.Config();
+        cfg.splits = true;
+        cfg.time = true;
+        cfg.intervalMin = 5;
+        cfg.goal = true;
+        cfg.goalM = 4000;
+        VoiceCoach c = new VoiceCoach(cfg);
+        c.onProgress(500, 180000);
+        assertNull(c.lastKind);
+        c.onProgress(1000, 299000);
+        assertEquals("goal", c.lastKind);
+        c.onProgress(1500, 300000);
+        assertEquals("time", c.lastKind);
+        c.onProgress(4000, 599000);
+        assertEquals("goal-reached", c.lastKind);
+        VoiceCoach.Config sc = new VoiceCoach.Config();
+        sc.splits = true;
+        VoiceCoach s = new VoiceCoach(sc);
+        s.onProgress(1000, 300000);
+        assertEquals("split", s.lastKind);
+    }
+
+    @Test
     public void phrases() {
         assertEquals("1 hour 3 minutes 5 seconds", VoiceCoach.spokenDuration(3785000));
         assertEquals("0 seconds", VoiceCoach.spokenDuration(0));
