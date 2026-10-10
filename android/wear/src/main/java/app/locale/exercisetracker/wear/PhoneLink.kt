@@ -22,6 +22,8 @@ data class PhoneStatus(
     val distance: Double = 0.0,
     val speed: Double? = null,
     val units: String = "metric",
+    /** Goal distance for this workout (manual or predicted), when set; null otherwise. */
+    val goalM: Double? = null,
 ) {
     val active: Boolean get() = state == "recording" || state == "paused" || state == "autopaused"
 
@@ -57,6 +59,7 @@ object PhoneLink {
             receivedAt = SystemClock.elapsedRealtime(),
             distance = 7470.0,
             speed = 2.56,
+            goalM = 10000.0,
         )
         heartRate.value = 158
         phoneReachable.value = true
@@ -105,6 +108,7 @@ object PhoneLink {
             distance = json.optDouble("distance", 0.0),
             speed = if (json.has("speed")) json.optDouble("speed") else null,
             units = json.optString("units", "metric"),
+            goalM = if (json.has("goalM")) json.optDouble("goalM") else null,
         )
         val prev = status.value
         status.value = next

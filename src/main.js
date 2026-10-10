@@ -6,6 +6,7 @@ import { requestPersistence } from './db/idb.js';
 import { useBackend } from './db/workouts.js';
 import { currentPath, currentView, navigate, route, startRouter } from './router.js';
 import { syncWorkouts } from './services/sync.js';
+import { getRoutineModel, scheduleRoutineRebuild } from './insights/model.js';
 import { loadSettings } from './settings.js';
 import { tracker } from './tracker/client.js';
 import { closeTopDialog } from './ui/dialog.js';
@@ -97,6 +98,8 @@ async function boot() {
   App.addListener('resume', () => syncWorkouts());
   // Saved natively (e.g. stopped from the watch or notification): refresh lists.
   tracker.on('saved', () => window.dispatchEvent(new CustomEvent('workouts-changed')));
+  // Keep the learned routines (goal prediction) in step with the workout list.
+  window.addEventListener('workouts-changed', () => scheduleRoutineRebuild());
   // A workout started outside the app (widget, watch, notification) while it's open: show it.
   tracker.on('state', (ev) => {
     if (ev.reason === 'start' && !currentPath().startsWith('/live')) navigate('/live');
@@ -106,6 +109,7 @@ async function boot() {
   const status = await tracker.getStatus().catch(() => ({ state: 'idle' }));
   if (status.state !== 'idle' && currentPath() === '/') navigate('/live');
   await syncWorkouts();
+  getRoutineModel().catch((e) => console.error(e));
 }
 
 boot();

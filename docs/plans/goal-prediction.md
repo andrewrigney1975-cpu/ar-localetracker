@@ -1,6 +1,40 @@
 # Plan: predict goal distances from workout history
 
-Status: **proposed** (October 2026). Builds on voice announcements (backlog item 4).
+Status: **implemented** (October 2026), all three phases. Builds on voice announcements
+(backlog item 4).
+
+> **Built:** `src/insights/routines.js` (features, route similarity, clustering, model,
+> `predictGoal`), `insights/model.js` (rebuild and store), `insights/routeGuard.js`;
+> `RoutineMatcher.java`, `RouteGuard.java` and the goal flow in `TrackingService`; goal modes
+> Off · Set · Auto with the spoken confirmation; the start-screen auto goal; Settings →
+> Learned routines (rename, forget, restore); the workout's `prediction` and the detail line;
+> a goal ring on the watch.
+>
+> **Verified:**
+> - Replay evaluation (`scripts/evaluate-goals.mjs`, 5 seeds × 26 weeks per scenario):
+>   - typical routines: 72% of workouts get a goal, 100% of those within ±10%
+>   - habit change: 91% coverage, 95% precision
+>   - noise only, and noise from home: no goals
+>   - two routes from the same start at the same time: 3% coverage, all during the first
+>     weeks (a cold start that can't be told apart yet)
+> - JS and Java decide identically on the shared fixture (`RoutineMatcherTest`).
+> - Browser simulator end to end: learned routines, start-screen auto goal, the spoken
+>   confirmation and milestones.
+> - On the Pixel: the model builds from the real history and the start screen shows
+>   "learning · 1 of 5 walks".
+>
+> **Changed while tuning** (the sections below show the original plan):
+> - Confidence needs a share of at least **0.7** and a margin of at least **0.3**.
+>   Unexplained workouts from the same start compete as one group, not one by one.
+> - The time-only fallback is used only **without a fix**. With a fix at an unknown place,
+>   or with no routine matching there, there is no goal.
+> - Feedback looks at a routine's **last 5** auto goals and pauses it when fewer than half
+>   landed. A paused routine that hasn't been done for 14 days is a stale habit, and its
+>   workouts stop competing.
+> - A **loop** must also stay within 0.4 × its length of the start, so an out-and-back is a
+>   "route".
+> - **Staleness:** there is no native stale flag. The model is rebuilt on every app resume
+>   and sync, which picks up workouts saved natively while the app was closed.
 
 **Goal:** Locale learns your routines and sets the goal distance itself. A routine is the
 same activity from about the same place, at about the same time of week, over about the

@@ -113,6 +113,14 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   also shows on the watch face as an ongoing activity.
 - **Starting with the phone in your pocket** needs location set to "Allow all the time"
   (Settings → Watch). Without it, the watch asks you to tap a notification on the phone.
+- **Auto goals:** Locale learns your routines: the same activity from the same place at
+  about the same time of week over the same route. It then sets the goal itself, says it
+  ("Goal 4.7 kilometres, your usual Saturday morning loop"), and announces 25%, 50%, 75%
+  and 100%. Round numbers win when your history clusters around one. If you leave the
+  usual route, the goal announcements stop. Each activity's goal can be Auto, Set (chosen
+  on the start screen) or Off. Settings → Learned routines lets you rename or forget a
+  routine. Auto goals switch on after 5 workouts of an activity, and a routine needs 3
+  similar ones. The watch shows goal progress as a ring.
 - **Pull to refresh** on the Track screen picks up workouts recorded from the watch, a
   widget or the notification while the app wasn't open, and shows one still in progress.
   The list also refreshes by itself whenever you come back to the app.
@@ -239,11 +247,13 @@ src/
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, settings
   voice/     announcement triggers and phrases (mirrored natively in VoiceCoach)
+  insights/  learned routines and goal prediction (matcher mirrored in RoutineMatcher)
 android/app/src/main/java/app/locale/exercisetracker/tracker/
   LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
   WearListenerService  WearSync          (watch link)
   LocaleWidgets  Widget1x1/2x1/2x2Provider  (home-screen widgets)
   VoiceCoach  Speaker                        (voice announcements, text-to-speech)
+  RoutineMatcher  RouteGuard                 (auto goals from learned routines)
 android/app/src/main/java/app/locale/exercisetracker/store/
   WorkoutStore (SQLite)  LocaleStorePlugin  TrackCodec  WorkoutBuilder (JS processing port)
 android/wear/            Wear OS companion app (Kotlin, Compose for Wear OS)

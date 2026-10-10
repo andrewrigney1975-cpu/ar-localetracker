@@ -11,17 +11,24 @@ const MIN_AVG_DISTANCE_M = 50;
 export const GOAL_STEPS = { walk: 1, run: 1, cycle: 5, ski: 5 };
 export const INTERVAL_OPTIONS = [5, 10, 15, 30];
 
-/** Announcement settings for one activity, from the app settings object. */
+/**
+ * Announcement settings for one activity, from the app settings object. Goal mode 'set' uses
+ * the distance chosen on the start screen; 'auto' starts with no goal until the routine
+ * predictor sets one (setGoal).
+ */
 export function voiceConfig(s, activity) {
   const v = s.voice;
+  const mode = v.goalMode[activity] ?? 'off';
   return {
     splits: Boolean(v.splits[activity]),
     time: Boolean(v.time[activity]),
-    goal: Boolean(v.goal[activity]),
+    goal: mode === 'set',
     intervalMin: v.intervalMin,
-    goalM: v.goalM[activity],
+    goalM: mode === 'set' ? v.goalM[activity] : 0,
     pace: (s.liveSpeedMode?.[activity] ?? 'pace') === 'pace',
     imperial: s.units === 'imperial',
+    autoGoal: mode === 'auto',
+    confirmGoal: v.confirmGoal !== false,
   };
 }
 
@@ -33,10 +40,23 @@ export class VoiceCoach {
     this.lastSplitMs = 0;
     this.intervalsDone = 0;
     this.goalMask = 0;
+    this.goalPaused = false;
   }
 
   get enabled() {
-    return this.cfg.splits || this.cfg.time || (this.cfg.goal && this.cfg.goalM > 0);
+    return this.cfg.splits || this.cfg.time || (this.cfg.goal && this.cfg.goalM > 0) || Boolean(this.cfg.autoGoal);
+  }
+
+  /** Set (or replace) the goal mid-workout; milestones already passed are not announced. */
+  setGoal(goalM, distanceM) {
+    this.cfg = { ...this.cfg, goal: true, goalM };
+    this.goalMask = 0;
+    for (let q = 1; q <= 4; q++) if (distanceM >= (goalM * q) / 4) this.goalMask |= 1 << q;
+  }
+
+  /** Stop goal milestones (e.g. the user left their usual route); other kinds carry on. */
+  pauseGoal() {
+    this.goalPaused = true;
   }
 
   /** Mark everything already passed as announced (e.g. resuming without saved state). */
@@ -86,7 +106,7 @@ export class VoiceCoach {
           reached = q;
         }
       }
-      if (reached && cfg.goal) {
+      if (reached && cfg.goal && !this.goalPaused) {
         const goal = `${spokenNumber(cfg.goalM / unit)} ${cfg.imperial ? 'mile' : 'kilometre'} goal`;
         if (reached === 4) parts.push(`Goal reached: ${goal}, in ${spokenDuration(elapsedMs)}.`);
         else {
@@ -101,6 +121,22 @@ export class VoiceCoach {
     return parts.join(' ');
   }
 }
+
+/**
+ * Spoken once when a goal is chosen: "Goal 4.7 kilometres, your usual Saturday morning loop."
+ * source: 'route' | 'time' | 'manual'.
+ */
+export function goalConfirmation(goalM, imperial, source, name) {
+  const unit = imperial ? MILE : KM;
+  const v = spokenNumber(goalM / unit);
+  const words = `${v} ${imperial ? (v === '1' ? 'mile' : 'miles') : v === '1' ? 'kilometre' : 'kilometres'}`;
+  if (source === 'route' && name) return `Goal ${words}, your usual ${name}.`;
+  if (source === 'time' && name) return `Goal ${words}, based on your ${name}.`;
+  return `Goal ${words}.`;
+}
+
+/** Said once when the user leaves the routine's route. */
+export const OFF_ROUTE_PHRASE = 'Off your usual route. Goal announcements paused.';
 
 /** "Average pace 6 minutes 18 seconds per kilometre." or "Average speed 24.3 kilometres per hour." */
 export function spokenAverage(distanceM, elapsedMs, { pace, imperial }) {

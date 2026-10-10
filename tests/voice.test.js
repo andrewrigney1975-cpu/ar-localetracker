@@ -112,7 +112,7 @@ describe('voice triggers', () => {
 
   it('builds the config from settings', () => {
     const s = structuredClone(DEFAULT_SETTINGS);
-    expect(voiceConfig(s, 'run')).toMatchObject({ splits: true, time: false, goal: false, goalM: 10000, pace: true, imperial: false });
+    expect(voiceConfig(s, 'run')).toMatchObject({ splits: true, time: false, goal: false, goalM: 0, autoGoal: true, pace: true, imperial: false });
     expect(voiceConfig({ ...s, units: 'imperial' }, 'cycle')).toMatchObject({ splits: false, pace: false, imperial: true });
   });
 });

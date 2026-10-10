@@ -8,9 +8,14 @@ import { settings, updateSettings } from '../settings.js';
 import { verticalThreshold } from '../stats/summary.js';
 import { parseJournal } from '../tracker/journal.js';
 import { GOAL_STEPS } from '../voice/coach.js';
+import { getRoutineModel } from '../insights/model.js';
+import { predictGoal } from '../insights/routines.js';
+
+const PLURAL = { walk: 'walks', run: 'runs', cycle: 'rides', ski: 'ski days' };
+const FIX_MAX_AGE_MS = 120000;
 import { tracker } from '../tracker/client.js';
 import { choiceDialog, confirmDialog } from '../ui/dialog.js';
-import { Disposer, el } from '../ui/dom.js';
+import { Disposer, el, escapeHtml } from '../ui/dom.js';
 import { icons } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
 import {
@@ -236,26 +241,91 @@ export async function mount(root, params, _query, ctx) {
     return wrap;
   }
 
-  /** Goal distance for goal-based announcements, chosen before starting. */
+  // ---- Goal (Settings → Voice: Off · Set · Auto) ----------------------------------------
+  let routineModel = null;
+  /** Goal chosen with −/+ in Auto mode: this workout only. */
+  let goalOverride = null;
+  let lastGoalHtml = '';
+
+  /** The warm-up fix, if recent and good enough to place the user at a routine's start. */
+  function freshFix() {
+    const l = status.last;
+    if (!l || !Number.isFinite(l.lat) || !(l.accuracy <= 30) || Date.now() - (l.t ?? 0) > FIX_MAX_AGE_MS) return null;
+    return { lat: l.lat, lon: l.lon, t: l.t, accuracy: l.accuracy };
+  }
+
+  function autoPrediction() {
+    const fix = freshFix();
+    return predictGoal(routineModel, {
+      activity: act.id,
+      now: Date.now(),
+      tzOffset: new Date().getTimezoneOffset(),
+      lat: fix?.lat,
+      lon: fix?.lon,
+      imperial: units === 'imperial',
+    });
+  }
+
+  /** Goal distance for goal announcements, shown before starting. */
   function renderGoal() {
     const v = settings().voice;
-    ref.goal.hidden = !(phase === 'ready' && v.goal[act.id]);
-    if (ref.goal.hidden) return;
+    const mode = v.goalMode[act.id] ?? 'off';
+    ref.goal.hidden = phase !== 'ready' || mode === 'off';
+    if (ref.goal.hidden) {
+      lastGoalHtml = '';
+      return;
+    }
     const unitM = units === 'imperial' ? 1609.344 : 1000;
     const step = GOAL_STEPS[act.id];
-    const value = Math.max(step, Math.round(v.goalM[act.id] / unitM / step) * step);
-    ref.goal.innerHTML = `
-      <button class="icon-btn" data-goal="-1" aria-label="Shorter goal" ${value <= step ? 'disabled' : ''}>−</button>
-      <span class="goal-value"><small>Goal</small><b>${value}<small>${distanceUnit(units)}</small></b></span>
+    const fmt = (m) => String(Math.round((m / unitM) * 10) / 10);
+    let label = 'Goal';
+    let value = null; // metres
+    let sub = '';
+    if (mode === 'set') {
+      value = Math.max(step, Math.round(v.goalM[act.id] / unitM / step) * step) * unitM;
+    } else if (goalOverride != null) {
+      value = goalOverride;
+      sub = '<button class="goal-reset" data-goal-reset>This workout · use auto</button>';
+    } else {
+      label = 'Auto goal';
+      const p = autoPrediction();
+      if (p.goalM) {
+        value = p.goalM;
+        sub = escapeHtml(p.source === 'route' ? `usual ${p.name}` : `your ${p.name}`);
+      } else if (p.reason === 'learning') {
+        sub = `learning · ${p.have} of ${p.need} ${PLURAL[act.id]}`;
+      } else {
+        sub = freshFix() ? 'no usual route here now' : 'waiting for GPS';
+      }
+    }
+    const html = `
+      <button class="icon-btn" data-goal="-1" aria-label="Shorter goal" ${value != null && value <= step * unitM ? 'disabled' : ''}>−</button>
+      <span class="goal-value"><small>${label}</small><b>${value != null ? fmt(value) : '–'}<small>${distanceUnit(units)}</small></b>${sub ? `<span class="goal-sub">${sub}</span>` : ''}</span>
       <button class="icon-btn" data-goal="1" aria-label="Longer goal">+</button>`;
+    if (html === lastGoalHtml) return;
+    lastGoalHtml = html;
+    ref.goal.innerHTML = html;
     ref.goal.querySelectorAll('[data-goal]').forEach((b) =>
       b.addEventListener('click', async () => {
-        const next = Math.max(step, value + Number(b.dataset.goal) * step);
-        const voice = settings().voice;
-        await updateSettings({ voice: { ...voice, goalM: { ...voice.goalM, [act.id]: next * unitM } } });
+        const dir = Number(b.dataset.goal);
+        const base = value ?? v.goalM[act.id];
+        // Step to the next whole step from wherever the goal is (4.7 → 5 or 4).
+        const steps = base / unitM / step;
+        const nextSteps = Math.max(1, dir > 0 ? Math.floor(steps + 1e-9) + 1 : Math.ceil(steps - 1e-9) - 1);
+        const next = nextSteps * step * unitM;
+        if (mode === 'set') {
+          const voice = settings().voice;
+          await updateSettings({ voice: { ...voice, goalM: { ...voice.goalM, [act.id]: next } } });
+        } else {
+          goalOverride = next;
+        }
         renderGoal();
       })
     );
+    ref.goal.querySelector('[data-goal-reset]')?.addEventListener('click', () => {
+      goalOverride = null;
+      renderGoal();
+    });
   }
 
   function renderControls() {
@@ -336,7 +406,15 @@ export async function mount(root, params, _query, ctx) {
     try {
       if (!(await ensurePermissions()) || !(await checkDevice())) return;
       const workoutId = newWorkoutId();
-      await tracker.start({ workoutId, activity: act.id, autoPause: Boolean(s.autoPause[act.id]), units });
+      const fix = freshFix();
+      await tracker.start({
+        workoutId,
+        activity: act.id,
+        autoPause: Boolean(s.autoPause[act.id]),
+        units,
+        ...(goalOverride != null && settings().voice.goalMode[act.id] === 'auto' ? { goalM: goalOverride } : {}),
+        ...(fix ? { fix } : {}),
+      });
       climb.reset();
       phase = 'recording';
       status = { ...status, state: 'recording', workoutId, elapsedMs: 0, distance: 0 };
@@ -392,6 +470,7 @@ export async function mount(root, params, _query, ctx) {
       if (ev.state === 'idle' && phase !== 'ready') return; // stray warm-up fix
       status = { ...status, ...ev, last: ev.last ?? status.last };
       statusAt = performance.now();
+      if (phase === 'ready') renderGoal(); // the warm-up fix can place the user at a routine
       if (phase === 'recording' && ev.last) climb.push(ev.last.altitude);
       renderMetrics();
       renderTimer();
@@ -414,14 +493,22 @@ export async function mount(root, params, _query, ctx) {
   );
   // Spoken announcements also show as a caption under the controls for a few seconds.
   let captionTimer = 0;
+  const caption = (text) => {
+    if (phase !== 'recording' && phase !== 'autopaused') return;
+    ref.hint.textContent = text;
+    clearTimeout(captionTimer);
+    captionTimer = setTimeout(() => {
+      if (ref.hint.textContent === text) ref.hint.textContent = '';
+    }, 10000);
+  };
+  d.add(tracker.on('announce', (ev) => caption(ev.text)));
   d.add(
-    tracker.on('announce', (ev) => {
-      if (phase !== 'recording') return;
-      ref.hint.textContent = ev.text;
-      clearTimeout(captionTimer);
-      captionTimer = setTimeout(() => {
-        if (ref.hint.textContent === ev.text) ref.hint.textContent = '';
-      }, 10000);
+    tracker.on('goal', (ev) => {
+      // Spoken (and captioned) already unless the confirmation is turned off.
+      if (ev.goalM && !ev.offRoute && settings().voice.confirmGoal === false) {
+        const unitM = units === 'imperial' ? 1609.344 : 1000;
+        caption(`Goal ${Math.round((ev.goalM / unitM) * 10) / 10} ${distanceUnit(units)}${ev.name ? ` · ${ev.name}` : ''}`);
+      }
     })
   );
   d.add(() => clearTimeout(captionTimer));
@@ -505,5 +592,11 @@ export async function mount(root, params, _query, ctx) {
   d.add(() => tracker.setKeepScreenOn(false));
 
   renderAll();
+  getRoutineModel()
+    .then((m) => {
+      routineModel = m;
+      renderGoal();
+    })
+    .catch(() => {});
   return () => d.dispose();
 }

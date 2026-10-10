@@ -7,6 +7,52 @@ import { Disposer, escapeHtml } from '../ui/dom.js';
 import { toast } from '../ui/toast.js';
 import { App } from '@capacitor/app';
 import { INTERVAL_OPTIONS, spokenAverage, spokenDistance } from '../voice/coach.js';
+import { getRoutineModel, rebuildRoutineModel } from '../insights/model.js';
+import { confirmDialog, openDialog } from '../ui/dialog.js';
+
+const GOAL_MODES = ['auto', 'set', 'off'];
+const GOAL_LABELS = { auto: 'Auto goal', set: 'Set goal', off: 'Goal' };
+const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const clock = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
+
+/** "Sat", "Tue & Thu", "Mon, Wed & Fri": the days a routine is usually done on. */
+function usualDays(weekdays) {
+  const total = weekdays.reduce((a, b) => a + b, 0);
+  const days = weekdays.map((n, d) => [n, d]).filter(([n]) => n >= total * 0.2).map(([, d]) => DAY_SHORT[d]);
+  if (!days.length) return 'any day';
+  return days.length === 1 ? days[0] : `${days.slice(0, -1).join(', ')} & ${days[days.length - 1]}`;
+}
+
+function routinesHTML(model, s) {
+  const imperial = s.units === 'imperial';
+  const unit = imperial ? 'mi' : 'km';
+  const rows = [];
+  const learning = [];
+  for (const id of ACTIVITY_IDS) {
+    const a = model?.activities?.[id];
+    if (s.voice.goalMode[id] !== 'auto') continue;
+    if (!a?.ready) {
+      learning.push(`${ACTIVITIES[id].label}: ${a?.usable ?? 0} of ${model?.need ?? 5}`);
+      continue;
+    }
+    for (const r of a.routines.filter((x) => x.eligible || x.suppressed)) {
+      const goal = Math.round((r.goal[imperial ? 'imperial' : 'metric'] / (imperial ? 1609.344 : 1000)) * 10) / 10;
+      const hit = r.predictions ? ` · goal hit ${r.hits} of ${r.predictions}` : '';
+      rows.push(`<div class="setting" data-activity="${id}"><span class="act-label">${ACTIVITIES[id].icon}<span class="text">${escapeHtml(r.name[0].toUpperCase() + r.name.slice(1))}
+          <small>${goal} ${unit} · ${r.count} times · ${usualDays(r.weekdays)} ~${clock(r.startMin)}${hit}${r.suppressed ? ' · paused: recent goals missed' : ''}</small></span></span>
+          <span class="voice-kinds"><button class="chip" data-rename="${escapeHtml(r.id)}">Rename</button><button class="chip" data-forget="${escapeHtml(r.id)}">Forget</button></span></div>`);
+    }
+  }
+  const excluded = s.routines.excluded.length;
+  return `
+    <div class="section-title">Learned routines</div>
+    <div class="card settings-group">
+      ${rows.join('') || `<div class="setting"><div class="text">No routines yet<small>Locale learns once an activity has ${model?.need ?? 5} workouts in the last 6 months. Three similar workouts from the same place at about the same time of week make a routine, and it then sets the goal for you.</small></div></div>`}
+      ${learning.length ? `<div class="setting"><div class="text">Still learning<small>${learning.join(' · ')} workouts</small></div></div>` : ''}
+      ${excluded ? `<div class="setting"><div class="text">${excluded} workout${excluded === 1 ? '' : 's'} left out<small>From routines you asked Locale to forget</small></div><button class="btn ghost" data-act="unforget">Restore</button></div>` : ''}
+    </div>`;
+}
 
 const MAP_STYLE_LABELS = { streets: 'Streets', light: 'Light', dark: 'Dark', topo: 'Topo' };
 
@@ -20,11 +66,12 @@ export async function mount(root) {
   const d = new Disposer();
   const render = async () => {
     const s = settings();
-    const [caps, perms, workouts, watch] = await Promise.all([
+    const [caps, perms, workouts, watch, model] = await Promise.all([
       tracker.getCapabilities().catch(() => null),
       tracker.checkPermissions().catch(() => null),
       listWorkouts().catch(() => []),
       tracker.getWatchStatus().catch(() => null),
+      getRoutineModel().catch(() => null),
     ]);
     const p = s.profile;
     const imperial = s.units === 'imperial';
@@ -99,16 +146,22 @@ export async function mount(root) {
               ${ACTIVITY_IDS.map((id) => {
                 const a = ACTIVITIES[id];
                 const chip = (kind, label) => `<button class="chip" data-voice="${kind}" data-activity="${id}" aria-pressed="${Boolean(s.voice[kind][id])}">${label}</button>`;
+                const mode = s.voice.goalMode[id] ?? 'off';
+                const goalChip = `<button class="chip goal-chip" data-goalmode="${id}" aria-pressed="${mode !== 'off'}" aria-label="Goal: ${mode}">${GOAL_LABELS[mode]}</button>`;
                 return `<div class="setting" data-activity="${id}"><span class="act-label">${a.icon}<span class="text">${a.label}</span></span>
-                  <span class="voice-kinds">${chip('splits', 'Splits')}${chip('time', 'Time')}${chip('goal', 'Goal')}</span></div>`;
+                  <span class="voice-kinds">${chip('splits', 'Splits')}${chip('time', 'Time')}${goalChip}</span></div>`;
               }).join('')}
               <div class="setting stack"><div class="text">Time announcements<small>Every few minutes of active time, with distance and average pace or speed</small></div>
                 ${segmented('voice.intervalMin', INTERVAL_OPTIONS.map((m) => [m, `${m} min`]), s.voice.intervalMin)}</div>
               <div class="setting"><div class="text">Other audio<small>Music and podcasts while Locale speaks</small></div>
                 ${segmented('voice.duck', [['true', 'Lower'], ['false', 'Pause']], String(s.voice.duck))}</div>
-              <div class="setting"><div class="text">Splits every ${imperial ? 'mile' : 'kilometre'}; goal at 25, 50, 75 and 100%<small>Set the goal distance on the start screen</small></div>
+              <label class="setting"><span class="text">Say the goal at the start<small>For example "Goal 4.7 kilometres, your usual Saturday morning loop"</small></span>
+                <input type="checkbox" class="switch" data-toggle="confirmGoal" ${s.voice.confirmGoal ? 'checked' : ''} /></label>
+              <div class="setting"><div class="text">Splits every ${imperial ? 'mile' : 'kilometre'}; goal at 25, 50, 75 and 100%<small>Auto goal: learned from your usual routes and times. Set goal: the distance chosen on the start screen. Tap a goal chip to switch.</small></div>
                 <button class="btn ghost" data-act="voicetest">Test</button></div>
             </div>
+
+            ${routinesHTML(model, s)}
 
             <div class="section-title">Maps</div>
             <div class="card settings-group">
@@ -202,6 +255,66 @@ export async function mount(root) {
         b.setAttribute('aria-pressed', String(on));
       })
     );
+    root.querySelectorAll('[data-goalmode]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const id = b.dataset.goalmode;
+        const voice = settings().voice;
+        const next = GOAL_MODES[(GOAL_MODES.indexOf(voice.goalMode[id] ?? 'off') + 1) % GOAL_MODES.length];
+        await updateSettings({ voice: { ...voice, goalMode: { ...voice.goalMode, [id]: next } } });
+        render();
+      })
+    );
+    root.querySelector('[data-toggle="confirmGoal"]').addEventListener('change', (e) =>
+      updateSettings({ voice: { ...settings().voice, confirmGoal: e.target.checked } })
+    );
+    const findRoutine = (id) => Object.values(model?.activities ?? {}).flatMap((a) => a.routines).find((r) => r.id === id);
+    root.querySelectorAll('[data-rename]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const r = findRoutine(b.dataset.rename);
+        if (!r) return;
+        const name = await openDialog((dlg, close) => {
+          dlg.innerHTML = `
+            <h2>Rename routine</h2>
+            <p>Used when Locale says the goal: "your usual …"</p>
+            <label class="field"><span>Name</span><input type="text" maxlength="40" autofocus /></label>
+            <div class="actions"><button class="btn ghost" data-v="cancel">Cancel</button><button class="btn primary" data-v="save">Save</button></div>`;
+          const input = dlg.querySelector('input');
+          input.value = r.name;
+          dlg.querySelector('[data-v="cancel"]').addEventListener('click', () => close(null));
+          dlg.querySelector('[data-v="save"]').addEventListener('click', () => close(input.value.trim()));
+        });
+        if (name == null) return;
+        const routines = settings().routines;
+        const names = { ...routines.names };
+        if (name) names[r.id] = name;
+        else delete names[r.id];
+        await updateSettings({ routines: { ...routines, names } });
+        await rebuildRoutineModel();
+        render();
+      })
+    );
+    root.querySelectorAll('[data-forget]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const r = findRoutine(b.dataset.forget);
+        if (!r) return;
+        const ok = await confirmDialog({
+          title: 'Forget this routine?',
+          message: `Locale stops predicting "${r.name}" and leaves its ${r.count} workouts out of learning. The workouts themselves are kept.`,
+          confirmLabel: 'Forget',
+          danger: true,
+        });
+        if (!ok) return;
+        const routines = settings().routines;
+        await updateSettings({ routines: { ...routines, excluded: [...new Set([...routines.excluded, ...r.workoutIds])] } });
+        await rebuildRoutineModel();
+        render();
+      })
+    );
+    root.querySelector('[data-act="unforget"]')?.addEventListener('click', async () => {
+      await updateSettings({ routines: { ...settings().routines, excluded: [] } });
+      await rebuildRoutineModel();
+      render();
+    });
     root.querySelector('[data-act="voicetest"]').addEventListener('click', () => {
       const unit = imperial ? 1609.344 : 1000;
       const text = `${spokenDistance(5 * unit, imperial)}. Split time 6 minutes 12 seconds. ${spokenAverage(5 * unit, 5 * 378000, { pace: true, imperial })}`;

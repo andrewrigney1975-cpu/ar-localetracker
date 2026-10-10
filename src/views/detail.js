@@ -248,11 +248,25 @@ function renderSummary(panel, w, track, units) {
   panel.innerHTML = `
     <div class="page">
       <div class="stat-grid num" style="margin-top:12px">${rows.join('')}</div>
+      ${goalHTML(w, units)}
       ${effortHTML(w, track)}
       <div class="card mini-profile">${miniProfileSVG(track)}</div>
       ${w.notes ? `<div class="card notes">${escapeHtml(w.notes)}</div>` : ''}
       <p class="about">Altitude source: ${sm.hasBarometer ? 'barometer anchored to GPS' : 'GPS only'} · ${sm.pointCount.toLocaleString()} points${sm.segments > 1 ? ` · ${sm.segments} segments` : ''}${w.device ? ` · ${escapeHtml(w.device)}` : ''}</p>
     </div>`;
+}
+
+/** "Goal 4.7 km (auto, usual Saturday morning loop) · finished 4.72 km ✓" */
+function goalHTML(w, units) {
+  const p = w.prediction;
+  if (!p?.goalM) return '';
+  const unitM = units === 'imperial' ? 1609.344 : 1000;
+  const goal = Math.round((p.goalM / unitM) * 10) / 10;
+  const done = (w.summary.distance / unitM).toFixed(2);
+  const hit = Math.abs(w.summary.distance - p.goalM) / p.goalM <= 0.1;
+  const how = p.source === 'manual' ? 'set by you' : p.source === 'route' ? `auto, usual ${p.name ?? 'route'}` : `auto, ${p.name ?? 'usual time'}`;
+  const result = p.offRoute ? 'left the usual route' : hit ? `finished ${done} ${distanceUnit(units)} ✓` : `finished ${done} ${distanceUnit(units)}`;
+  return `<p class="goal-line">Goal ${goal} ${distanceUnit(units)} <span class="dim">(${escapeHtml(how)})</span> · ${result}</p>`;
 }
 
 /** Heart rate, calories, cardio load and time in zones. */

@@ -1,5 +1,6 @@
 package app.locale.exercisetracker.wear
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -146,14 +149,28 @@ private fun ActiveScreen(
         }
     }
     val paused = status.state != "recording"
+    val goal = status.goalM?.takeIf { it > 0 }
+    val progress = if (goal != null) (status.distance / goal).toFloat().coerceIn(0f, 1f) else null
     ScreenScaffold {
+        // Goal progress around the edge of the round screen.
+        if (progress != null) {
+            Canvas(Modifier.fillMaxSize().padding(3.dp)) {
+                val stroke = 5.dp.toPx()
+                val inset = stroke / 2
+                val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
+                val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
+                drawArc(Color(0x33FFFFFF), -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
+                drawArc(accent, -90f, 360f * progress, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+            }
+        }
         Column(
             modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Text(
-                "${activityLabel(status.activity)} · ${stateLabel(status.state)}",
+                if (!paused && goal != null) "${activityLabel(status.activity)} · ${(progress!! * 100).toInt()}% of ${formatGoal(goal, status.units)}"
+                else "${activityLabel(status.activity)} · ${stateLabel(status.state)}",
                 color = if (paused) Color(0xFFD08A10) else accent,
                 style = MaterialTheme.typography.labelMedium,
             )
@@ -223,6 +240,13 @@ private fun stateLabel(state: String) = when (state) {
 fun formatDuration(ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0)
     return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, (s / 60) % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
+}
+
+/** "4.7 km", "10 km", "3.1 mi" */
+fun formatGoal(m: Double, units: String): String {
+    val v = Math.round(m / (if (units == "imperial") 1609.344 else 1000.0) * 10) / 10.0
+    val text = if (v == Math.floor(v)) v.toLong().toString() else v.toString()
+    return "$text ${if (units == "imperial") "mi" else "km"}"
 }
 
 fun formatDistance(m: Double, units: String): String =

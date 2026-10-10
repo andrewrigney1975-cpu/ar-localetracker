@@ -5,7 +5,10 @@ import { activity as activityProfile } from '../activities.js';
 import { haversine } from '../geo/geo.js';
 import { HeartModel, SyntheticRoute } from './synthetic.js';
 import { settings } from '../settings.js';
-import { VoiceCoach, voiceConfig } from '../voice/coach.js';
+import { OFF_ROUTE_PHRASE, VoiceCoach, goalConfirmation, voiceConfig } from '../voice/coach.js';
+import { cachedRoutineModel } from '../insights/model.js';
+import { predictGoal } from '../insights/routines.js';
+import { RouteGuard } from '../insights/routeGuard.js';
 
 const Native = registerPlugin('LocaleTracker');
 
@@ -71,6 +74,9 @@ function simTracker() {
   let simClock = 0;
   let anchor = null;
   let coach = null;
+  let goal = null;
+  let guard = null;
+  let goalLine = null;
 
   function idleState() {
     return { state: 'idle', workoutId: null, activity: null, startedAt: 0, elapsedBase: 0, runningSince: 0, distance: 0, segment: 0, seq: 0, last: null };
@@ -98,7 +104,34 @@ function simTracker() {
     satsVisible: 34,
     hr: st.hr,
     last: st.last,
+    ...(goal ? { goal } : {}),
   });
+  const speakAndShow = (text) => {
+    webSpeak(text);
+    emit('announce', { text });
+  };
+  /** Same goal flow as TrackingService: manual, or predicted from the routine model. */
+  function startGoal(activity, opts) {
+    const cfg = coach.cfg;
+    goal = null;
+    guard = null;
+    let g = null;
+    if (opts.goalM > 0 || (cfg.goal && cfg.goalM > 0)) g = { goalM: opts.goalM > 0 ? opts.goalM : cfg.goalM, source: 'manual', routineId: null, confidence: 1 };
+    else if (cfg.autoGoal) {
+      const fix = opts.fix ?? { lat: START.lat, lon: START.lon };
+      const p = predictGoal(cachedRoutineModel(), { activity, now: st.startedAt, tzOffset: new Date(st.startedAt).getTimezoneOffset(), lat: fix.lat, lon: fix.lon, imperial: cfg.imperial });
+      if (p.goalM) g = p;
+      else emit('goal', { reason: p.reason });
+    }
+    if (!g) return;
+    coach.setGoal(g.goalM, 0);
+    goal = { goalM: g.goalM, source: g.source, ...(g.name ? { name: g.name } : {}) };
+    if (g.signature) guard = new RouteGuard(g.signature);
+    goalLine = { type: 'goal', goalM: g.goalM, source: g.source, routineId: g.routineId ?? null, ...(g.name ? { name: g.name } : {}), confidence: g.confidence ?? 1 };
+    append(st.workoutId, { ...goalLine, t: now() });
+    if (cfg.confirmGoal) speakAndShow(goalConfirmation(g.goalM, cfg.imperial, g.source, g.name));
+    emit('goal', goal);
+  }
   function setState(next, reason) {
     if (st.state === 'recording' && next !== 'recording') st.elapsedBase += now() - st.runningSince;
     if (next === 'recording' && st.state !== 'recording') st.runningSince = now();
@@ -133,11 +166,16 @@ function simTracker() {
           }
         }
       }
-      const text = st.state === 'recording' ? coach?.onProgress(st.distance, elapsed()) : null;
-      if (text) {
-        webSpeak(text);
-        emit('announce', { text });
+      if (st.state === 'recording' && guard?.onFix(p.lat, p.lon, elapsed())) {
+        guard = null;
+        coach.pauseGoal();
+        goal = { ...goal, offRoute: true };
+        append(st.workoutId, { ...goalLine, t: now(), offRoute: true });
+        speakAndShow(OFF_ROUTE_PHRASE);
+        emit('goal', goal);
       }
+      const text = st.state === 'recording' ? coach?.onProgress(st.distance, elapsed()) : null;
+      if (text) speakAndShow(text);
     }
     emit('point', snapshot());
   }
@@ -157,7 +195,7 @@ function simTracker() {
     async getCapabilities() {
       return { barometer: true, compass: true, gpsEnabled: true, ignoringBatteryOptimizations: true, manufacturer: 'Browser', model: 'Simulator', sdk: 36 };
     },
-    async start({ workoutId, activity, resume }) {
+    async start({ workoutId, activity, resume, goalM, fix }) {
       if (st.state !== 'idle') throw Object.assign(new Error('A workout is already in progress'), { code: 'busy' });
       clearInterval(warmTimer);
       simClock = Date.now();
@@ -167,6 +205,7 @@ function simTracker() {
       st = { ...idleState(), workoutId, activity, startedAt: simClock };
       anchor = null;
       coach = new VoiceCoach(voiceConfig(settings(), activity));
+      if (!resume) startGoal(activity, { goalM, fix });
       if (!resume) {
         localStorage.removeItem(JKEY(workoutId));
         append(workoutId, { type: 'meta', v: 1, workoutId, activity, startedAt: simClock, autoPause: false, hasBarometer: true, device: 'browser simulator' });
@@ -193,6 +232,8 @@ function simTracker() {
       append(id, { type: 'end', t: now(), elapsedMs: st.elapsedBase, distance: st.distance });
       clearInterval(timer);
       st = idleState();
+      goal = null;
+      guard = null;
       return { workoutId: id, pointCount: count, saved: false };
     },
     async getStatus() {
