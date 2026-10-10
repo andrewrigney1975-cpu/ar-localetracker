@@ -110,6 +110,8 @@ export async function mount(root, params, query, ctx) {
             exaggeration: s.exaggeration,
             satellite: settings().satellite3d,
             onSatelliteChange: (on) => updateSettings({ satellite3d: on }),
+            smooth: settings().smooth3d,
+            onSmoothChange: (on) => updateSettings({ smooth3d: on }),
           });
         }
       } catch (e) {

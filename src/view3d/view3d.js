@@ -13,14 +13,15 @@ import { cssVar, Disposer } from '../ui/dom.js';
 import { markerInfoHTML, Popover } from '../ui/popover.js';
 import { distanceUnit, formatPace, splitLength } from '../units.js';
 import { IMAGERY, latToPx, loadImagery, lonToPx } from './imagery.js';
+import { SMOOTH_WINDOW_S, smoothForDisplay } from './smooth.js';
 
 const WORLD = 100; // horizontal extent normalised to this many scene units
 
 /**
  * @param {HTMLElement} root
- * @param {{workout:object, track:object, units:string, exaggeration:'auto'|number, satellite?:boolean, onSatelliteChange?:(on:boolean)=>void}} opts
+ * @param {{workout:object, track:object, units:string, exaggeration:'auto'|number, satellite?:boolean, onSatelliteChange?:(on:boolean)=>void, smooth?:boolean, onSmoothChange?:(on:boolean)=>void}} opts
  */
-export function mountView3D(root, { workout, track, units, exaggeration = 'auto', satellite = true, onSatelliteChange }) {
+export function mountView3D(root, { workout, track, units, exaggeration = 'auto', satellite = true, onSatelliteChange, smooth = true, onSmoothChange }) {
   const d = new Disposer();
   let disposed = false;
   d.add(() => {
@@ -32,6 +33,8 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
       <div class="view3d-attrib" hidden>${IMAGERY.attribution}</div>
       <div class="view3d-controls">
         <button class="chip" data-act="satellite" aria-pressed="false">Satellite</button>
+        <button class="chip" data-act="smooth" aria-pressed="false" title="Average the drawn route over ${SMOOTH_WINDOW_S} s">Smooth</button>
+        <span class="chips-break"></span>
         <label for="exag">Vertical</label>
         <input id="exag" type="range" min="1" max="10" step="0.5" />
         <output for="exag"></output>
@@ -65,11 +68,28 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
   const autoExag = Math.min(10, Math.max(1, Math.round(((0.25 * extentM) / vRange) * 2) / 2));
   let exag = exaggeration === 'auto' ? autoExag : Number(exaggeration) || autoExag;
 
-  const toScene = (i, e = exag) =>
-    new THREE.Vector3(ex[i] * scale, (Math.max(0, (Number.isFinite(track.alt[i]) ? track.alt[i] : minAlt) - minAlt)) * scale * e, -ny[i] * scale);
-  const toSceneLL = (lat, lon, alt, e = exag) => {
-    const [x, y] = proj.toXY(lat, lon);
-    return new THREE.Vector3(x * scale, Math.max(0, (Number.isFinite(alt) ? alt : minAlt) - minAlt) * scale * e, -y * scale);
+  // Drawn positions: raw, or a 10 s moving average (display only; see smooth.js).
+  const raw = { x: ex, y: ny, alt: track.alt, speed: track.speed };
+  const smoothed = smoothForDisplay(track, raw);
+  let smoothOn = smooth;
+  let pts = smoothOn ? smoothed : raw;
+
+  const sceneY = (alt, e) => Math.max(0, (Number.isFinite(alt) ? alt : minAlt) - minAlt) * scale * e;
+  const toScene = (i, e = exag) => new THREE.Vector3(pts.x[i] * scale, sceneY(pts.alt[i], e), -pts.y[i] * scale);
+  /** Point on the drawn route at a cumulative distance, so arrows and markers sit on the line. */
+  const atDistance = (dist, e = exag) => {
+    const dd = track.dist;
+    if (dist <= dd[0]) return toScene(0, e);
+    if (dist >= dd[n - 1]) return toScene(n - 1, e);
+    let lo = 0;
+    let hi = n - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (dd[mid] <= dist) lo = mid;
+      else hi = mid;
+    }
+    const f = dd[hi] > dd[lo] ? (dist - dd[lo]) / (dd[hi] - dd[lo]) : 0;
+    return toScene(lo, e).lerp(toScene(hi, e), f);
   };
 
   // ---- Renderer, scene, camera ------------------------------------------------------------
@@ -249,7 +269,7 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
       for (let i = from; i < to; i += step) {
         const p = toScene(i);
         pos.push(p.x, p.y, p.z);
-        const [r, g, b] = rampRGB((track.speed[i] - vmin) / (vmax - vmin));
+        const [r, g, b] = rampRGB((pts.speed[i] - vmin) / (vmax - vmin));
         col.push(r / 255, g / 255, b / 255);
         sh.push(p.x, 0.02, p.z);
       }
@@ -293,15 +313,12 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
     const q = new THREE.Quaternion();
     for (let k = 0; k < count; k++) {
       const dist = ((k + 0.5) / count) * total;
-      const a = sampleAtDistance(track, Math.max(0, dist - 8));
-      const b = sampleAtDistance(track, Math.min(total, dist + 8));
-      const pa = toSceneLL(a.lat, a.lon, a.alt);
-      const pb = toSceneLL(b.lat, b.lon, b.alt);
+      const pa = atDistance(Math.max(0, dist - 8));
+      const pb = atDistance(Math.min(total, dist + 8));
       const dir = pb.clone().sub(pa);
       if (dir.lengthSq() < 1e-9) dir.set(1, 0, 0);
       q.setFromUnitVectors(up, dir.normalize());
-      const c = sampleAtDistance(track, dist);
-      const mid = toSceneLL(c.lat, c.lon, c.alt);
+      const mid = atDistance(dist);
       mid.y += 0.6;
       m4.compose(mid, q, new THREE.Vector3(1, 1, 1));
       arrows.setMatrixAt(k, m4);
@@ -310,8 +327,7 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
     group.add(arrows);
 
     for (const sp of sprites) {
-      const s = sp.userData.data;
-      const p = toSceneLL(s.lat, s.lon, s.alt);
+      const p = atDistance(sp.userData.data.dist);
       sp.position.set(p.x, p.y + 1.2, p.z);
     }
     render();
@@ -413,6 +429,16 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
   resize();
   satBtn.setAttribute('aria-pressed', String(satOn));
   if (satOn) loadGround();
+
+  const smoothBtn = root.querySelector('[data-act="smooth"]');
+  smoothBtn.setAttribute('aria-pressed', String(smoothOn));
+  smoothBtn.addEventListener('click', () => {
+    smoothOn = !smoothOn;
+    pts = smoothOn ? smoothed : raw;
+    smoothBtn.setAttribute('aria-pressed', String(smoothOn));
+    onSmoothChange?.(smoothOn);
+    build();
+  });
 
   d.add(() => {
     cancelAnimationFrame(frame);

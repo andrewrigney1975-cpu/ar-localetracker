@@ -129,6 +129,9 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - Three.js plot with an altitude exaggeration slider from 1× to 10×.
   - **Satellite imagery** on the ground.
   - Direction arrows, and the same clickable distance markers as the map.
+  - **Smooth** route: a 10-second time-weighted average removes GPS noise and altitude
+    bounce from the drawn line (display only; stats and exports use the raw track).
+    Toggle it on the 3D view or in Settings.
 - **Share as text:** a short summary (distance, time, pace or speed, climb, heart rate,
   calories) by **SMS** with one tap, or to any app through the Android share sheet.
 - **Export** through the Android share sheet as:
@@ -214,7 +217,7 @@ src/
              (idbStore), track codec, one-time migration
   export/    FIT, GPX, TCX, KML, GeoJSON, CSV
   map/       MapLibre workout map, Live position map    profile/  elevation side view
-  view3d/    Three.js 3D view, satellite imagery
+  view3d/    Three.js 3D view, satellite imagery, display smoothing
   seed/      City2Surf sample workout (course data + generator)
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, settings
@@ -231,7 +234,7 @@ docs/        screenshots
 ```
 
 See [PLAN.md](PLAN.md) for the design and decisions, and [BACKLOG.md](BACKLOG.md) for
-planned features: voice announcements and 3D smoothing.
+planned features: voice announcements.
 
 ## Credits
 
