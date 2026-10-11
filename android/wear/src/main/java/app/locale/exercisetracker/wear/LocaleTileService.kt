@@ -19,6 +19,12 @@ import com.google.common.util.concurrent.ListenableFuture
 class LocaleTileService : TileService() {
     private companion object {
         const val RES_VERSION = "1"
+        val ACCENT = mapOf(
+            "walk" to 0xFF13A594.toInt(),
+            "run" to 0xFFF2672E.toInt(),
+            "cycle" to 0xFF2F7DF6.toInt(),
+            "ski" to 0xFF8A63F0.toInt(),
+        )
     }
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
@@ -100,12 +106,17 @@ class LocaleTileService : TileService() {
             .build()
     }
 
-    private fun idleLayout() = column(
-        text("Locale", 18f, 0xFFF2672E.toInt(), bold = true),
-        text("Phone records GPS", 12f, 0xFFB0BAC4.toInt()),
-        pill("Start run", 0xFFF2672E.toInt(), launch("run")),
-        text("More activities in app", 11f, 0xFF8B97A3.toInt()),
-    )
+    /** Starts the last used activity; the others are a tap away in the app. */
+    private fun idleLayout(): LayoutElementBuilders.LayoutElement {
+        val activity = PhoneLink.lastActivity(this)
+        val accent = ACCENT[activity] ?: ACCENT.getValue("run")
+        return column(
+            text("Locale", 18f, accent, bold = true),
+            text("Phone records GPS", 12f, 0xFFB0BAC4.toInt()),
+            pill("Start ${activityLabel(activity).lowercase()}", accent, launch(activity)),
+            text("More activities in app", 11f, 0xFF8B97A3.toInt()),
+        )
+    }
 
     private fun activeLayout(s: PhoneStatus) = column(
         text("${activityLabel(s.activity)} · ${if (s.state == "recording") "Recording" else "Paused"}", 13f, 0xFFF2672E.toInt()),

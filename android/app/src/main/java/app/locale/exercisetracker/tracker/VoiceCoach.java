@@ -116,8 +116,9 @@ final class VoiceCoach {
             long j = elapsedMs / intervalMs;
             if (j > intervalsDone) {
                 if (cfg.time) {
-                    parts.add(capitalise(spokenDuration(j * intervalMs)) + "."
-                        + (saidDistance ? "" : " Distance " + spokenDistance(distanceM, cfg.imperial) + "."));
+                    // Always the workout's distance so far, even when a split (a round number) was just said.
+                    parts.add(capitalise(spokenDuration(j * intervalMs)) + ". Distance "
+                        + spokenDistance(distanceM, cfg.imperial) + ".");
                     saidDistance = true;
                     kTime = true;
                 }

@@ -1,6 +1,8 @@
 import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
+import { personalBests, pruneSplitCache, splitTimesFor } from '../insights/bests.js';
 import { effortAvailability, effortFor, pruneEffortCache } from '../insights/effort.js';
+import { getRoutineModel } from '../insights/model.js';
 import {
   buildReport,
   canShiftWindow,
@@ -21,13 +23,14 @@ import {
   windowLabel,
   WINDOWS,
 } from '../insights/report.js';
+import { displayName } from '../insights/routines.js';
 import { shareFile } from '../services/share.js';
 import { settings } from '../settings.js';
 import { openDialog } from '../ui/dialog.js';
 import { Disposer, el, escapeHtml, on } from '../ui/dom.js';
 import { icons } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
-import { distanceUnit, distanceValue, formatDuration, M_PER_MI, paceUnit, speedUnit, speedValue } from '../units.js';
+import { distanceUnit, distanceValue, formatDate, formatDuration, formatPace, M_PER_MI, paceUnit, speedUnit, speedValue } from '../units.js';
 
 // Stack and legend order: keeps cycle (blue) and ski (violet) apart, which are hard to tell
 // apart side by side with red-green colour blindness.
@@ -36,7 +39,7 @@ const STACK_ORDER = ['cycle', 'run', 'walk', 'ski'];
 const GROUP_LABELS = { day: 'Daily', week: 'Weekly', month: 'Monthly', quarter: 'Every 3 months', year: 'Yearly' };
 
 const STATE_KEY = 'insights.view.v1';
-const DEFAULT_STATE = { range: '12m', group: 'month', activity: 'all', split: false, metric: 'distance', from: null, to: null };
+const DEFAULT_STATE = { range: '12m', group: 'month', activity: 'all', routine: 'all', split: false, metric: 'distance', from: null, to: null };
 
 function loadState() {
   let s;
@@ -104,6 +107,17 @@ function niceTicks(max, pace) {
   return ticks;
 }
 
+/** Routines worth filtering by: those that name workouts (learned and eligible, or marked). */
+function routineList(model) {
+  const out = [];
+  for (const id of ACTIVITY_IDS) {
+    for (const r of model?.activities?.[id]?.routines ?? []) {
+      if (r.eligible || r.user) out.push({ id: r.id, activity: id, name: displayName(r.name), workoutIds: r.workoutIds });
+    }
+  }
+  return out;
+}
+
 const compact = (v) => (v >= 10000 ? `${round(v / 1000)}K` : v.toLocaleString());
 
 export async function mount(root, params, query) {
@@ -113,6 +127,8 @@ export async function mount(root, params, query) {
   let workouts = [];
   let report = null;
   let renderToken = 0;
+  let bestsToken = 0;
+  let routines = [];
 
   root.innerHTML = `
     <div class="screen">
@@ -141,8 +157,10 @@ export async function mount(root, params, query) {
             <button class="chip" role="radio" data-activity-filter="all">All</button>
             ${ACTIVITY_IDS.map((id) => `<button class="chip" role="radio" data-activity-filter="${id}" data-activity="${id}">${ACTIVITIES[id].icon}${ACTIVITIES[id].label}</button>`).join('')}
           </div>
+          <select class="select routine-select" data-ref="routine" aria-label="Routine" hidden></select>
           <label class="split-toggle" data-ref="split-row"><span>Separate activity types</span><input type="checkbox" class="switch" data-ref="split" /></label>
           <div data-slot="content"></div>
+          <div data-slot="bests"></div>
         </div>
       </div>
     </div>`;
@@ -153,6 +171,8 @@ export async function mount(root, params, query) {
   const toInput = $('[data-ref="to"]');
   const rangeSelect = $('[data-ref="range"]');
   const groupSelect = $('[data-ref="group"]');
+  const routineSelect = $('[data-ref="routine"]');
+  const bestsHost = $('[data-slot="bests"]');
   /** Windows back from the current one (0 = today / this week / …); not remembered. */
   let offset = 0;
 
@@ -168,15 +188,26 @@ export async function mount(root, params, query) {
     root.querySelectorAll('[data-step]').forEach((b) => (b.disabled = !canShiftWindow(state.range, offset, Number(b.dataset.step), { from: state.from, to: state.to })));
     root.querySelectorAll('[data-activity-filter]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.activityFilter === state.activity)));
     $('[data-ref="custom"]').hidden = state.range !== 'custom';
-    $('[data-ref="split-row"]').hidden = state.activity !== 'all';
+    const shown = routines.filter((r) => state.activity === 'all' || r.activity === state.activity);
+    routineSelect.innerHTML = `<option value="all">All routines</option>${shown
+      .map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}${state.activity === 'all' ? ` · ${ACTIVITIES[r.activity].label}` : ''}</option>`)
+      .join('')}`;
+    routineSelect.value = state.routine;
+    routineSelect.hidden = !shown.length;
+    $('[data-ref="split-row"]').hidden = state.activity !== 'all' || state.routine !== 'all';
     $('[data-ref="split"]').checked = state.split;
   }
 
   const change = (patch) => {
+    const scope = state.activity + state.routine;
     Object.assign(state, patch);
+    // A routine belongs to one activity: picking another activity drops it.
+    const r = selectedRoutine();
+    if (state.routine !== 'all' && (!r || (state.activity !== 'all' && r.activity !== state.activity))) state.routine = 'all';
     saveState(state);
     syncControls();
     render();
+    if (state.activity + state.routine !== scope) renderBests();
   };
   rangeSelect.addEventListener('change', () => {
     const range = rangeSelect.value;
@@ -191,6 +222,7 @@ export async function mount(root, params, query) {
     }
   });
   groupSelect.addEventListener('change', () => change({ group: groupSelect.value }));
+  routineSelect.addEventListener('change', () => change({ routine: routineSelect.value }));
   root.querySelectorAll('[data-step]').forEach((b) =>
     b.addEventListener('click', () => {
       const step = Number(b.dataset.step);
@@ -209,6 +241,14 @@ export async function mount(root, params, query) {
   fromInput.addEventListener('change', () => fromInput.value && change({ from: fromInput.value }));
   toInput.addEventListener('change', () => toInput.value && change({ to: toInput.value }));
 
+  const selectedRoutine = () => routines.find((r) => r.id === state.routine) ?? null;
+  /** Workouts in the activity and routine filters (any date). */
+  function scoped() {
+    const r = selectedRoutine();
+    const ids = r ? new Set(r.workoutIds) : null;
+    return workouts.filter((w) => (state.activity === 'all' || w.activity === state.activity) && (!ids || ids.has(w.id)));
+  }
+
   const earliest = () => (workouts.length ? Math.min(...workouts.map((w) => w.startedAt)) : null);
 
   async function render() {
@@ -217,10 +257,11 @@ export async function mount(root, params, query) {
     fromInput.value = isoDate(from);
     toInput.value = isoDate(to);
     const profile = settings().profile;
-    const inRange = workouts.filter((w) => w.startedAt >= from && w.startedAt < nextPeriod(to, 'day') && (state.activity === 'all' || w.activity === state.activity));
+    const pool = scoped();
+    const inRange = pool.filter((w) => w.startedAt >= from && w.startedAt < nextPeriod(to, 'day'));
     const draw = (effort) => {
-      const entries = workouts.map((w) => reportEntry(w, effort?.get(w.id)));
-      report = buildReport(entries, { from, to, group: state.group, activity: state.activity, split: state.activity === 'all' && state.split });
+      const entries = pool.map((w) => reportEntry(w, effort?.get(w.id)));
+      report = buildReport(entries, { from, to, group: state.group, activity: state.activity, split: state.activity === 'all' && state.routine === 'all' && state.split });
       renderContent(effort == null);
     };
     draw(null);
@@ -429,6 +470,52 @@ export async function mount(root, params, query) {
     });
   }
 
+  /** Personal bests over all time, in the activity and routine filters. */
+  async function renderBests() {
+    const token = ++bestsToken;
+    const pool = scoped();
+    if (!pool.length) {
+      bestsHost.innerHTML = '';
+      return;
+    }
+    const draw = (splitTimes, pending) => {
+      const groups = personalBests(pool, splitTimes, units).sort((a, b) => ACTIVITY_IDS.indexOf(a.activity) - ACTIVITY_IDS.indexOf(b.activity));
+      const r = selectedRoutine();
+      bestsHost.innerHTML = `
+        <div class="section-title">Personal bests</div>
+        <p class="bests-scope">All time${r ? ` · ${escapeHtml(r.name)}` : ''}</p>
+        ${groups.map((g) => bestsGroupHTML(g, groups.length > 1, pending)).join('')}`;
+    };
+    draw(new Map(), true);
+    const splitTimes = await splitTimesFor(pool, { isCancelled: () => token !== bestsToken });
+    if (token !== bestsToken) return;
+    draw(splitTimes, false);
+  }
+
+  function bestsGroupHTML(g, titled, pending) {
+    const act = ACTIVITIES[g.activity];
+    const pace = (settings().liveSpeedMode?.[g.activity] ?? act.liveSpeedMode) === 'pace';
+    const splitWord = units === 'imperial' ? 'mile' : 'km';
+    const tile = (label, best, value, unit, waiting = false) => {
+      const inner = `<label>${label}</label><div class="value">${best ? value : waiting ? '…' : '–'}${best && unit ? `<small>${unit}</small>` : ''}</div>
+        <div class="pb-date">${best ? formatDate(best.startedAt) : '&nbsp;'}</div>`;
+      return best ? `<a class="stat pb" href="#/workout/${encodeURIComponent(best.id)}">${inner}</a>` : `<div class="stat pb">${inner}</div>`;
+    };
+    const tiles = [];
+    if (g.activity !== 'ski') {
+      tiles.push(
+        pace
+          ? tile('Best avg pace', g.avgSpeed, g.avgSpeed && formatPace(g.avgSpeed.value, units, false), paceUnit(units))
+          : tile('Best avg speed', g.avgSpeed, g.avgSpeed && speedValue(g.avgSpeed.value, units).toFixed(1), speedUnit(units))
+      );
+      tiles.push(tile(`Best ${splitWord} split`, g.split, g.split && formatDuration(g.split.value), '', pending));
+    }
+    tiles.push(tile('Fastest speed', g.maxSpeed, g.maxSpeed && speedValue(g.maxSpeed.value, units).toFixed(1), speedUnit(units), pending));
+    tiles.push(tile('Longest workout', g.longest, g.longest && metricFormat('distance', units).text(distanceValue(g.longest.value, units)), distanceUnit(units)));
+    return `${titled ? `<div class="pb-activity" data-activity="${g.activity}">${act.icon}${act.label}</div>` : ''}
+      <div class="stat-grid num pb-grid">${tiles.join('')}</div>`;
+  }
+
   $('[data-act="export"]').addEventListener('click', async () => {
     if (!report || !workouts.length) {
       toast('No workouts to export');
@@ -465,15 +552,38 @@ export async function mount(root, params, query) {
     }
   });
 
+  async function loadRoutines() {
+    routines = routineList(await getRoutineModel().catch(() => null));
+    // The remembered routine may have been forgotten since.
+    if (state.routine !== 'all' && !selectedRoutine()) state.routine = 'all';
+  }
+
   async function reload() {
     workouts = (await listWorkouts()).filter((w) => !String(w.id).startsWith('sample-'));
     pruneEffortCache(workouts.map((w) => w.id));
+    pruneSplitCache(workouts.map((w) => w.id));
+    await loadRoutines();
     syncControls();
+    renderBests();
     await render();
   }
 
   d.add(on(window, 'workouts-changed', reload));
-  d.add(() => renderToken++);
+  d.add(
+    on(window, 'routines-changed', async () => {
+      const before = state.routine;
+      await loadRoutines();
+      syncControls();
+      if (state.routine !== before) {
+        render();
+        renderBests();
+      }
+    })
+  );
+  d.add(() => {
+    renderToken++;
+    bestsToken++;
+  });
   syncControls();
   await reload();
   return () => d.dispose();

@@ -85,6 +85,14 @@ describe('voice triggers', () => {
     expect(c.onProgress(1600, 600000)).toBe('10 minutes. Distance 1.6 kilometres. Average pace 6 minutes 15 seconds per kilometre.');
   });
 
+  it('says the distance so far with the time, even when a split falls on the same fix', () => {
+    const c = new VoiceCoach(cfg({ splits: true, time: true, intervalMin: 5 }));
+    c.onProgress(500, 150000);
+    expect(c.onProgress(1030, 300000)).toBe(
+      '1 kilometre. Split time 5 minutes. 5 minutes. Distance 1.03 kilometres. Average pace 4 minutes 51 seconds per kilometre.'
+    );
+  });
+
   it('announces 25, 50, 75 and 100 percent of the goal once each', () => {
     const c = new VoiceCoach(cfg({ goal: true, goalM: 10000 }));
     expect(c.onProgress(2500, 945000)).toBe('25 percent of your 10 kilometre goal. 2.5 kilometres. Average pace 6 minutes 18 seconds per kilometre.');
