@@ -8,6 +8,10 @@ import {
   reportEntry,
   reportToCSV,
   reportToJSON,
+  canShiftWindow,
+  shiftCustom,
+  windowBounds,
+  windowLabel,
 } from '../src/insights/report.js';
 
 const at = (y, m, d, h = 7) => new Date(y, m - 1, d, h).getTime();
@@ -22,16 +26,60 @@ function workout(id, activity, startedAt, { distance = 5000, duration = 1800, mo
 }
 
 describe('periods', () => {
-  it('starts weeks on Monday', () => {
-    // Sunday 11 Oct 2026 belongs to the week of Monday 5 Oct.
-    expect(isoDate(periodStart(at(2026, 10, 11), 'week'))).toBe('2026-10-05');
-    expect(isoDate(periodStart(at(2026, 10, 12), 'week'))).toBe('2026-10-12');
+  it('runs weeks Sunday to Saturday', () => {
+    expect(isoDate(periodStart(at(2026, 10, 11), 'week'))).toBe('2026-10-11');
+    expect(isoDate(periodStart(at(2026, 10, 17), 'week'))).toBe('2026-10-11');
+    expect(isoDate(periodStart(at(2026, 10, 10), 'week'))).toBe('2026-10-04');
   });
 
   it('groups quarters and years', () => {
     expect(isoDate(periodStart(at(2026, 8, 20), 'quarter'))).toBe('2026-07-01');
     expect(isoDate(nextPeriod(periodStart(at(2026, 11, 2), 'quarter'), 'quarter'))).toBe('2027-01-01');
     expect(isoDate(periodStart(at(2026, 8, 20), 'year'))).toBe('2026-01-01');
+  });
+});
+
+describe('date windows', () => {
+  // Wednesday 14 Oct 2026, mid-morning.
+  const now = at(2026, 10, 14, 10);
+  const win = (range, offset = 0, opts = {}) => windowBounds(range, offset, { now, ...opts }).map(isoDate);
+
+  it('covers today, this week (Sunday to Saturday), this month and this year', () => {
+    expect(win('today')).toEqual(['2026-10-14', '2026-10-14']);
+    expect(win('week')).toEqual(['2026-10-11', '2026-10-17']);
+    expect(win('month')).toEqual(['2026-10-01', '2026-10-31']);
+    expect(win('ytd')).toEqual(['2026-01-01', '2026-10-14']);
+    expect(win('3m')).toEqual(['2026-07-15', '2026-10-14']);
+    expect(win('all', 0, { earliest: at(2025, 3, 2, 18) })).toEqual(['2025-03-02', '2026-10-14']);
+  });
+
+  it('steps back and forward by the window', () => {
+    expect(win('today', -1)).toEqual(['2026-10-13', '2026-10-13']);
+    expect(win('week', -1)).toEqual(['2026-10-04', '2026-10-10']);
+    expect(win('month', -1)).toEqual(['2026-09-01', '2026-09-30']);
+    expect(win('month', -10)).toEqual(['2025-12-01', '2025-12-31']);
+    expect(win('3m', -1)).toEqual(['2026-04-15', '2026-07-14']);
+    expect(win('12m', -1)).toEqual(['2024-10-15', '2025-10-14']);
+    expect(win('ytd', -1)).toEqual(['2025-01-01', '2025-12-31']);
+    expect(shiftCustom('2026-10-01', '2026-10-10', -1)).toEqual({ from: '2026-09-21', to: '2026-09-30' });
+  });
+
+  it('never goes past the current window, and all time does not move', () => {
+    expect(canShiftWindow('week', 0, 1, { now })).toBe(false);
+    expect(canShiftWindow('week', -1, 1, { now })).toBe(true);
+    expect(canShiftWindow('week', 0, -1, { now })).toBe(true);
+    expect(canShiftWindow('all', 0, -1, { now })).toBe(false);
+    expect(canShiftWindow('custom', 0, 1, { now, from: '2026-09-01', to: '2026-09-30' })).toBe(true);
+    expect(canShiftWindow('custom', 0, 1, { now, from: '2026-10-01', to: '2026-10-14' })).toBe(false);
+  });
+
+  it('names the window on screen', () => {
+    const label = (range, offset) => windowLabel(range, offset, ...windowBounds(range, offset, { now }));
+    expect(label('week', 0)).toBe('This week');
+    expect(label('today', -1)).toBe('Yesterday');
+    expect(label('week', -1)).toBe('Last week');
+    expect(label('month', -1)).toBe('Last month');
+    expect(label('ytd', -2)).toBe('2024');
   });
 });
 
@@ -76,8 +124,8 @@ describe('buildReport', () => {
 
   it('includes empty periods so the time axis is even', () => {
     const r = buildReport(entries, { ...opts, group: 'week' });
-    expect(r.periods.length).toBe(6);
-    expect(r.periods.filter((p) => p.total.workouts).length).toBe(3);
+    expect(r.periods.length).toBe(7);
+    expect(r.periods.filter((p) => p.total.workouts).length).toBe(4);
   });
 
   it('exports CSV and JSON rows for periods with workouts', () => {

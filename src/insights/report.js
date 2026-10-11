@@ -26,7 +26,7 @@ const MI = 1609.344;
 
 // ---- Periods (local time) --------------------------------------------------------------------
 
-/** Start of the period containing `ms` (local midnight; weeks start on Monday). */
+/** Start of the period containing `ms` (local midnight; weeks run Sunday to Saturday). */
 export function periodStart(ms, group) {
   const d = new Date(ms);
   const y = d.getFullYear();
@@ -35,7 +35,7 @@ export function periodStart(ms, group) {
     case 'day':
       return new Date(y, m, d.getDate()).getTime();
     case 'week':
-      return new Date(y, m, d.getDate() - ((d.getDay() + 6) % 7)).getTime();
+      return new Date(y, m, d.getDate() - d.getDay()).getTime();
     case 'month':
       return new Date(y, m, 1).getTime();
     case 'quarter':
@@ -113,6 +113,115 @@ export function periodTick(start, group) {
     default:
       return String(d.getFullYear());
   }
+}
+
+// ---- Date windows ----------------------------------------------------------------------------
+
+export const WINDOWS = [
+  { id: 'today', label: 'Today' },
+  { id: 'week', label: 'This week' },
+  { id: 'month', label: 'This month' },
+  { id: '3m', label: '3 months' },
+  { id: '12m', label: '12 months' },
+  { id: 'ytd', label: 'This year' },
+  { id: 'all', label: 'All time' },
+  { id: 'custom', label: 'Custom' },
+];
+
+const day = (y, m, d) => new Date(y, m, d).getTime();
+
+/**
+ * [from, to] local-day bounds (ms at midnight, both inclusive) for a date window, moved
+ * `offset` windows back (negative) or forward from the current one.
+ * - today: one day; week: Sunday to Saturday; month and year: calendar ones
+ * - 3m / 12m: rolling, ending today (offset −1 is the 3 or 12 months before that)
+ * - ytd ("This year"): 1 Jan to today; other offsets are whole years
+ * - custom: from/to as given (YYYY-MM-DD); all: from `earliest` to today
+ */
+export function windowBounds(range, offset = 0, { now = Date.now(), earliest = null, from = null, to = null } = {}) {
+  const n = new Date(now);
+  const y = n.getFullYear();
+  const m = n.getMonth();
+  const d = n.getDate();
+  const today = day(y, m, d);
+  switch (range) {
+    case 'today':
+      return [day(y, m, d + offset), day(y, m, d + offset)];
+    case 'week': {
+      const sunday = d - n.getDay() + 7 * offset;
+      return [day(y, m, sunday), day(y, m, sunday + 6)];
+    }
+    case 'month':
+      return [day(y, m + offset, 1), day(y, m + offset + 1, 0)];
+    case '3m':
+    case '12m': {
+      const len = range === '3m' ? 3 : 12;
+      return [day(y, m - len + len * offset, d + 1), day(y, m + len * offset, d)];
+    }
+    case 'ytd':
+      return offset === 0 ? [day(y, 0, 1), today] : [day(y + offset, 0, 1), day(y + offset, 11, 31)];
+    case 'all':
+      return [earliest != null ? periodStart(earliest, 'day') : today, today];
+    default: {
+      const f = from ? parseIsoDate(from) : day(y, m - 12, d + 1);
+      const t = to ? parseIsoDate(to) : today;
+      return f <= t ? [f, t] : [t, f];
+    }
+  }
+}
+
+/** Can the window move by `step` (−1 back, +1 forward)? Never past the current window. */
+export function canShiftWindow(range, offset, step, opts = {}) {
+  if (range === 'all') return false;
+  if (step < 0) return true;
+  if (range === 'custom') return windowBounds(range, 0, opts)[1] < windowBounds('today', 0, opts)[0];
+  return offset < 0;
+}
+
+/** A custom window moved by its own length: new YYYY-MM-DD from/to. */
+export function shiftCustom(from, to, step) {
+  const f = parseIsoDate(from);
+  const t = parseIsoDate(to);
+  const fd = new Date(f);
+  const td = new Date(t);
+  const days = Math.round((t - f) / 86400000) + 1;
+  return {
+    from: isoDate(day(fd.getFullYear(), fd.getMonth(), fd.getDate() + days * step)),
+    to: isoDate(day(td.getFullYear(), td.getMonth(), td.getDate() + days * step)),
+  };
+}
+
+/** What the window shows, for the select: "Today", "Yesterday", "Last week", "August 2026"… */
+export function windowLabel(range, offset, from, to) {
+  const f = new Date(from);
+  const t = new Date(to);
+  const short = (dt, year) => dt.toLocaleDateString([], { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) });
+  const span = () => `${short(f, f.getFullYear() !== t.getFullYear())} – ${short(t, true)}`;
+  if (offset === 0) return WINDOWS.find((w) => w.id === range)?.label ?? 'Custom';
+  switch (range) {
+    case 'today':
+      return offset === -1 ? 'Yesterday' : f.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    case 'week':
+      return offset === -1 ? 'Last week' : `Week of ${short(f, true)}`;
+    case 'month':
+      return offset === -1 ? 'Last month' : f.toLocaleDateString([], { month: 'long', year: 'numeric' });
+    case 'ytd':
+      return offset === -1 ? 'Last year' : String(f.getFullYear());
+    default:
+      return span();
+  }
+}
+
+/** The window's dates in words ("Sun 4 Oct – Sat 10 Oct 2026"), shown under the controls. */
+export function windowDates(from, to) {
+  // Weekday and date formatted apart, so both ends read the same with or without a year.
+  const fmt = (ms, year) => {
+    const dt = new Date(ms);
+    return `${dt.toLocaleDateString([], { weekday: 'short' })} ${dt.toLocaleDateString([], { day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) })}`;
+  };
+  if (from === to) return fmt(to, true);
+  const sameYear = new Date(from).getFullYear() === new Date(to).getFullYear();
+  return `${fmt(from, !sameYear)} – ${fmt(to, true)}`;
 }
 
 // ---- Aggregation -----------------------------------------------------------------------------

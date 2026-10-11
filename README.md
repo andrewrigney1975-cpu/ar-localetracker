@@ -183,8 +183,10 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - GPX, TCX, KML (3D in Google Earth), GeoJSON or CSV.
 
 ### Insights
-- **Date range:** last 30 days, 3 months, 12 months, this year, all time, or custom dates.
-- **Grouping:** daily, weekly (from Monday), monthly, every 3 months (calendar quarters)
+- **Date range:** today, this week (Sunday to Saturday), this month, the last 3 or 12
+  months, this year, all time, or custom dates. The ‹ and › arrows step back and forward
+  a window at a time: yesterday, last week, August, the 3 months before, last year.
+- **Grouping:** daily, weekly (Sunday to Saturday), monthly, every 3 months (calendar quarters)
   or yearly.
 - **Activity:** all together, one activity, or all with each activity shown separately.
 - **Metrics:** distance, average speed and pace (over moving time), activity time,
