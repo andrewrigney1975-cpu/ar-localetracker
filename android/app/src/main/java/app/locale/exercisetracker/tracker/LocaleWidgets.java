@@ -1,6 +1,7 @@
 package app.locale.exercisetracker.tracker;
 
 import android.Manifest;
+import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
@@ -15,19 +16,23 @@ import android.view.View;
 import android.widget.RemoteViews;
 import app.locale.exercisetracker.MainActivity;
 import app.locale.exercisetracker.R;
+import app.locale.exercisetracker.store.WorkoutStore;
 import com.getcapacitor.JSObject;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Locale;
 
 /**
  * Home-screen widgets: 1×1 (last-used activity), 2×1 (run, walk) and 2×2 (all four).
  * Idle widgets start a workout with one tap; while recording they show elapsed time and
- * distance and open the app.
+ * distance and open the app. The 2×2 week widget shows this week's distance instead.
  */
 public final class LocaleWidgets {
-    enum Size { SMALL, WIDE, LARGE }
+    enum Size { SMALL, WIDE, LARGE, WEEK }
 
     private static final String PREFS = "locale_widgets";
     private static final String KEY_LAST = "lastActivity";
+    static final String ACTION_NEW_WEEK = "app.locale.exercisetracker.NEW_WEEK";
 
     private LocaleWidgets() {}
 
@@ -61,6 +66,7 @@ public final class LocaleWidgets {
         update(app, manager, Widget1x1Provider.class, Size.SMALL);
         update(app, manager, Widget2x1Provider.class, Size.WIDE);
         update(app, manager, Widget2x2Provider.class, Size.LARGE);
+        update(app, manager, WidgetWeekProvider.class, Size.WEEK);
     }
 
     static Class<? extends Provider> providerFor(String size) {
@@ -69,6 +75,8 @@ public final class LocaleWidgets {
                 return Widget1x1Provider.class;
             case "2x1":
                 return Widget2x1Provider.class;
+            case "week":
+                return WidgetWeekProvider.class;
             default:
                 return Widget2x2Provider.class;
         }
@@ -91,6 +99,7 @@ public final class LocaleWidgets {
         TrackingService svc = TrackingService.get();
         JSObject s = svc != null ? svc.snapshot() : null;
         String state = s != null ? s.getString("state", "idle") : "idle";
+        if (size == Size.WEEK) return week(ctx, "idle".equals(state) ? null : s);
         if (!"idle".equals(state)) return active(ctx, size, s, state);
         switch (size) {
             case SMALL: {
@@ -126,6 +135,7 @@ public final class LocaleWidgets {
         boolean recording = "recording".equals(state);
         String status = recording ? "Recording" : "autopaused".equals(state) ? "Auto-paused" : "Paused";
         v.setImageViewResource(R.id.active_icon, icon(act.id));
+        v.setInt(R.id.active_icon, "setColorFilter", accent(act.id)); // the icons are white; this reads in both themes
         v.setTextViewText(R.id.active_title, size == Size.SMALL ? status : act.label + " · " + status);
         v.setTextColor(R.id.active_title, recording ? accent(act.id) : 0xFFD08A10);
         long elapsed = s.optLong("elapsedMs", 0L);
@@ -140,6 +150,66 @@ public final class LocaleWidgets {
         v.setViewVisibility(R.id.active_icon, size == Size.SMALL ? View.GONE : View.VISIBLE);
         v.setOnClickPendingIntent(R.id.widget_root, openApp(ctx));
         return v;
+    }
+
+    /** Midnight at the start of this week's Sunday, local time. */
+    static long weekStart(long nowMs) {
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(nowMs);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        c.add(Calendar.DAY_OF_YEAR, Calendar.SUNDAY - c.get(Calendar.DAY_OF_WEEK));
+        return c.getTimeInMillis();
+    }
+
+    private static long addDays(long ms, int days) {
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(ms);
+        c.add(Calendar.DAY_OF_YEAR, days);
+        return c.getTimeInMillis();
+    }
+
+    /** This week's distance, Sunday to Saturday, including a workout being recorded now. */
+    private static RemoteViews week(Context ctx, JSObject live) {
+        long from = weekStart(System.currentTimeMillis());
+        long to = addDays(from, 7);
+        double meters = 0;
+        int count = 0;
+        try {
+            double[] r = WorkoutStore.get(ctx).distanceBetween(from, to);
+            meters = r[0];
+            count = (int) r[1];
+        } catch (Exception e) {
+            // Store unavailable: show zero rather than fail the widget.
+        }
+        if (live != null && live.optLong("startedAt", 0) >= from) {
+            meters += live.optDouble("distance", 0);
+            count++;
+        }
+        boolean imperial = "imperial".equals(PhoneSettings.units(ctx));
+        double value = imperial ? meters / 1609.344 : meters / 1000;
+        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget_week);
+        v.setTextViewText(R.id.week_distance, String.format(Locale.US, value < 100 ? "%.1f" : "%.0f", value));
+        v.setTextViewText(R.id.week_unit, imperial ? "mi" : "km");
+        SimpleDateFormat day = new SimpleDateFormat("d MMM", Locale.getDefault());
+        v.setTextViewText(R.id.week_range, day.format(from) + " – " + day.format(addDays(from, 6)));
+        v.setTextViewText(R.id.week_count, count == 0 ? "No workouts yet" : count == 1 ? "1 workout" : count + " workouts");
+        v.setContentDescription(R.id.widget_root, String.format(Locale.US, "This week %.1f %s, %d workouts",
+            value, imperial ? "miles" : "kilometres", count));
+        v.setOnClickPendingIntent(R.id.widget_root, openApp(ctx));
+        scheduleNewWeek(ctx, to);
+        return v;
+    }
+
+    /** Refresh the week widget when the next week starts (inexact: may land a little late). */
+    private static void scheduleNewWeek(Context ctx, long atMs) {
+        AlarmManager alarms = ctx.getSystemService(AlarmManager.class);
+        if (alarms == null) return;
+        Intent intent = new Intent(ctx, WidgetWeekProvider.class).setAction(ACTION_NEW_WEEK);
+        PendingIntent pi = PendingIntent.getBroadcast(ctx, 105, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        alarms.set(AlarmManager.RTC, atMs + 1000, pi);
     }
 
     /** Start tracking directly (a widget tap counts as user interaction), or open the app if location isn't allowed yet. */

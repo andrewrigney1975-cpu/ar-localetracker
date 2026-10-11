@@ -4,6 +4,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.util.Base64;
+import app.locale.exercisetracker.tracker.LocaleWidgets;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -34,6 +35,9 @@ public class LocaleStorePlugin extends Plugin {
         io.execute(() -> {
             try {
                 job.run(WorkoutStore.get(getContext()), call);
+                if (call.getMethodName().matches("saveWorkout|bulkImport|updateWorkout|deleteWorkout")) {
+                    LocaleWidgets.updateAll(getContext()); // the week's distance
+                }
             } catch (Exception e) {
                 call.reject(e.getClass().getSimpleName() + ": " + e.getMessage(), "store", e);
             }
