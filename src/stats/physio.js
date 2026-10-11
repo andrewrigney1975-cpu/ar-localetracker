@@ -32,6 +32,23 @@ export function restingHeartRate(profile) {
   return Number(profile?.restingHr) > 0 ? Number(profile.restingHr) : 60;
 }
 
+/** Body mass index (kg/m²) to one decimal, or null without both weight and height. */
+export function bmi(profile) {
+  const kg = Number(profile?.weightKg);
+  const m = Number(profile?.heightCm) / 100;
+  if (!(kg > 0) || !(m > 0)) return null;
+  return Math.round((kg / (m * m)) * 10) / 10;
+}
+
+/** WHO adult category for a BMI. */
+export function bmiCategory(value) {
+  if (value == null) return null;
+  if (value < 18.5) return 'Underweight';
+  if (value < 25) return 'Healthy weight';
+  if (value < 30) return 'Overweight';
+  return 'Obese';
+}
+
 /** Profile fields required for calories (weight, age, sex). */
 export function profileComplete(profile) {
   return Boolean(Number(profile?.weightKg) > 0 && ageAt(profile) && (profile?.sex === 'male' || profile?.sex === 'female'));

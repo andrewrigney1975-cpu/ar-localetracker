@@ -37,7 +37,7 @@ export const DEFAULT_SETTINGS = {
     duck: true,
   },
   /** For calories, heart-rate zones and cardio load (weight in kg); name labels shared courses. */
-  profile: { name: null, birthYear: null, sex: null, weightKg: null, restingHr: null, maxHr: null },
+  profile: { name: null, birthYear: null, sex: null, heightCm: null, weightKg: null, restingHr: null, maxHr: null },
 };
 
 let current = structuredClone(DEFAULT_SETTINGS);

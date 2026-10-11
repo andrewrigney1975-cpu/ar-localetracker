@@ -1999,6 +1999,16 @@ main#view {
   font-variant-numeric: tabular-nums;
 }
 
+/* Read-only, so no input border: lines up with the inputs' numbers above. */
+.bmi-value {
+  padding: 8px 11px;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 650;
+}
+
 .input-unit {
   display: inline-flex;
   align-items: center;

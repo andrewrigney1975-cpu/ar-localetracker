@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { alignHeartRate, processJournal } from '../src/geo/process.js';
 import { generateCalibratedCity2Surf } from '../src/seed/city2surf.js';
 import {
+  bmi,
+  bmiCategory,
   estimateCalories,
   heartRateStats,
   keytelKcalPerMin,
@@ -104,5 +106,18 @@ describe('City2Surf with heart rate', () => {
     expect(kcal.method).toBe('activity');
     expect(kcal.kcal).toBeGreaterThan(900);
     expect(kcal.kcal).toBeLessThan(1400);
+  });
+});
+
+describe('BMI', () => {
+  it('is worked out from height and weight, to one decimal', () => {
+    expect(bmi({ weightKg: 75, heightCm: 175 })).toBe(24.5);
+    expect(bmi({ weightKg: 75, heightCm: null })).toBeNull();
+    expect(bmi({ weightKg: null, heightCm: 175 })).toBeNull();
+  });
+  it('names the WHO category', () => {
+    expect([18.4, 18.5, 24.9, 25, 29.9, 30].map(bmiCategory)).toEqual([
+      'Underweight', 'Healthy weight', 'Healthy weight', 'Overweight', 'Overweight', 'Obese',
+    ]);
   });
 });
