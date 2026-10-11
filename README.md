@@ -11,7 +11,8 @@ Afterwards you can review each workout as stats, heart-rate effort (calories, ca
 zones), splits, an interactive map with an elevation side view, or a 3D plot over
 satellite imagery. Then you can export it as **FIT** (for Strava and Garmin Connect),
 GPX, TCX, KML, GeoJSON or CSV. **Insights** reports your totals and averages by day, week,
-month, quarter or year, per activity, and exports them as CSV or JSON. You can **share a
+month, quarter or year, per activity or routine, shows your **personal bests**, and
+exports the report as CSV or JSON. You can **share a
 course** (the route and its altitude, with no times or speeds) by SMS, email or Quick
 Share, and the recipient explores it on the map and in 3D with Locale's **View** tool.
 
@@ -116,7 +117,8 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - GNSS satellite status
 - **Voice announcements**, spoken by the phone even with the screen off:
   - **Splits:** every km or mile, with the split time and average pace or speed.
-  - **Time:** every 5, 10, 15 or 30 minutes of active time, with distance and average.
+  - **Time:** every 5, 10, 15 or 30 minutes of active time, with the workout's distance so
+    far and average.
   - **Goal:** at 25%, 50%, 75% and 100% of a goal distance set on the start screen.
 
   Each kind is on or off per activity (Settings → Voice announcements). Music is lowered
@@ -140,7 +142,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 
 ### Wear OS watch (Pixel Watch and other Wear OS 5+ watches)
 - **Start, pause, resume and stop** phone workouts from the watch app or its tile. Stop
-  needs a second tap.
+  needs a second tap. The tile starts the activity you used last.
 - **Live heart rate** from the watch, read through Wear OS Health Services and streamed to
   the phone about every 3 s. It's saved into the workout recording, so every GPS point
   has a heart rate.
@@ -228,11 +230,16 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Grouping:** daily, weekly (Sunday to Saturday), monthly, every 3 months (calendar quarters)
   or yearly.
 - **Activity:** all together, one activity, or all with each activity shown separately.
+- **Routine:** narrow the report to one of your routines (learned, or marked by you).
 - **Metrics:** distance, average speed and pace (over moving time), activity time,
   average heart rate (max too in exports), cardio load and calories. Totals sit at the top; the chart
   shows the metric you pick (tap a bar for its values), and a table lists every period.
 - **Export** the report as **CSV** (one row per period, or per period and activity) or
   **JSON** (with totals) through the Android share sheet. Values are SI units.
+- **Personal bests**, per activity over all time (following the activity and routine
+  filters): best average pace or speed, best km or mile split, fastest speed (held for
+  at least 5 seconds, so a GPS glitch doesn't count) and longest workout. Tap one to open
+  the workout. Ski days show only fastest speed and longest workout.
 - Calories and cardio load need the profile in Settings. They are worked out from each
   workout's full recording and cached on the device until the workout or profile changes.
 
@@ -284,9 +291,10 @@ your goal" without setting anything up.
    - the usual weekday and start time
    - the usual distance and how much it varies
    - a name such as "Saturday morning loop" or "weekday evening route"
-4. **It works out the goal:** the usual (median) distance, rounded to 0.1 km or mi. If
-   your distances cluster around a round number, such as 4.9–5.1 km, the goal is that
-   number: "5 kilometres".
+4. **It works out the goal:** the usual (median) distance, rounded to 0.1 km or mi.
+   Recent workouts count most (one from 3 weeks ago counts half), so the goal follows a
+   routine you have lengthened or shortened. If your distances cluster around a round
+   number, such as 4.9–5.1 km, the goal is that number: "5 kilometres".
 5. **It checks it has enough history first.** Auto goals start once an activity has 5
    workouts in the last 6 months. A routine counts once it has 3 workouts, 2 of them in
    the last 60 days, with distances that vary by no more than about 12%.
