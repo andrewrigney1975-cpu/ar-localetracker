@@ -37,6 +37,9 @@ object PhoneLink {
     private const val CAPABILITY_PHONE = "locale_phone"
     /** Keep heart rate running this long after a watch start while the phone catches up. */
     private const val START_GRACE_MS = 30_000L
+    private const val PREFS = "locale_wear"
+    private const val KEY_LAST_ACTIVITY = "lastActivity"
+    private val ACTIVITY_IDS = setOf("walk", "run", "cycle", "ski")
 
     val status = MutableStateFlow(PhoneStatus())
     val error = MutableStateFlow<String?>(null)
@@ -69,6 +72,19 @@ object PhoneLink {
         )
         heartRate.value = 158
         phoneReachable.value = true
+    }
+
+    /** The activity of the last workout, started from the watch, phone or a widget; the tile offers it. */
+    fun lastActivity(ctx: Context): String =
+        ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_LAST_ACTIVITY, null)
+            ?.takeIf { it in ACTIVITY_IDS } ?: "run"
+
+    fun rememberActivity(ctx: Context, activity: String) {
+        if (activity !in ACTIVITY_IDS || activity == lastActivity(ctx)) return
+        ctx.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_LAST_ACTIVITY, activity).apply()
+        TileService.getUpdater(ctx).requestUpdate(LocaleTileService::class.java)
     }
 
     fun markStartRequested() {
@@ -122,6 +138,7 @@ object PhoneLink {
         if (next.active) {
             error.value = null
             pendingStartAt = 0
+            rememberActivity(ctx, next.activity)
         }
         HeartRateService.sync(ctx, next)
         if (prev.state != next.state || prev.workoutId != next.workoutId) {

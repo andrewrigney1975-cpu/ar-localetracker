@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
     private fun doStart(activity: String) {
         PhoneLink.error.value = null
         PhoneLink.markStartRequested()
+        PhoneLink.rememberActivity(this, activity)
         lifecycleScope.launch {
             val sent = PhoneLink.send(this@MainActivity, "/locale/start", JSONObject().put("activity", activity))
             if (!sent) {
