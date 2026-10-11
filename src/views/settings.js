@@ -3,7 +3,7 @@ import { initialsOf } from '../course/courseFile.js';
 import { listWorkouts } from '../db/workouts.js';
 import { settings, updateSettings } from '../settings.js';
 import { tracker } from '../tracker/client.js';
-import { maxHeartRate } from '../stats/physio.js';
+import { bmi, bmiCategory, maxHeartRate } from '../stats/physio.js';
 import { Disposer, escapeHtml } from '../ui/dom.js';
 import { toast } from '../ui/toast.js';
 import { App } from '@capacitor/app';
@@ -16,6 +16,13 @@ const GOAL_LABELS = { auto: 'Auto goal', set: 'Set goal', off: 'Goal' };
 const DAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const clock = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
+
+/** Read-only BMI row: worked out from height and weight. */
+function bmiHTML(p) {
+  const v = bmi(p);
+  return `<div class="text">BMI<small>${v == null ? 'From your height and weight' : bmiCategory(v)}</small></div>
+    <span class="input-unit"><output class="bmi-value num" aria-label="Body mass index">${v == null ? '–' : v.toFixed(1)}</output>kg/m²</span>`;
+}
 
 /** "Sat", "Tue & Thu", "Mon, Wed & Fri": the days a routine is usually done on. */
 function usualDays(weekdays) {
@@ -105,8 +112,11 @@ export async function mount(root) {
                 ${segmented('profile.sex', [['male', 'Male'], ['female', 'Female']], p.sex)}</div>
               <label class="setting"><span class="text">Birth year</span>
                 <input class="num-input" type="number" inputmode="numeric" min="1900" max="2025" data-profile="birthYear" value="${p.birthYear ?? ''}" placeholder="1985" /></label>
+              <label class="setting"><span class="text">Height</span>
+                <span class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="50" max="250" data-profile="heightCm" value="${p.heightCm ?? ''}" placeholder="175" />cm</span></label>
               <label class="setting"><span class="text">Weight</span>
                 <span class="input-unit"><input class="num-input" type="number" inputmode="decimal" min="20" max="300" step="0.5" data-profile="weight" value="${weightShown}" placeholder="${imperial ? '165' : '75'}" />${imperial ? 'lb' : 'kg'}</span></label>
+              <div class="setting" data-ref="bmi">${bmiHTML(p)}</div>
               <label class="setting"><span class="text">Resting heart rate<small>Optional · default 60</small></span>
                 <span class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="30" max="120" data-profile="restingHr" value="${p.restingHr ?? ''}" placeholder="60" />bpm</span></label>
               <label class="setting"><span class="text">Max heart rate<small>Optional · ${estMax ? `estimated ${estMax} from age` : 'estimated from age'}</small></span>
@@ -230,6 +240,7 @@ export async function mount(root) {
         if (field === 'weight') profile.weightKg = v == null ? null : imperial ? Math.round((v / 2.20462) * 10) / 10 : v;
         else profile[field] = v == null ? null : Math.round(v);
         await updateSettings({ profile });
+        if (field === 'weight' || field === 'heightCm') root.querySelector('[data-ref="bmi"]').innerHTML = bmiHTML(profile);
         if (field === 'birthYear' || field === 'maxHr') render();
       })
     );
