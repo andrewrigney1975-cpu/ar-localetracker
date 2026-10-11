@@ -49,17 +49,21 @@ export class Popover {
   }
 }
 
-/** Popover body for a distance marker / track sample. */
-export function markerInfoHTML({ title, sample, units }) {
+/** Popover body for a distance marker / track sample. `course`: no time rows (shared courses). */
+export function markerInfoHTML({ title, sample, units, course = false }) {
   const rows = [
     ['Distance', formatDistance(sample.dist, units)],
-    ['Time', formatDuration(sample.active)],
-    ['Clock', formatClock(sample.t)],
+    ...(course
+      ? []
+      : [
+          ['Time', formatDuration(sample.active)],
+          ['Clock', formatClock(sample.t)],
+        ]),
     ['Latitude', formatCoord(sample.lat, 'lat')],
     ['Longitude', formatCoord(sample.lon, 'lon')],
     ['Altitude', formatAltitude(sample.alt, units)],
   ];
-  if (Number.isFinite(sample.hr)) rows.push(['Heart rate', `${Math.round(sample.hr)} bpm`]);
+  if (!course && Number.isFinite(sample.hr)) rows.push(['Heart rate', `${Math.round(sample.hr)} bpm`]);
   if (sample.extra) rows.push(...sample.extra);
   return `
     <h3><span>${escapeHtml(title)}</span><button data-close aria-label="Close">×</button></h3>

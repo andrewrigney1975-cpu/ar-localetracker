@@ -7,7 +7,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { sampleAtDistance } from '../geo/process.js';
 import { TrackSnapper } from '../geo/snap.js';
 import { ElevationProfile } from '../profile/elevationProfile.js';
-import { distanceMarkers } from '../stats/summary.js';
+import { distanceMarkers, verticalGainLoss } from '../stats/summary.js';
 import { rampCSS, rampHex, speedRange } from '../ui/colors.js';
 import { cssVar, Disposer, el, escapeHtml } from '../ui/dom.js';
 import { icons } from '../ui/icons.js';
@@ -55,10 +55,12 @@ const BLANK_STYLE = (bg) => ({ version: 8, sources: {}, layers: [{ id: 'bg', typ
 
 /**
  * @param {HTMLElement} root  panel to render into
- * @param {{workout:object, track:object, units:string, styleId:string, activityAccent:string, preferSpeed:boolean, onStyleChange?:(id:string)=>void}} opts
+ * @param {{workout:object, track:object, units:string, styleId:string, activityAccent:string, preferSpeed:boolean, course?:boolean, onStyleChange?:(id:string)=>void}} opts
+ *   course: a shared course (View): one-colour line, no legend, and no time, speed or heart
+ *   rate anywhere, since the track carries none
  * @returns {() => void} dispose
  */
-export function mountMapView(root, { workout, track, units, styleId = 'streets', preferSpeed = false, onStyleChange }) {
+export function mountMapView(root, { workout, track, units, styleId = 'streets', preferSpeed = false, course = false, onStyleChange }) {
   const d = new Disposer();
   const splitLen = splitLength(units);
   root.innerHTML = `
@@ -69,7 +71,7 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
           <button data-act="style" aria-label="Map style">${icons.layers}</button>
           <button data-act="fit" aria-label="Fit route">${icons.recenter}</button>
         </div>
-        <div class="legend" aria-hidden="true"><span>Speed (${speedUnit(units)})</span><div class="ramp"></div><div class="ends"><span class="lo"></span><span class="hi"></span></div></div>
+        ${course ? '' : `<div class="legend" aria-hidden="true"><span>Speed (${speedUnit(units)})</span><div class="ramp"></div><div class="ends"><span class="lo"></span><span class="hi"></span></div></div>`}
       </div>
       <div class="readout" aria-live="polite"></div>
       <div class="profile"></div>
@@ -77,10 +79,12 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
   const wrap = root.querySelector('.map-wrap');
   const mapEl = root.querySelector('.map');
   const readout = root.querySelector('.readout');
-  const [vmin, vmax] = speedRange(track);
-  root.querySelector('.legend .ramp').style.background = rampCSS();
-  root.querySelector('.legend .lo').textContent = speedValue(vmin, units).toFixed(0);
-  root.querySelector('.legend .hi').textContent = speedValue(vmax, units).toFixed(0);
+  const [vmin, vmax] = course ? [0, 1] : speedRange(track);
+  if (!course) {
+    root.querySelector('.legend .ramp').style.background = rampCSS();
+    root.querySelector('.legend .lo').textContent = speedValue(vmin, units).toFixed(0);
+    root.querySelector('.legend .hi').textContent = speedValue(vmax, units).toFixed(0);
+  }
 
   if (track.n < 2) {
     mapEl.innerHTML = '<div class="map-offline">Not enough GPS points to draw a map.</div>';
@@ -106,7 +110,7 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
   map.addControl(new maplibregl.ScaleControl({ unit: units === 'imperial' ? 'imperial' : 'metric' }), 'bottom-right');
   d.add(() => map.remove());
 
-  const geo = buildGeoJSON(track, vmin, vmax);
+  const geo = buildGeoJSON(track, vmin, vmax, course ? cssVar('--accent', root) || '#f2672e' : null);
   const popover = new Popover(wrap);
   let popAnchor = null;
   const placePopover = () => {
@@ -137,7 +141,7 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
   const openInfo = (title, sample) => {
     popAnchor = [sample.lon, sample.lat];
     const p = map.project(popAnchor);
-    popover.show(p.x, p.y, markerInfoHTML({ title, sample, units }));
+    popover.show(p.x, p.y, markerInfoHTML({ title, sample, units, course }));
   };
   for (const m of markers) {
     const node = el(`<div class="km-marker" role="button" aria-label="${m.k} ${unit} marker">${m.k}</div>`);
@@ -145,10 +149,7 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
       e.stopPropagation();
       const prev = markers[m.k - 2];
       const splitTime = m.active - (prev ? prev.active : 0);
-      openInfo(`${m.k} ${unit}`, {
-        ...m,
-        extra: [['Split pace', formatPace(splitLen / Math.max(1, splitTime), units)]],
-      });
+      openInfo(`${m.k} ${unit}`, course ? m : { ...m, extra: [['Split pace', formatPace(splitLen / Math.max(1, splitTime), units)]] });
     });
     new maplibregl.Marker({ element: node }).setLngLat([m.lon, m.lat]).addTo(map);
   }
@@ -210,17 +211,26 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
     if (hit) setCursor(hit.dist, 'click');
   });
 
-  const hasHr = Boolean(track.hr) && Array.from(track.hr).some(Number.isFinite);
-  const readoutHTML = ({ dist, active, alt, speed, grade, hr }) =>
-    [
-      ['', formatDistance(dist, units)],
-      ['', formatDuration(active)],
-      ['Alt', formatAltitude(alt, units)],
-      ['', preferSpeed ? formatSpeed(speed, units) : formatPace(speed, units)],
-      ['Grade', `${grade >= 0 ? '+' : '−'}${Math.abs(grade).toFixed(1)}%`],
-      // Always present when the workout has heart rate, so the line never gains an item.
-      ...(hasHr ? [['♥', Number.isFinite(hr) ? `${Math.round(hr)}` : '–']] : []),
-    ]
+  const hasHr = !course && Boolean(track.hr) && Array.from(track.hr).some(Number.isFinite);
+  const gradeText = (grade) => `${grade >= 0 ? '+' : '−'}${Math.abs(grade).toFixed(1)}%`;
+  const readoutHTML = ({ dist, active, alt, speed, grade, hr, climb }) =>
+    (course
+      ? [
+          ['', formatDistance(dist, units)],
+          ['Alt', formatAltitude(alt, units)],
+          ['Grade', gradeText(grade)],
+          ['Climb', `+${formatAltitude(climb, units)}`],
+        ]
+      : [
+          ['', formatDistance(dist, units)],
+          ['', formatDuration(active)],
+          ['Alt', formatAltitude(alt, units)],
+          ['', preferSpeed ? formatSpeed(speed, units) : formatPace(speed, units)],
+          ['Grade', gradeText(grade)],
+          // Always present when the workout has heart rate, so the line never gains an item.
+          ...(hasHr ? [['♥', Number.isFinite(hr) ? `${Math.round(hr)}` : '–']] : []),
+        ]
+    )
       .map(([k, v]) => `<span>${k ? `${k} ` : ''}<b>${escapeHtml(v)}</b></span>`)
       .join('');
 
@@ -229,7 +239,9 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
     const fwd = sampleAtDistance(track, s.dist + 25);
     const run = fwd.dist - back.dist;
     const grade = run > 5 ? ((fwd.alt - back.alt) / run) * 100 : 0;
-    readout.innerHTML = readoutHTML({ ...s, grade });
+    // Courses: climb from the start to the cursor, with the same hysteresis as the summary.
+    const climb = course ? verticalGainLoss(track.alt, 3, 0, s.index + 1).gain : 0;
+    readout.innerHTML = readoutHTML({ ...s, grade, climb });
   }
 
   /**
@@ -249,6 +261,7 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
       speed: preferSpeed ? 88 : 0, // fastest speed / "–:––" pace are the widest
       grade: -88.8,
       hr: 188,
+      climb: workout.summary.elevGain ?? 8888,
     });
     const base = parseFloat(getComputedStyle(readout).fontSize);
     let size = base;
@@ -301,7 +314,8 @@ function showStyleName(wrap, label) {
   setTimeout(() => n.remove(), 1200);
 }
 
-function buildGeoJSON(track, vmin, vmax) {
+/** Track features; `color` draws the whole line in one colour (courses) instead of by speed. */
+function buildGeoJSON(track, vmin, vmax, color = null) {
   const n = track.n;
   const chunk = Math.max(2, Math.ceil(n / 700));
   const colored = [];
@@ -320,7 +334,7 @@ function buildGeoJSON(track, vmin, vmax) {
         v /= b - a + 1;
         colored.push({
           type: 'Feature',
-          properties: { color: rampHex((v - vmin) / (vmax - vmin)) },
+          properties: { color: color ?? rampHex((v - vmin) / (vmax - vmin)) },
           geometry: { type: 'LineString', coordinates: coords.slice(a - segStart, b - segStart + 1) },
         });
       }

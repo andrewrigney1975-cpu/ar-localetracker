@@ -36,8 +36,8 @@ export const DEFAULT_SETTINGS = {
     /** Lower other audio while speaking (true) or pause it (false). */
     duck: true,
   },
-  /** For calories, heart-rate zones and cardio load. Weight in kg. */
-  profile: { birthYear: null, sex: null, weightKg: null, restingHr: null, maxHr: null },
+  /** For calories, heart-rate zones and cardio load (weight in kg); name labels shared courses. */
+  profile: { name: null, birthYear: null, sex: null, weightKg: null, restingHr: null, maxHr: null },
 };
 
 let current = structuredClone(DEFAULT_SETTINGS);

@@ -1,5 +1,8 @@
 package app.locale.exercisetracker.store;
 
+import android.database.Cursor;
+import android.net.Uri;
+import android.provider.OpenableColumns;
 import android.util.Base64;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -7,6 +10,9 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.json.JSONArray;
@@ -44,6 +50,47 @@ public class LocaleStorePlugin extends Plugin {
 
     private static JSObject js(JSONObject o) throws Exception {
         return new JSObject(o.toString());
+    }
+
+    private static final int MAX_COURSE_BYTES = 20 * 1024 * 1024;
+
+    /**
+     * Text of a file another app handed us (a course opened from Messages, Gmail or Files):
+     * {uri} → {text, name}. Reads through the ContentResolver, which holds the temporary read
+     * grant that came with the VIEW intent.
+     */
+    @PluginMethod
+    public void readUri(PluginCall call) {
+        io.execute(() -> {
+            try {
+                Uri uri = Uri.parse(call.getString("uri"));
+                String name = null;
+                if ("content".equals(uri.getScheme())) {
+                    try (Cursor cur = getContext().getContentResolver().query(uri, new String[] { OpenableColumns.DISPLAY_NAME }, null, null, null)) {
+                        if (cur != null && cur.moveToFirst()) name = cur.getString(0);
+                    } catch (Exception ignored) {
+                        // Some providers don't answer queries; the name is only a fallback label.
+                    }
+                }
+                if (name == null) name = uri.getLastPathSegment();
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                try (InputStream in = getContext().getContentResolver().openInputStream(uri)) {
+                    if (in == null) throw new IllegalStateException("Cannot open " + uri);
+                    byte[] buf = new byte[64 * 1024];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                        if (out.size() > MAX_COURSE_BYTES) throw new IllegalStateException("File too large");
+                    }
+                }
+                JSObject o = new JSObject();
+                o.put("text", new String(out.toByteArray(), StandardCharsets.UTF_8));
+                o.put("name", name);
+                call.resolve(o);
+            } catch (Exception e) {
+                call.reject(e.getClass().getSimpleName() + ": " + e.getMessage(), "uri", e);
+            }
+        });
     }
 
     @PluginMethod

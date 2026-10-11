@@ -1,4 +1,5 @@
 import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
+import { initialsOf } from '../course/courseFile.js';
 import { listWorkouts } from '../db/workouts.js';
 import { settings, updateSettings } from '../settings.js';
 import { tracker } from '../tracker/client.js';
@@ -98,6 +99,8 @@ export async function mount(root) {
 
             <div class="section-title">Profile</div>
             <div class="card settings-group">
+              <label class="setting"><span class="text">Your name<small>${p.name ? `Shared courses are labelled ${escapeHtml(initialsOf(p.name))}` : 'Your initials label the courses you share'}</small></span>
+                <input class="text-input" type="text" maxlength="60" autocomplete="name" data-name value="${escapeHtml(p.name ?? '')}" placeholder="First Last" /></label>
               <div class="setting"><div class="text">Sex<small>Used for calories and cardio load</small></div>
                 ${segmented('profile.sex', [['male', 'Male'], ['female', 'Female']], p.sex)}</div>
               <label class="setting"><span class="text">Birth year</span>
@@ -208,6 +211,10 @@ export async function mount(root) {
         })
       )
     );
+    root.querySelector('[data-name]').addEventListener('change', async (e) => {
+      await updateSettings({ profile: { ...settings().profile, name: e.target.value.trim() || null } });
+      render();
+    });
     root.querySelectorAll('[data-profile]').forEach((input) =>
       input.addEventListener('change', async () => {
         const raw = input.value.trim();

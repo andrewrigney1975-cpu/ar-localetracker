@@ -61,7 +61,7 @@ export function altitudeValue(m, units) {
 
 export function formatAltitude(m, units, withUnit = true) {
   if (m == null || !Number.isFinite(m)) return '–';
-  const v = Math.round(altitudeValue(m, units)).toLocaleString();
+  const v = (Math.round(altitudeValue(m, units)) || 0).toLocaleString(); // no "-0"
   return withUnit ? `${v} ${altitudeUnit(units)}` : v;
 }
 

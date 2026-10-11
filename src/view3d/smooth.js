@@ -2,6 +2,17 @@
 // stored track are never touched; this only changes how the 3D route is drawn.
 
 export const SMOOTH_WINDOW_S = 10;
+/** Courses have no time; they are averaged over this distance instead (about 10 s running). */
+export const SMOOTH_DISTANCE_M = 25;
+
+/**
+ * A stand-in for `track` whose time axis is distance, scaled so the usual 10 s window spans
+ * SMOOTH_DISTANCE_M. Used for shared courses, which carry no timestamps.
+ */
+export function distanceAxis(track) {
+  const scale = (SMOOTH_WINDOW_S * 1000) / SMOOTH_DISTANCE_M;
+  return { n: track.n, seg: track.seg, t: Float64Array.from(track.dist, (d) => d * scale) };
+}
 
 /**
  * Time-weighted moving average over a centred window (default 10 s: ±5 s).

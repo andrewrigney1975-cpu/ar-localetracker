@@ -21,6 +21,7 @@
   --cycle: #2f7df6;
   --ski: #8a63f0;
   --live: #f5c518;
+  --view: #4b6584;
   --accent: var(--run);
   --on-accent: #ffffff;
 
@@ -72,6 +73,7 @@
 [data-activity='run'] { --accent: var(--run); }
 [data-activity='cycle'] { --accent: var(--cycle); }
 [data-activity='ski'] { --accent: var(--ski); }
+[data-activity='view'] { --accent: var(--view); }
 [data-activity='live'] { --accent: var(--live); --on-accent: #1b1d1f; }
 
 /* ==========================================================================
@@ -2417,4 +2419,80 @@ main#view {
   padding: 6px 2px 4px 44px;
   font-size: 0.82rem;
   color: var(--text-dim);
+}
+
+/* ==========================================================================
+   Shared courses: share sheet, Settings name, View
+   ========================================================================== */
+.share-course-note {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+}
+
+.share-hide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0 10px;
+  font-weight: 600;
+}
+
+.share-hide small {
+  display: block;
+  font-weight: 500;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.course-btn {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.course-btn span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.text-input {
+  width: min(180px, 45vw);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+.view-tile svg {
+  width: 32px;
+  height: 32px;
+}
+
+.view-intro {
+  margin: 4px 0 14px;
+}
+
+.open-course {
+  width: 100%;
+}
+
+.course-item {
+  grid-template-columns: 1fr auto;
+  padding-right: 4px;
+}
+
+.course-link {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.course-item .thumb {
+  color: var(--accent);
 }
