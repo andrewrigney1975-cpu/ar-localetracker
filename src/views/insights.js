@@ -3,6 +3,7 @@ import { listWorkouts } from '../db/workouts.js';
 import { effortAvailability, effortFor, pruneEffortCache } from '../insights/effort.js';
 import {
   buildReport,
+  canShiftWindow,
   GROUPINGS,
   isoDate,
   METRICS,
@@ -14,6 +15,11 @@ import {
   reportFilename,
   reportToCSV,
   reportToJSON,
+  shiftCustom,
+  windowBounds,
+  windowDates,
+  windowLabel,
+  WINDOWS,
 } from '../insights/report.js';
 import { shareFile } from '../services/share.js';
 import { settings } from '../settings.js';
@@ -23,30 +29,25 @@ import { icons } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
 import { distanceUnit, distanceValue, formatDuration, M_PER_MI, paceUnit, speedUnit, speedValue } from '../units.js';
 
-const RANGES = [
-  { id: '30d', label: '30 days' },
-  { id: '3m', label: '3 months' },
-  { id: '12m', label: '12 months' },
-  { id: 'ytd', label: 'This year' },
-  { id: 'all', label: 'All time' },
-  { id: 'custom', label: 'Custom' },
-];
-
 // Stack and legend order: keeps cycle (blue) and ski (violet) apart, which are hard to tell
 // apart side by side with red-green colour blindness.
 const STACK_ORDER = ['cycle', 'run', 'walk', 'ski'];
 
-const GROUP_CHIPS = { day: 'Daily', week: 'Weekly', month: 'Monthly', quarter: 'Every 3 months', year: 'Yearly' };
+const GROUP_LABELS = { day: 'Daily', week: 'Weekly', month: 'Monthly', quarter: 'Every 3 months', year: 'Yearly' };
 
 const STATE_KEY = 'insights.view.v1';
 const DEFAULT_STATE = { range: '12m', group: 'month', activity: 'all', split: false, metric: 'distance', from: null, to: null };
 
 function loadState() {
+  let s;
   try {
-    return { ...DEFAULT_STATE, ...JSON.parse(localStorage.getItem(STATE_KEY) ?? '{}') };
+    s = { ...DEFAULT_STATE, ...JSON.parse(localStorage.getItem(STATE_KEY) ?? '{}') };
   } catch {
-    return { ...DEFAULT_STATE };
+    s = { ...DEFAULT_STATE };
   }
+  // "30 days" was replaced by "This month".
+  if (!WINDOWS.some((w) => w.id === s.range)) s.range = 'month';
+  return s;
 }
 
 function saveState(s) {
@@ -54,30 +55,6 @@ function saveState(s) {
     localStorage.setItem(STATE_KEY, JSON.stringify(s));
   } catch {
     // Per-viewer convenience only.
-  }
-}
-
-/** [from, to] local-day bounds in ms for a range preset. */
-function rangeBounds(state, earliest) {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const back = (months, days = 0) => new Date(now.getFullYear(), now.getMonth() - months, now.getDate() - days + 1).getTime();
-  switch (state.range) {
-    case '30d':
-      return [back(0, 30), today];
-    case '3m':
-      return [back(3), today];
-    case '12m':
-      return [back(12), today];
-    case 'ytd':
-      return [new Date(now.getFullYear(), 0, 1).getTime(), today];
-    case 'all':
-      return [earliest ?? today, today];
-    default: {
-      const from = state.from ? parseIsoDate(state.from) : back(12);
-      const to = state.to ? parseIsoDate(state.to) : today;
-      return from <= to ? [from, to] : [to, from];
-    }
   }
 }
 
@@ -145,15 +122,20 @@ export async function mount(root, params, query) {
       </header>
       <div class="body">
         <div class="page insights">
-          <div class="filter-row" role="radiogroup" aria-label="Date range">
-            ${RANGES.map((r) => `<button class="chip" role="radio" data-range="${r.id}">${r.label}</button>`).join('')}
+          <div class="period-row">
+            <button class="icon-btn step" data-step="-1" aria-label="Earlier">${icons.back}</button>
+            <select class="select" data-ref="range" aria-label="Date range">
+              ${WINDOWS.map((w) => `<option value="${w.id}">${w.label}</option>`).join('')}
+            </select>
+            <button class="icon-btn step" data-step="1" aria-label="Later">${icons.back}</button>
+            <select class="select" data-ref="group" aria-label="Group by">
+              ${GROUPINGS.map((g) => `<option value="${g.id}">${GROUP_LABELS[g.id]}</option>`).join('')}
+            </select>
           </div>
+          <div class="period-dates num" data-ref="dates"></div>
           <div class="date-range" data-ref="custom" hidden>
             <label><span>From</span><input type="date" data-ref="from" /></label>
             <label><span>To</span><input type="date" data-ref="to" /></label>
-          </div>
-          <div class="filter-row" role="radiogroup" aria-label="Group by">
-            ${GROUPINGS.map((g) => `<button class="chip" role="radio" data-group="${g.id}">${GROUP_CHIPS[g.id]}</button>`).join('')}
           </div>
           <div class="filter-row" role="radiogroup" aria-label="Activity">
             <button class="chip" role="radio" data-activity-filter="all">All</button>
@@ -169,10 +151,21 @@ export async function mount(root, params, query) {
   const content = $('[data-slot="content"]');
   const fromInput = $('[data-ref="from"]');
   const toInput = $('[data-ref="to"]');
+  const rangeSelect = $('[data-ref="range"]');
+  const groupSelect = $('[data-ref="group"]');
+  /** Windows back from the current one (0 = today / this week / …); not remembered. */
+  let offset = 0;
+
+  const bounds = () => windowBounds(state.range, offset, { earliest: earliest(), from: state.from, to: state.to });
 
   function syncControls() {
-    root.querySelectorAll('[data-range]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.range === state.range)));
-    root.querySelectorAll('[data-group]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.group === state.group)));
+    const [from, to] = bounds();
+    rangeSelect.value = state.range;
+    // The selected option names the window on screen ("Last week", "August 2026").
+    for (const o of rangeSelect.options) o.textContent = o.value === state.range ? windowLabel(state.range, offset, from, to) : WINDOWS.find((w) => w.id === o.value).label;
+    groupSelect.value = state.group;
+    $('[data-ref="dates"]').textContent = windowDates(from, to);
+    root.querySelectorAll('[data-step]').forEach((b) => (b.disabled = !canShiftWindow(state.range, offset, Number(b.dataset.step), { from: state.from, to: state.to })));
     root.querySelectorAll('[data-activity-filter]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.activityFilter === state.activity)));
     $('[data-ref="custom"]').hidden = state.range !== 'custom';
     $('[data-ref="split-row"]').hidden = state.activity !== 'all';
@@ -185,16 +178,32 @@ export async function mount(root, params, query) {
     syncControls();
     render();
   };
-  root.querySelectorAll('[data-range]').forEach((b) =>
+  rangeSelect.addEventListener('change', () => {
+    const range = rangeSelect.value;
+    if (range === 'custom') {
+      // Start the custom range from what was on screen.
+      const [f, t] = bounds();
+      offset = 0;
+      change({ range, from: isoDate(f), to: isoDate(t) });
+    } else {
+      offset = 0;
+      change({ range });
+    }
+  });
+  groupSelect.addEventListener('change', () => change({ group: groupSelect.value }));
+  root.querySelectorAll('[data-step]').forEach((b) =>
     b.addEventListener('click', () => {
-      if (b.dataset.range === 'custom' && state.range !== 'custom') {
-        // Start the custom range from what was on screen.
-        const [f, t] = rangeBounds(state, earliest());
-        change({ range: 'custom', from: isoDate(f), to: isoDate(t) });
-      } else change({ range: b.dataset.range });
+      const step = Number(b.dataset.step);
+      if (!canShiftWindow(state.range, offset, step, { from: state.from, to: state.to })) return;
+      if (state.range === 'custom') {
+        const [f, t] = bounds();
+        change(shiftCustom(isoDate(f), isoDate(t), step));
+      } else {
+        offset += step;
+        change({});
+      }
     })
   );
-  root.querySelectorAll('[data-group]').forEach((b) => b.addEventListener('click', () => change({ group: b.dataset.group })));
   root.querySelectorAll('[data-activity-filter]').forEach((b) => b.addEventListener('click', () => change({ activity: b.dataset.activityFilter })));
   $('[data-ref="split"]').addEventListener('change', (e) => change({ split: e.target.checked }));
   fromInput.addEventListener('change', () => fromInput.value && change({ from: fromInput.value }));
@@ -204,7 +213,7 @@ export async function mount(root, params, query) {
 
   async function render() {
     const token = ++renderToken;
-    const [from, to] = rangeBounds(state, earliest());
+    const [from, to] = bounds();
     fromInput.value = isoDate(from);
     toInput.value = isoDate(to);
     const profile = settings().profile;
