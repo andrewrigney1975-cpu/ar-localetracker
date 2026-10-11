@@ -124,11 +124,12 @@ export async function mount(root) {
             <div class="section-title">Home-screen widgets</div>
             <div class="card settings-group">
               ${[
-                ['1x1', '1 × 1', 'Your last-used activity'],
-                ['2x1', '2 × 1', 'Run and walk'],
-                ['2x2', '2 × 2', 'Walk, run, cycle and ski'],
+                ['1x1', '1 × 1', 'Your last-used activity. One tap starts recording.'],
+                ['2x1', '2 × 1', 'Run and walk. One tap starts recording.'],
+                ['2x2', '2 × 2', 'Walk, run, cycle and ski. One tap starts recording.'],
+                ['week', '2 × 2 this week', 'Distance of your workouts this week, Sunday to Saturday.'],
               ]
-                .map(([size, label, desc]) => `<div class="setting"><div class="text">${label}<small>${desc}. One tap starts recording.</small></div>
+                .map(([size, label, desc]) => `<div class="setting"><div class="text">${label}<small>${desc}</small></div>
                   <button class="btn ghost" data-widget="${size}">Add</button></div>`)
                 .join('')}
             </div>

@@ -194,6 +194,15 @@ public final class WorkoutStore extends SQLiteOpenHelper {
         return w;
     }
 
+    /** Total distance (m) and count of workouts started in [fromMs, toMs), not counting the samples. */
+    public double[] distanceBetween(long fromMs, long toMs) {
+        try (Cursor c = getReadableDatabase().rawQuery(
+            "SELECT COALESCE(SUM(distance_m), 0), COUNT(*) FROM workouts WHERE started_at >= ? AND started_at < ? AND id NOT LIKE 'sample-%'",
+            new String[] { Long.toString(fromMs), Long.toString(toMs) })) {
+            return c.moveToFirst() ? new double[] { c.getDouble(0), c.getInt(1) } : new double[] { 0, 0 };
+        }
+    }
+
     public boolean has(String id) {
         try (Cursor c = getReadableDatabase().rawQuery("SELECT 1 FROM workouts WHERE id = ?", new String[] { id })) {
             return c.moveToFirst();

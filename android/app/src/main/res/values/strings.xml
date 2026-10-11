@@ -10,6 +10,11 @@
     <string name="widget_1x1_description">One tap starts your last-used activity</string>
     <string name="widget_2x1_description">Start a run or a walk</string>
     <string name="widget_2x2_description">Start a walk, run, ride or ski</string>
+    <string name="widget_week_label">Locale: distance this week</string>
+    <string name="widget_week_description">Distance of your workouts this week, Sunday to Saturday</string>
+    <string name="widget_week_title">This week</string>
+    <string name="widget_week_placeholder">0.0</string>
+    <string name="widget_week_unit_km">km</string>
     <string name="activity_walk">Walk</string>
     <string name="activity_run">Run</string>
     <string name="activity_cycle">Cycle</string>

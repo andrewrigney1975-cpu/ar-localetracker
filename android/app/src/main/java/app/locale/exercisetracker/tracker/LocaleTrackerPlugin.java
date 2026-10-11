@@ -98,6 +98,8 @@ public class LocaleTrackerPlugin extends Plugin {
         unregisterHeading();
         // Nothing runs in the background unless a workout is recording.
         stopWarmupInternal();
+        // Back to the home screen: the week widget picks up a Units change.
+        LocaleWidgets.updateAll(getContext());
     }
 
     @Override
@@ -198,7 +200,7 @@ public class LocaleTrackerPlugin extends Plugin {
 
     // ---- Widgets ----------------------------------------------------------------------------
 
-    /** Ask the launcher to add a widget ("1x1", "2x1" or "2x2"); the user confirms in a system dialog. */
+    /** Ask the launcher to add a widget ("1x1", "2x1", "2x2" or "week"); the user confirms in a system dialog. */
     @PluginMethod
     public void pinWidget(PluginCall call) {
         android.appwidget.AppWidgetManager manager = android.appwidget.AppWidgetManager.getInstance(getContext());
