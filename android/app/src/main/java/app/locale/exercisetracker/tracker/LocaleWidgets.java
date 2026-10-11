@@ -135,6 +135,7 @@ public final class LocaleWidgets {
         boolean recording = "recording".equals(state);
         String status = recording ? "Recording" : "autopaused".equals(state) ? "Auto-paused" : "Paused";
         v.setImageViewResource(R.id.active_icon, icon(act.id));
+        v.setInt(R.id.active_icon, "setColorFilter", accent(act.id)); // the icons are white; this reads in both themes
         v.setTextViewText(R.id.active_title, size == Size.SMALL ? status : act.label + " · " + status);
         v.setTextColor(R.id.active_title, recording ? accent(act.id) : 0xFFD08A10);
         long elapsed = s.optLong("elapsedMs", 0L);

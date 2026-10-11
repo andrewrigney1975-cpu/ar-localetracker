@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-screen widget colours, dark theme. -->
+<resources>
+    <color name="widget_background">#F0161D24</color>
+    <color name="widget_text">#FFFFFFFF</color>
+    <color name="widget_text_secondary">#FFC9D1D9</color>
+    <color name="widget_text_muted">#FF8B96A3</color>
+    <color name="widget_accent">#FFF2672E</color>
+</resources>

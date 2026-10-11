@@ -15,14 +15,14 @@
         android:fontFamily="sans-serif-medium"
         android:maxLines="1"
         android:text="@string/widget_week_title"
-        android:textColor="#FFF2672E"
+        android:textColor="@color/widget_accent"
         android:textSize="14sp" />
     <TextView
         android:id="@+id/week_range"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:maxLines="1"
-        android:textColor="#FF8B96A3"
+        android:textColor="@color/widget_text_muted"
         android:textSize="12sp" />
     <!-- Spacer: RemoteViews can't inflate a plain View. -->
     <FrameLayout
@@ -39,10 +39,12 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:fontFamily="sans-serif-medium"
+            android:includeFontPadding="false"
+            android:letterSpacing="-0.05"
             android:maxLines="1"
             android:text="@string/widget_week_placeholder"
-            android:textColor="#FFFFFFFF"
-            android:textSize="40sp" />
+            android:textColor="@color/widget_text"
+            android:textSize="58sp" />
         <TextView
             android:id="@+id/week_unit"
             android:layout_width="wrap_content"
@@ -51,14 +53,14 @@
             android:fontFamily="sans-serif-medium"
             android:maxLines="1"
             android:text="@string/widget_week_unit_km"
-            android:textColor="#FFC9D1D9"
-            android:textSize="18sp" />
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="20sp" />
     </LinearLayout>
     <TextView
         android:id="@+id/week_count"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:maxLines="1"
-        android:textColor="#FFC9D1D9"
+        android:textColor="@color/widget_text_secondary"
         android:textSize="13sp" />
 </LinearLayout>
