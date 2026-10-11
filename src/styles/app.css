@@ -1643,17 +1643,22 @@ main#view {
 }
 
 .readout {
+  /* Always one line: the font is fitted to the widest values in mapView.js (fitReadout). */
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0 clamp(8px, 3vw, 14px);
   justify-content: center;
-  padding: 8px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 10px;
   background: var(--surface);
   border-top: 1px solid var(--border);
   font-size: 0.82rem;
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
-  min-height: 36px;
 }
 
 .readout span b {
@@ -1662,6 +1667,7 @@ main#view {
 }
 
 .readout span {
+  flex: none;
   color: var(--text-dim);
 }
 

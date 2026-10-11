@@ -182,6 +182,7 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
     if (source !== 'map') scrub.setLngLat([s.lon, s.lat]);
     if (source !== 'profile') profile.setCursor(dist);
     if (source === 'profile' && !map.getBounds().contains([s.lon, s.lat])) map.panTo([s.lon, s.lat], { duration: 200 });
+    lastCursor = s;
     renderReadout(s);
   }
 
@@ -209,24 +210,66 @@ export function mountMapView(root, { workout, track, units, styleId = 'streets',
     if (hit) setCursor(hit.dist, 'click');
   });
 
+  const hasHr = Boolean(track.hr) && Array.from(track.hr).some(Number.isFinite);
+  const readoutHTML = ({ dist, active, alt, speed, grade, hr }) =>
+    [
+      ['', formatDistance(dist, units)],
+      ['', formatDuration(active)],
+      ['Alt', formatAltitude(alt, units)],
+      ['', preferSpeed ? formatSpeed(speed, units) : formatPace(speed, units)],
+      ['Grade', `${grade >= 0 ? '+' : '−'}${Math.abs(grade).toFixed(1)}%`],
+      // Always present when the workout has heart rate, so the line never gains an item.
+      ...(hasHr ? [['♥', Number.isFinite(hr) ? `${Math.round(hr)}` : '–']] : []),
+    ]
+      .map(([k, v]) => `<span>${k ? `${k} ` : ''}<b>${escapeHtml(v)}</b></span>`)
+      .join('');
+
   function renderReadout(s) {
     const back = sampleAtDistance(track, Math.max(0, s.dist - 25));
     const fwd = sampleAtDistance(track, s.dist + 25);
     const run = fwd.dist - back.dist;
     const grade = run > 5 ? ((fwd.alt - back.alt) / run) * 100 : 0;
-    const speedTxt = preferSpeed ? formatSpeed(s.speed, units) : formatPace(s.speed, units);
-    readout.innerHTML = [
-      ['', formatDistance(s.dist, units)],
-      ['', formatDuration(s.active)],
-      ['Alt', formatAltitude(s.alt, units)],
-      ['', speedTxt],
-      ['Grade', `${grade >= 0 ? '+' : ''}${grade.toFixed(1)}%`],
-      ...(Number.isFinite(s.hr) ? [['♥', `${Math.round(s.hr)}`]] : []),
-    ]
-      .map(([k, v]) => `<span>${k ? `${k} ` : ''}<b>${escapeHtml(v)}</b></span>`)
-      .join('');
+    readout.innerHTML = readoutHTML({ ...s, grade });
   }
+
+  /**
+   * Keep the readout on one line at a fixed size: fit the font once to the widest values
+   * this workout can show (longest distance and time, highest altitude, slowest pace,
+   * a steep grade), instead of reacting as values change under the cursor.
+   */
+  function fitReadout() {
+    const n = track.n;
+    let maxAlt = 0;
+    for (let i = 0; i < n; i++) if (Number.isFinite(track.alt[i])) maxAlt = Math.max(maxAlt, Math.abs(track.alt[i]));
+    readout.style.fontSize = '';
+    readout.innerHTML = readoutHTML({
+      dist: n ? track.dist[n - 1] : 0,
+      active: n ? track.active[n - 1] : 0,
+      alt: -maxAlt || -888,
+      speed: preferSpeed ? 88 : 0, // fastest speed / "–:––" pace are the widest
+      grade: -88.8,
+      hr: 188,
+    });
+    const base = parseFloat(getComputedStyle(readout).fontSize);
+    let size = base;
+    while (readout.scrollWidth > readout.clientWidth && size > base * 0.6) {
+      size -= 0.5;
+      readout.style.fontSize = `${size}px`;
+    }
+  }
+  let lastCursor = first;
+  fitReadout();
   renderReadout(first);
+  // Rotation or a resized window: refit to the new width.
+  let lastWidth = readout.clientWidth;
+  const ro = new ResizeObserver(() => {
+    if (readout.clientWidth === lastWidth) return;
+    lastWidth = readout.clientWidth;
+    fitReadout();
+    renderReadout(lastCursor);
+  });
+  ro.observe(readout);
+  d.add(() => ro.disconnect());
   profile.setCursor(0);
 
   // Tools.
