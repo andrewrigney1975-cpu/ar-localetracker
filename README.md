@@ -20,7 +20,7 @@ The app is written in HTML5, vanilla JavaScript and CSS3, and packaged with
 sensors.
 
 <p align="center">
-  <img src="docs/screenshots/home.png" width="250" alt="Home screen with activity tiles and the City2Surf sample workout">
+  <img src="docs/screenshots/home.png" width="250" alt="Home screen with activity tiles, the Live and View tiles, and the City2Surf sample workout">
   &nbsp;
   <img src="docs/screenshots/live.png" width="250" alt="Live workout screen with elapsed time, heart rate, distance, pace, heading, altitude and location">
   &nbsp;
@@ -41,7 +41,7 @@ sensors.
   <img src="docs/screenshots/live-position.png" width="250" alt="Live position screen: coordinates, barometric altitude, speed, compass heading and a map, with nothing recorded">
 </p>
 <p align="center">
-  <img src="docs/screenshots/voice-settings.png" width="250" alt="Voice announcement settings: Splits, Time and Goal per activity, time interval, lower or pause other audio, and a Test button">
+  <img src="docs/screenshots/voice-settings.png" width="250" alt="Voice announcement settings: Splits, Time and Goal per activity, time interval, lower or pause other audio, watch vibration and saying the goal at the start">
   &nbsp;
   <img src="docs/screenshots/voice-live.png" width="250" alt="Live workout screen showing the last spoken announcement as a caption under the controls">
 </p>
