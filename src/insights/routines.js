@@ -23,6 +23,8 @@ export const T = {
   routeTolFraction: 0.04,
   loopM: 200,
   halfLifeDays: 60,
+  /** Goals follow the routine's recent workouts: one from three weeks ago counts half. */
+  goalHalfLifeDays: 21,
   activityWindowDays: 180,
   activityMinWorkouts: 5,
   routineMinCount: 3,
@@ -222,15 +224,38 @@ const cv = (xs) => {
 };
 
 /**
- * Goal in metres for one unit system: the median rounded to 0.1, or to a whole number when
- * the history clusters around one (e.g. 4.9–5.1 km → 5 km).
+ * Quantile of `xs` where each value counts with its weight: values sit at the middle of
+ * their share of the total weight, interpolated between. Equal weights give the median.
  */
-export function goalFor(distances, imperial) {
+export function weightedQuantile(xs, ws, q) {
+  const s = xs.map((x, i) => [x, ws[i]]).sort((a, b) => a[0] - b[0]);
+  const total = s.reduce((t, [, w]) => t + w, 0);
+  if (!(total > 0)) return quantile(xs, q);
+  let cum = 0;
+  const pos = s.map(([, w]) => {
+    const p = (cum + w / 2) / total;
+    cum += w;
+    return p;
+  });
+  if (q <= pos[0]) return s[0][0];
+  for (let i = 1; i < s.length; i++) {
+    if (q <= pos[i]) return s[i - 1][0] + ((s[i][0] - s[i - 1][0]) * (q - pos[i - 1])) / (pos[i] - pos[i - 1]);
+  }
+  return s[s.length - 1][0];
+}
+
+/**
+ * Goal in metres for one unit system: the median rounded to 0.1, or to a whole number when
+ * the history clusters around one (e.g. 4.9–5.1 km → 5 km). With `weights` (recency), recent
+ * workouts count for more, so the goal follows a routine that has grown or shrunk.
+ */
+export function goalFor(distances, imperial, weights = null) {
   const unit = imperial ? MILE : KM;
-  const med = median(distances) / unit;
+  const ws = weights ?? distances.map(() => 1);
+  const med = weightedQuantile(distances, ws, 0.5) / unit;
   const whole = Math.round(med);
-  const lo = quantile(distances, 0.25) / unit - 0.05;
-  const hi = quantile(distances, 0.75) / unit + 0.05;
+  const lo = weightedQuantile(distances, ws, 0.25) / unit - 0.05;
+  const hi = weightedQuantile(distances, ws, 0.75) / unit + 0.05;
   const value = whole > 0 && Math.abs(whole - med) <= T.roundSnap * med && whole >= lo && whole <= hi ? whole : Math.round(med * 10) / 10;
   return Math.round(value * unit * 10) / 10;
 }
@@ -329,6 +354,7 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
     .sort((a, b) => a.startedAt - b.startedAt || String(a.id).localeCompare(String(b.id)))
     .map(features);
   const weight = (f) => Math.pow(0.5, (now - f.at) / DAY_MS / T.halfLifeDays);
+  const goalWeight = (f) => Math.pow(0.5, (now - f.at) / DAY_MS / T.goalHalfLifeDays);
   const activities = {};
   for (const act of [...new Set(all.map((f) => f.activity))].sort()) {
     const fs = all.filter((f) => f.activity === act);
@@ -356,7 +382,8 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
         lastAt: ms[ms.length - 1].at,
         medianM: Math.round(median(dists) * 10) / 10,
         cv: round4(cv(dists)),
-        goal: { metric: goalFor(dists, false), imperial: goalFor(dists, true) },
+        // Recent workouts of the routine count most, so the goal follows it as it changes.
+        goal: { metric: goalFor(dists, false, ms.map(goalWeight)), imperial: goalFor(dists, true, ms.map(goalWeight)) },
         medianS: Math.round(median(ms.map((m) => m.duration))),
         startMin: circularMeanMinute(ms.map((m) => m.minute)),
         weekdays: [0, 1, 2, 3, 4, 5, 6].map((d) => ms.filter((m) => m.weekday === d).length),
@@ -396,7 +423,7 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
           count: ms.length,
           medianM: Math.round(median(dists) * 10) / 10,
           cv: round4(cv(dists)),
-          goal: { metric: goalFor(dists, false), imperial: goalFor(dists, true) },
+          goal: { metric: goalFor(dists, false, ms.map(goalWeight)), imperial: goalFor(dists, true, ms.map(goalWeight)) },
         };
         b.eligible = b.count >= T.bucketMinCount && b.cv <= T.bucketMaxCv;
         buckets.push(b);

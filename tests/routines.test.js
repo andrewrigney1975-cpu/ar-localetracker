@@ -115,6 +115,32 @@ describe('goal rounding', () => {
     expect(goalFor([8000, 8050, 7950], true)).toBeCloseTo(5 * 1609.344, 1); // 4.97 mi → 5 mi
     expect(goalFor([6400, 6450, 6420], false)).toBe(6400);
   });
+  it('leans towards recent workouts when weighted', () => {
+    expect(goalFor([5000, 5000, 5000, 5500, 5500], false)).toBe(5000);
+    expect(goalFor([5000, 5000, 5000, 5500, 5500], false, [0.25, 0.3, 0.35, 0.9, 1])).toBe(5500);
+  });
+});
+
+describe('routine goal follows the history', () => {
+  const rand = rng(33);
+  const route = loopRoute(PARK, 5000, 120, rand);
+  // Saturday park loop: ten weeks at 5 km, then extended to 5.5 km for the last four.
+  const history = Array.from({ length: 14 }, (_, i) =>
+    record(`g${i}`, route, (i < 10 ? 5000 : 5500) + ((i * 37) % 60) - 30, at(2026, 5, 6 + 7 * i, 7, 30))
+  );
+  const now = history[13].startedAt + DAY;
+
+  it('moves the goal to what the routine has become', () => {
+    const r = buildRoutineModel(history, { now }).activities.run.routines[0];
+    expect(r.count).toBe(14);
+    expect(r.medianM).toBeLessThan(5100); // most of its history is still 5 km
+    expect(r.goal.metric).toBe(5500);
+  });
+
+  it('a goal from all-time history alone would have stayed at 5 km', () => {
+    const r = buildRoutineModel(history.slice(0, 11), { now: history[10].startedAt + DAY }).activities.run.routines[0];
+    expect(r.goal.metric).toBe(5000);
+  });
 });
 
 describe('learning routines', () => {
@@ -156,7 +182,7 @@ describe('learning routines', () => {
 
   it('gives goals in the user’s units', () => {
     const p = predictGoal(model, { activity: 'run', now: at(2026, 9, 11, 8, 40), tzOffset: TZ, lat: PARK.lat, lon: PARK.lon, imperial: true });
-    expect(p.goalM).toBeCloseTo(6.2 * 1609.344, 1);
+    expect(p.goalM).toBeCloseTo(6.3 * 1609.344, 1); // recent runs of the ~10 km route
   });
 
   it('needs enough history first', () => {
