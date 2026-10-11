@@ -11,7 +11,9 @@ Afterwards you can review each workout as stats, heart-rate effort (calories, ca
 zones), splits, an interactive map with an elevation side view, or a 3D plot over
 satellite imagery. Then you can export it as **FIT** (for Strava and Garmin Connect),
 GPX, TCX, KML, GeoJSON or CSV. **Insights** reports your totals and averages by day, week,
-month, quarter or year, per activity, and exports them as CSV or JSON.
+month, quarter or year, per activity, and exports them as CSV or JSON. You can **share a
+course** (the route and its altitude, with no times or speeds) by SMS, email or Quick
+Share, and the recipient explores it on the map and in 3D with Locale's **View** tool.
 
 The app is written in HTML5, vanilla JavaScript and CSS3, and packaged with
 [Capacitor](https://capacitorjs.com/). A small Java plugin handles background GPS and
@@ -51,6 +53,16 @@ sensors.
   <img src="docs/screenshots/insights-weekly.png" width="250" alt="Insights: weekly cardio load for the last 3 months stacked by activity, with a tooltip for one week">
 </p>
 <p align="center">
+  <img src="docs/screenshots/view-share.png" width="250" alt="Share sheet: Share course section with a Hide start and finish switch and a Share AR City2Surf 2026.gpx button">
+  &nbsp;
+  <img src="docs/screenshots/view-list.png" width="250" alt="View: Open a course file, and the courses opened before with who shared them, distance and climb">
+</p>
+<p align="center">
+  <img src="docs/screenshots/view-map.png" width="250" alt="A shared course on the map in one colour, with a readout of distance, altitude, grade and climb so far, and the elevation profile">
+  &nbsp;
+  <img src="docs/screenshots/view-3d.png" width="250" alt="A shared course in 3D over satellite imagery, drawn in one colour">
+</p>
+<p align="center">
   <img src="docs/screenshots/watch-home.png" width="200" alt="Pixel Watch: Locale start screen with Start Run and Start Walk">
   &nbsp;
   <img src="docs/screenshots/watch-workout.png" width="200" alt="Pixel Watch: workout in progress with elapsed time, distance, pace, heart rate, pause and stop">
@@ -60,7 +72,8 @@ sensors.
 City2Surf (Hyde Park to Bondi via Heartbreak Hill at 6:18/km, with simulated heart rate).
 It is generated from the course map and is not a real recording. The voice screenshots
 come from the browser simulator. The Insights screenshots use a year of generated
-workouts in the browser build. The watch screenshots
+workouts in the browser build. The View screenshots show the sample shared as a course,
+and a generated walk shared with its start and finish hidden. The watch screenshots
 are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</sub>
 
 ## Features
@@ -181,6 +194,32 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
     Includes per-km laps, heart rate, climb and calories. The encoder is written from the
     FIT protocol spec and checked in tests with Garmin's official FIT SDK.
   - GPX, TCX, KML (3D in Google Earth), GeoJSON or CSV.
+
+### Share and view courses
+- **Share course**, in a workout's Share sheet, sends the route and its altitude only. It
+  leaves out every time and date, speed, pace, pause, heart rate, calorie, note and
+  device detail, so a share can never give away how fast you went or when.
+  - The file is named with your initials and the workout's label, like
+    `AR Bondi loop.gpx`. Your name is in **Settings → Profile**, and only the initials
+    are sent.
+  - **Hide start and finish** (off by default) leaves out the first and last 200 m, so a
+    course that starts at home doesn't show where you live.
+  - It goes through the Android share sheet: Messages (SMS/MMS or RCS), Gmail, Quick
+    Share, Drive or Files. A 10 km course is about 30–60 kB.
+  - The format is standard **GPX 1.1** with no timestamps, so Garmin Connect, Strava
+    routes, Komoot or Google Earth can open it too. Locale's extra details (the activity,
+    distance and climb) ride in a small `locale:course` extension that other apps ignore.
+- **View**, the tile under Live on the Track screen, opens a course file someone shared
+  with you. Tap a `.gpx` attachment in Messages, Gmail or Files and choose **Open with
+  Locale**, or use **Open a course file** in View.
+  - **Map**: the course in one colour (there's no speed to colour it by), distance
+    markers, start and finish, and the elevation profile. The readout shows distance,
+    altitude, grade and the climb so far, and nothing about time or performance.
+  - **3D**: the same course in one colour over satellite imagery, with the vertical
+    exaggeration and Smooth (averaged over 25 m, as there are no times).
+  - Opened courses are kept in their own list in View, apart from your workouts, so they
+    never show up in History, Insights or your routines. View also opens other GPX
+    tracks and routes, and GeoJSON lines, ignoring any timing in them.
 
 ### Insights
 - **Date range:** today, this week (Sunday to Saturday), this month, the last 3 or 12
@@ -361,7 +400,8 @@ src/
   seed/      City2Surf sample workout (course data + generator)
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, insights,
-             settings
+             settings, courses + course (View)
+  course/    shared course files (write, name, parse) and the View course store
   voice/     announcement triggers and phrases (mirrored natively in VoiceCoach)
   insights/  learned routines and goal prediction (matcher mirrored in RoutineMatcher);
              date-based reports with CSV/JSON export, calorie and load cache

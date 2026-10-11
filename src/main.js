@@ -12,6 +12,7 @@ import { tracker } from './tracker/client.js';
 import { closeTopDialog } from './ui/dialog.js';
 import { $, el } from './ui/dom.js';
 import { icons } from './ui/icons.js';
+import { toast } from './ui/toast.js';
 
 route('/', () => import('./views/home.js'), { tabs: true });
 route('/history', () => import('./views/history.js'), { tabs: true });
@@ -21,6 +22,8 @@ route('/live', () => import('./views/live.js'));
 route('/live/:activity', () => import('./views/live.js'));
 route('/workout/:id', () => import('./views/detail.js'));
 route('/position', () => import('./views/position.js'));
+route('/view', () => import('./views/courses.js'));
+route('/course/:id', () => import('./views/course.js'));
 
 const TABS = [
   { path: '/', label: 'Track', icon: icons.home },
@@ -76,6 +79,32 @@ async function initStorage() {
   }).catch((e) => console.warn('IndexedDB cleanup deferred', e));
 }
 
+/**
+ * A course opened from another app ("Open with Locale" on a .gpx in Messages, Gmail or
+ * Files): read it natively, keep it in View and show it.
+ */
+async function openIncomingCourse(url) {
+  if (!url || !/^(content|file):/i.test(url)) return;
+  try {
+    const [{ LocaleStore }, { saveCourse }, { CourseError }] = await Promise.all([
+      import('./db/nativeStore.js'),
+      import('./course/courseStore.js'),
+      import('./course/courseFile.js'),
+    ]);
+    const { text, name } = await LocaleStore.readUri({ uri: url });
+    try {
+      const entry = await saveCourse(text, name ?? '');
+      navigate(`/course/${encodeURIComponent(entry.id)}`);
+    } catch (e) {
+      if (!(e instanceof CourseError)) throw e;
+      toast(e.message);
+    }
+  } catch (e) {
+    console.error('Could not open the course', e);
+    toast('Could not open that file');
+  }
+}
+
 async function boot() {
   // Canvas text (profile, 3D markers) needs the bundled font before first draw.
   await Promise.race([document.fonts.load('400 16px "Google Sans Variable"'), new Promise((r) => setTimeout(r, 1500))]).catch(() => {});
@@ -98,6 +127,7 @@ async function boot() {
     }
   });
   App.addListener('resume', () => syncWorkouts());
+  App.addListener('appUrlOpen', ({ url }) => openIncomingCourse(url));
   // Saved natively (e.g. stopped from the watch or notification): refresh lists.
   tracker.on('saved', () => window.dispatchEvent(new CustomEvent('workouts-changed')));
   // Keep the learned routines (goal prediction) in step with the workout list.
@@ -110,6 +140,11 @@ async function boot() {
   // If a workout is running (app reopened from the notification), jump straight to it.
   const status = await tracker.getStatus().catch(() => ({ state: 'idle' }));
   if (status.state !== 'idle' && currentPath() === '/') navigate('/live');
+  else if (Capacitor.isNativePlatform()) {
+    // Cold start from "Open with Locale".
+    const launch = await App.getLaunchUrl().catch(() => null);
+    if (launch?.url) await openIncomingCourse(launch.url);
+  }
   await syncWorkouts();
   getRoutineModel().catch((e) => console.error(e));
 }

@@ -4,6 +4,7 @@ import { EXPORT_FORMATS, renderExport } from '../export/index.js';
 import { navigate } from '../router.js';
 import { workoutShareText, smsUri } from '../export/text.js';
 import { changeActivity } from '../services/workoutService.js';
+import { COURSE_MIME, courseFilename, initialsOf, toCourseGPX } from '../course/courseFile.js';
 import { openSms, shareFile, shareText } from '../services/share.js';
 import { settings, updateSettings } from '../settings.js';
 import { estimateCalories, loadLabel, profileComplete, trimp, ZONES, zoneSeconds } from '../stats/physio.js';
@@ -193,6 +194,7 @@ export async function mount(root, params, query, ctx) {
   root.querySelector('[data-act="export"]').addEventListener('click', async () => {
     const cal = estimateCalories(track, w.activity, settings().profile, w.startedAt);
     const message = workoutShareText(w, { units, calories: cal?.kcal });
+    let hideEnds = false;
     const fmt = await openDialog((dlg, close) => {
       dlg.innerHTML = `<h2>Share</h2>
         <div class="share-preview" aria-label="Message preview"></div>
@@ -200,10 +202,19 @@ export async function mount(root, params, query, ctx) {
           <button class="btn primary" data-v="sms">${icons.message}Text message</button>
           <button class="btn ghost" data-v="text">${icons.share}Other apps</button>
         </div>
+        <div class="section-title">Share course</div>
+        <p class="share-course-note">The route and its altitude, for someone to explore in Locale's View or another map app. No times, speeds or heart rate.</p>
+        <label class="share-hide"><span>Hide start and finish<small>Leaves out the first and last 200 m</small></span><input type="checkbox" class="switch" data-hide /></label>
+        <button class="btn ghost course-btn" data-v="course">${icons.route}<span data-ref="course-name"></span></button>
         <div class="section-title">Export file</div>
         <div class="option-list"></div>
         <div class="actions"><button class="btn ghost" data-v="cancel">Cancel</button></div>`;
       dlg.querySelector('.share-preview').textContent = message;
+      const initials = initialsOf(settings().profile.name);
+      dlg.querySelector('[data-ref="course-name"]').textContent = initials ? `Share ${courseFilename(initials, w.name)}` : 'Share course';
+      dlg.querySelector('[data-hide]').addEventListener('change', (e) => {
+        hideEnds = e.target.checked;
+      });
       dlg.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => close(b.dataset.v === 'cancel' ? null : b.dataset.v)));
       const list = dlg.querySelector('.option-list');
       for (const f of EXPORT_FORMATS) {
@@ -215,6 +226,10 @@ export async function mount(root, params, query, ctx) {
     if (!fmt) return;
     if (fmt === 'sms') {
       openSms(smsUri(message));
+      return;
+    }
+    if (fmt === 'course') {
+      await shareCourse(w, track, { hideEnds });
       return;
     }
     if (fmt === 'text') {
@@ -245,6 +260,38 @@ export async function mount(root, params, query, ctx) {
 
   await showTab(tab);
   return () => d.dispose();
+}
+
+// ---- Share course -------------------------------------------------------------------------
+
+/** Ask once for the user's name (its initials label shared courses); null if cancelled. */
+async function askName() {
+  const name = await openDialog((dlg, close) => {
+    dlg.innerHTML = `
+      <h2>Your name</h2>
+      <p>Shared courses are labelled with your initials, like "AR Bondi loop". Only the initials are sent.</p>
+      <label class="field"><span>Name</span><input type="text" maxlength="60" autocomplete="name" placeholder="First Last" autofocus /></label>
+      <div class="actions"><button class="btn ghost" data-v="cancel">Cancel</button><button class="btn primary" data-v="save">Continue</button></div>`;
+    const input = dlg.querySelector('input');
+    dlg.querySelector('[data-v="cancel"]').addEventListener('click', () => close(null));
+    dlg.querySelector('[data-v="save"]').addEventListener('click', () => close(input.value.trim()));
+  });
+  if (!name) return null;
+  await updateSettings({ profile: { ...settings().profile, name } });
+  return name;
+}
+
+async function shareCourse(w, track, { hideEnds }) {
+  const name = settings().profile.name || (await askName());
+  if (!name) return;
+  const initials = initialsOf(name);
+  try {
+    const out = toCourseGPX(w, track, { initials, hideEnds });
+    await shareFile({ filename: courseFilename(initials, w.name), content: out.text, mime: COURSE_MIME, title: w.name });
+  } catch (e) {
+    console.error(e);
+    toast(`Sharing failed: ${e?.message ?? e}`);
+  }
 }
 
 // ---- Summary ------------------------------------------------------------------------------

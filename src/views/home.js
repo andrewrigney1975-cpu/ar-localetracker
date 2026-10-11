@@ -48,6 +48,10 @@ export async function mount(root) {
               ${icons.locate}
               <span><strong>Live</strong><small>Position, altitude, speed and heading. Nothing is recorded.</small></span>
             </button>
+            <button class="activity-tile live-tile view-tile" data-activity="view" data-view>
+              ${icons.route}
+              <span><strong>View</strong><small>Open a course someone shared with you, on the map and in 3D.</small></span>
+            </button>
           </div>
           <div data-slot="recent"></div>
         </div>
@@ -56,6 +60,9 @@ export async function mount(root) {
 
   root.querySelector('[data-live]').addEventListener('click', () => {
     location.hash = '#/position';
+  });
+  root.querySelector('[data-view]').addEventListener('click', () => {
+    location.hash = '#/view';
   });
   root.querySelectorAll('[data-go]').forEach((b) =>
     b.addEventListener('click', () => {

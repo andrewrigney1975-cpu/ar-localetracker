@@ -13,15 +13,17 @@ import { cssVar, Disposer } from '../ui/dom.js';
 import { markerInfoHTML, Popover } from '../ui/popover.js';
 import { distanceUnit, formatPace, splitLength } from '../units.js';
 import { IMAGERY, latToPx, loadImagery, lonToPx } from './imagery.js';
-import { SMOOTH_WINDOW_S, smoothForDisplay } from './smooth.js';
+import { SMOOTH_DISTANCE_M, SMOOTH_WINDOW_S, distanceAxis, smoothForDisplay } from './smooth.js';
 
 const WORLD = 100; // horizontal extent normalised to this many scene units
 
 /**
  * @param {HTMLElement} root
- * @param {{workout:object, track:object, units:string, exaggeration:'auto'|number, satellite?:boolean, onSatelliteChange?:(on:boolean)=>void, smooth?:boolean, onSmoothChange?:(on:boolean)=>void}} opts
+ * @param {{workout:object, track:object, units:string, exaggeration:'auto'|number, satellite?:boolean, onSatelliteChange?:(on:boolean)=>void, smooth?:boolean, onSmoothChange?:(on:boolean)=>void, course?:boolean}} opts
+ *   course: a shared course (View): the line in one colour, no split pace in markers, and
+ *   smoothing over distance since there is no time
  */
-export function mountView3D(root, { workout, track, units, exaggeration = 'auto', satellite = true, onSatelliteChange, smooth = true, onSmoothChange }) {
+export function mountView3D(root, { workout, track, units, exaggeration = 'auto', satellite = true, onSatelliteChange, smooth = true, onSmoothChange, course = false }) {
   const d = new Disposer();
   let disposed = false;
   d.add(() => {
@@ -33,7 +35,7 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
       <div class="view3d-attrib" hidden>${IMAGERY.attribution}</div>
       <div class="view3d-controls">
         <button class="chip" data-act="satellite" aria-pressed="false">Satellite</button>
-        <button class="chip" data-act="smooth" aria-pressed="false" title="Average the drawn route over ${SMOOTH_WINDOW_S} s">Smooth</button>
+        <button class="chip" data-act="smooth" aria-pressed="false" title="${course ? `Average the drawn route over ${SMOOTH_DISTANCE_M} m` : `Average the drawn route over ${SMOOTH_WINDOW_S} s`}">Smooth</button>
         <span class="chips-break"></span>
         <label for="exag">Vertical</label>
         <input id="exag" type="range" min="1" max="10" step="0.5" />
@@ -68,9 +70,10 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
   const autoExag = Math.min(10, Math.max(1, Math.round(((0.25 * extentM) / vRange) * 2) / 2));
   let exag = exaggeration === 'auto' ? autoExag : Number(exaggeration) || autoExag;
 
-  // Drawn positions: raw, or a 10 s moving average (display only; see smooth.js).
+  // Drawn positions: raw, or a 10 s moving average (display only; see smooth.js). A course
+  // has no time, so it is averaged over distance instead.
   const raw = { x: ex, y: ny, alt: track.alt, speed: track.speed };
-  const smoothed = smoothForDisplay(track, raw);
+  const smoothed = smoothForDisplay(course ? distanceAxis(track) : track, raw);
   let smoothOn = smooth;
   let pts = smoothOn ? smoothed : raw;
 
@@ -213,8 +216,9 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
     }
   });
 
-  const [vmin, vmax] = speedRange(track);
+  const [vmin, vmax] = course ? [0, 1] : speedRange(track);
   const accent = new THREE.Color(cssVar('--accent', root) || '#f2672e');
+  const accentRGB = [accent.r * 255, accent.g * 255, accent.b * 255];
   const lineMaterial = new LineMaterial({ linewidth: 4, vertexColors: true, worldUnits: false });
   const shadowMaterial = new THREE.LineBasicMaterial({ color: isDark ? 0x000000 : 0x5d6b78, transparent: true, opacity: isDark ? 0.55 : 0.35 });
   const curtainMaterial = new THREE.MeshBasicMaterial({ color: accent, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false });
@@ -244,7 +248,8 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
   for (const m of markerData) {
     const prev = markerData[m.k - 2];
     const splitTime = m.active - (prev ? prev.active : 0);
-    makeSprite(String(m.k), `#${accent.getHexString()}`, { ...m, extra: [['Split pace', formatPace(splitLen / Math.max(1, splitTime), units)]] }, `${m.k} ${unit}`);
+    const data = course ? m : { ...m, extra: [['Split pace', formatPace(splitLen / Math.max(1, splitTime), units)]] };
+    makeSprite(String(m.k), `#${accent.getHexString()}`, data, `${m.k} ${unit}`);
   }
   makeSprite('S', '#1f9d55', first, 'Start');
   makeSprite('F', '#111111', last, 'Finish');
@@ -269,7 +274,7 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
       for (let i = from; i < to; i += step) {
         const p = toScene(i);
         pos.push(p.x, p.y, p.z);
-        const [r, g, b] = rampRGB((pts.speed[i] - vmin) / (vmax - vmin));
+        const [r, g, b] = course ? accentRGB : rampRGB((pts.speed[i] - vmin) / (vmax - vmin));
         col.push(r / 255, g / 255, b / 255);
         sh.push(p.x, 0.02, p.z);
       }
@@ -361,7 +366,7 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
     if (hits.length) {
       const sp = hits[0].object;
       popTarget = sp;
-      popover.show(0, 0, markerInfoHTML({ title: sp.userData.title, sample: sp.userData.data, units }));
+      popover.show(0, 0, markerInfoHTML({ title: sp.userData.title, sample: sp.userData.data, units, course }));
       placePopover();
     } else {
       popover.close();
