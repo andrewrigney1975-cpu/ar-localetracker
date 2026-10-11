@@ -510,7 +510,7 @@ export async function mount(root, params, query) {
       );
       tiles.push(tile(`Best ${splitWord} split`, g.split, g.split && formatDuration(g.split.value), '', pending));
     }
-    tiles.push(tile('Fastest speed', g.maxSpeed, g.maxSpeed && speedValue(g.maxSpeed.value, units).toFixed(1), speedUnit(units)));
+    tiles.push(tile('Fastest speed', g.maxSpeed, g.maxSpeed && speedValue(g.maxSpeed.value, units).toFixed(1), speedUnit(units), pending));
     tiles.push(tile('Longest workout', g.longest, g.longest && metricFormat('distance', units).text(distanceValue(g.longest.value, units)), distanceUnit(units)));
     return `${titled ? `<div class="pb-activity" data-activity="${g.activity}">${act.icon}${act.label}</div>` : ''}
       <div class="stat-grid num pb-grid">${tiles.join('')}</div>`;

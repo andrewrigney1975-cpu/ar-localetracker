@@ -1,16 +1,22 @@
 // Personal bests for Insights: best average pace (or speed), best split, fastest speed and
-// longest workout, per activity. Split times need the full track, so the fastest kilometre
-// and mile of each workout are cached in localStorage by workout version; a cold cache
-// loads each track once (like effort.js).
+// longest workout, per activity. Splits and fastest speed need the full track, so each
+// workout's fastest kilometre, mile and sustained speed are cached in localStorage by
+// workout version; a cold cache loads each track once (like effort.js).
 
 import { getTrack } from '../db/workouts.js';
 import { computeSplits } from '../stats/summary.js';
 import { M_PER_MI } from '../units.js';
 
-const KEY = 'insights.splits.v1';
+const KEY = 'insights.splits.v2';
 
 /** Best average pace only counts workouts at least this long (a 300 m dash isn't a best). */
 export const MIN_AVG_DISTANCE_M = 1000;
+
+/**
+ * Fastest speed is averaged over at least this much moving time, so a single GPS jump
+ * (a walk "at" 14 km/h) doesn't count.
+ */
+export const TOP_SPEED_WINDOW_S = 5;
 
 /** Ski days include lifts, so their pace and splits mean nothing. */
 const SPLIT_ACTIVITIES = new Set(['walk', 'run', 'cycle']);
@@ -46,18 +52,34 @@ export function fastestSplit(track, splitLen) {
   return best;
 }
 
+/** Highest average speed (m/s) over any stretch of at least `windowS` moving seconds, or null. */
+export function sustainedSpeed(track, windowS = TOP_SPEED_WINDOW_S) {
+  const { n, dist, active } = track;
+  let best = null;
+  let i = 0;
+  for (let j = 1; j < n; j++) {
+    // Shortest stretch ending at j that still spans the window.
+    while (i + 1 < j && active[j] - active[i + 1] >= windowS) i++;
+    const dt = active[j] - active[i];
+    if (dt < windowS) continue;
+    const v = (dist[j] - dist[i]) / dt;
+    if (Number.isFinite(v) && (best == null || v > best)) best = v;
+  }
+  return best;
+}
+
 /**
- * Fastest kilometre and mile of each workout, loading tracks only for those not cached.
- * @returns {Promise<Map<string, {km:number|null, mi:number|null}>>}
+ * Fastest kilometre, mile and sustained speed of each workout, loading tracks only for
+ * those not cached.
+ * @returns {Promise<Map<string, {km:number|null, mi:number|null, top:number|null}>>}
  */
 export async function splitTimesFor(workouts, { onProgress, isCancelled } = {}) {
   const c = load();
   const out = new Map();
   const todo = [];
   for (const w of workouts) {
-    if (!SPLIT_ACTIVITIES.has(w.activity) || (w.summary?.distance ?? 0) < 1000) continue;
     const hit = c[w.id];
-    if (hit && hit.v === versionKey(w)) out.set(w.id, { km: hit.km, mi: hit.mi });
+    if (hit && hit.v === versionKey(w)) out.set(w.id, { km: hit.km, mi: hit.mi, top: hit.top });
     else todo.push(w);
   }
   let done = 0;
@@ -66,17 +88,21 @@ export async function splitTimesFor(workouts, { onProgress, isCancelled } = {}) 
     onProgress?.(done, todo.length);
     let km = null;
     let mi = null;
+    let top = null;
     try {
       const track = await getTrack(w.id);
       if (track) {
-        km = fastestSplit(track, 1000);
-        mi = fastestSplit(track, M_PER_MI);
+        if (SPLIT_ACTIVITIES.has(w.activity)) {
+          km = fastestSplit(track, 1000);
+          mi = fastestSplit(track, M_PER_MI);
+        }
+        top = sustainedSpeed(track);
       }
     } catch (e) {
       console.warn('Insights: no track for', w.id, e);
     }
-    c[w.id] = { v: versionKey(w), km, mi };
-    out.set(w.id, { km, mi });
+    c[w.id] = { v: versionKey(w), km, mi, top };
+    out.set(w.id, { km, mi, top });
     done++;
     if (done % 20 === 0) persist();
   }
@@ -103,9 +129,10 @@ const avgSpeedOf = (s) => s.avgMovingSpeed || (s.movingTime > 0 ? s.distance / s
 
 /**
  * Bests per activity. Each best is {id, startedAt, value} (or null): avgSpeed and maxSpeed
- * in m/s, split in seconds for one km or mile (`units`), longest in metres.
+ * in m/s, split in seconds for one km or mile (`units`), longest in metres. maxSpeed is the
+ * sustained speed from the track; it is null until the track has been read.
  * @param {object[]} workouts
- * @param {Map<string, {km:number|null, mi:number|null}>} [splitTimes]  from splitTimesFor
+ * @param {Map<string, {km:number|null, mi:number|null, top:number|null}>} [splitTimes]  from splitTimesFor
  * @param {'metric'|'imperial'} [units]
  * @returns {{activity:string, count:number, avgSpeed:object|null, split:object|null, maxSpeed:object|null, longest:object|null}[]}
  */
@@ -122,10 +149,10 @@ export function personalBests(workouts, splitTimes = new Map(), units = 'metric'
     };
     const more = (a, c) => a > c;
     consider('longest', s.distance, more);
-    consider('maxSpeed', s.maxSpeed, more);
+    const t = splitTimes.get(w.id);
+    consider('maxSpeed', t?.top, more);
     if (SPLIT_ACTIVITIES.has(w.activity)) {
       if ((s.distance ?? 0) >= MIN_AVG_DISTANCE_M) consider('avgSpeed', avgSpeedOf(s), more);
-      const t = splitTimes.get(w.id);
       consider('split', units === 'imperial' ? t?.mi : t?.km, (a, c) => a < c);
     }
   }

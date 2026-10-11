@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fastestSplit, personalBests } from '../src/insights/bests.js';
+import { fastestSplit, personalBests, sustainedSpeed } from '../src/insights/bests.js';
 
 /** A straight track at the given speeds (m/s), one point per second. */
 function track(speeds) {
@@ -23,6 +23,20 @@ describe('personal bests', () => {
     expect(fastestSplit(track(Array(100).fill(5)), 1000)).toBeNull();
   });
 
+  it('takes the fastest speed over a few seconds, so a one-point GPS jump does not count', () => {
+    // Walking at 1.5 m/s with one 20 m jump in a single second.
+    const speeds = Array(120).fill(1.5);
+    speeds[60] = 20;
+    const t = track(speeds);
+    expect(Math.max(...t.speed)).toBe(20);
+    expect(sustainedSpeed(t, 5)).toBeCloseTo((4 * 1.5 + 20) / 5, 5);
+    expect(sustainedSpeed(t, 5)).toBeLessThan(5.3);
+    // A real sprint held for 10 s shows in full.
+    const sprint = track([...Array(30).fill(3), ...Array(10).fill(7), ...Array(30).fill(3)]);
+    expect(sustainedSpeed(sprint, 5)).toBeCloseTo(7, 5);
+    expect(sustainedSpeed(track([2, 2]), 5)).toBeNull();
+  });
+
   it('picks each best per activity, with the workout it came from', () => {
     const workouts = [
       w('r1', 'run', { distance: 5000, movingTime: 1500, avgMovingSpeed: 5000 / 1500, maxSpeed: 5.1 }, 1),
@@ -32,8 +46,10 @@ describe('personal bests', () => {
       w('c1', 'cycle', { distance: 40000, movingTime: 5400, avgMovingSpeed: 40000 / 5400, maxSpeed: 15 }, 4),
     ];
     const splits = new Map([
-      ['r1', { km: 290, mi: 470 }],
-      ['r2', { km: 300, mi: 480 }],
+      ['r1', { km: 290, mi: 470, top: 5.1 }],
+      ['r2', { km: 300, mi: 480, top: 6.2 }],
+      ['r3', { km: null, mi: null, top: 6 }],
+      ['c1', { km: null, mi: null, top: 15 }],
     ]);
     const [run, cycle] = personalBests(workouts, splits, 'metric');
     expect(run).toMatchObject({
@@ -49,7 +65,7 @@ describe('personal bests', () => {
   });
 
   it('has no pace or split bests for skiing (lifts count as time)', () => {
-    const [ski] = personalBests([w('s1', 'ski', { distance: 30000, movingTime: 9000, maxSpeed: 20 })], new Map([['s1', { km: 60, mi: 99 }]]));
+    const [ski] = personalBests([w('s1', 'ski', { distance: 30000, movingTime: 9000, maxSpeed: 20 })], new Map([['s1', { km: 60, mi: 99, top: 20 }]]));
     expect(ski).toMatchObject({ avgSpeed: null, split: null, maxSpeed: { value: 20 }, longest: { value: 30000 } });
   });
 });
