@@ -39,7 +39,7 @@ const STACK_ORDER = ['cycle', 'run', 'walk', 'ski'];
 const GROUP_LABELS = { day: 'Daily', week: 'Weekly', month: 'Monthly', quarter: 'Every 3 months', year: 'Yearly' };
 
 const STATE_KEY = 'insights.view.v1';
-const DEFAULT_STATE = { range: '12m', group: 'month', activity: 'all', routine: 'all', split: false, metric: 'distance', from: null, to: null };
+const DEFAULT_STATE = { range: 'week', group: 'day', activity: 'all', routine: 'all', split: false, metric: 'distance', from: null, to: null };
 
 function loadState() {
   let s;
@@ -48,8 +48,9 @@ function loadState() {
   } catch {
     s = { ...DEFAULT_STATE };
   }
-  // "30 days" was replaced by "This month".
-  if (!WINDOWS.some((w) => w.id === s.range)) s.range = 'month';
+  // Insights always opens on this week, by day; the other filters are remembered.
+  s.range = DEFAULT_STATE.range;
+  s.group = DEFAULT_STATE.group;
   return s;
 }
 
