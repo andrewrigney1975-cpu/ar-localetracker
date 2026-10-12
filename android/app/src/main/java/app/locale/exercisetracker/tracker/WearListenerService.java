@@ -80,6 +80,7 @@ public class WearListenerService extends WearableListenerService {
                 idle.put("state", "idle");
                 idle.put("units", PhoneSettings.units(this));
                 idle.put("t", System.currentTimeMillis());
+                PhoneSettings.putHeartRange(this, idle);
             } catch (Exception ignored) {
             }
             WearSync.send(this, WearSync.PATH_STATUS, idle);

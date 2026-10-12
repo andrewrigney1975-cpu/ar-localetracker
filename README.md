@@ -146,8 +146,9 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Live heart rate** from the watch, read through Wear OS Health Services and streamed to
   the phone about every 3 s. It's saved into the workout recording, so every GPS point
   has a heart rate.
-- **Watch screen:** elapsed time, distance, pace or speed, and heart rate. The workout
-  also shows on the watch face as an ongoing activity.
+- **Watch screen:** elapsed time, distance, pace or speed, and heart rate. The heart rate
+  is coloured by zone, matching the phone's zone colours (from your profile's max and
+  resting heart rate). The workout also shows on the watch face as an ongoing activity.
 - **Starting with the phone in your pocket** needs location set to "Allow all the time"
   (Settings → Watch). Without it, the watch asks you to tap a notification on the phone.
 - **Pull to refresh** on the Track and History screens picks up workouts recorded from the watch, a
