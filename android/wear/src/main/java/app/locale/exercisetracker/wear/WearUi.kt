@@ -1,6 +1,8 @@
 package app.locale.exercisetracker.wear
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -168,9 +170,15 @@ private fun ActiveScreen(
         }
     }
     val paused = status.state != "recording"
+    val dark = isSystemInDarkTheme()
+    val fg = if (dark) Color.White else Color.Black
+    val bg = if (dark) Color.Black else Color.White
     val goal = status.goalM?.takeIf { it > 0 }
     val progress = if (goal != null) (status.distance / goal).toFloat().coerceIn(0f, 1f) else null
     ScreenScaffold {
+        // Plain details (white on black, or black on white in a light theme); only heart rate (by zone)
+        // and the ring and buttons (by activity) are coloured.
+        Box(Modifier.fillMaxSize().background(bg))
         // Goal progress around the edge of the round screen.
         if (progress != null) {
             Canvas(Modifier.fillMaxSize().padding(3.dp)) {
@@ -178,7 +186,7 @@ private fun ActiveScreen(
                 val inset = stroke / 2
                 val arcSize = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke)
                 val topLeft = androidx.compose.ui.geometry.Offset(inset, inset)
-                drawArc(Color(0x33FFFFFF), -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
+                drawArc(fg.copy(alpha = 0.2f), -90f, 360f, false, topLeft, arcSize, style = Stroke(stroke))
                 drawArc(accent, -90f, 360f * progress, false, topLeft, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
             }
         }
@@ -190,28 +198,33 @@ private fun ActiveScreen(
             Text(
                 if (!paused && goal != null) "${activityLabel(status.activity)} · ${(progress!! * 100).toInt()}% of ${formatGoal(goal, status.units)}"
                 else "${activityLabel(status.activity)} · ${stateLabel(status.state)}",
-                color = if (paused) Color(0xFFD08A10) else accent,
+                color = fg,
                 style = MaterialTheme.typography.labelMedium,
             )
             Text(
                 formatDuration(now),
                 fontSize = 40.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = fg,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Metric(formatDistance(status.distance, status.units))
-                Metric(formatSpeed(status.speed, status.activity, status.units))
+                Metric(formatDistance(status.distance, status.units), fg)
+                Metric(formatSpeed(status.speed, status.activity, status.units), fg)
             }
             Spacer(Modifier.height(2.dp))
-            Text(
-                if (hr != null) "♥ $hr bpm" else "♥ --",
-                color = heartColor(hr, status),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+            val heart = heartColor(hr, status)
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                // An icon, not "♥", which renders as a fixed-colour emoji.
+                Icon(painterResource(R.drawable.ic_heart), contentDescription = "Heart rate", tint = heart, modifier = Modifier.size(18.dp))
+                Text(
+                    if (hr != null) "$hr bpm" else "--",
+                    color = heart,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
             if (error != null) Message(error, MaterialTheme.colorScheme.error)
-            else AnnouncementCaption()
+            else AnnouncementCaption(fg)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilledIconButton(
@@ -240,7 +253,7 @@ private fun ActiveScreen(
                 }
             }
             Box(Modifier.height(18.dp), contentAlignment = Alignment.Center) {
-                if (confirmStop) Text("Tap stop again to finish", style = MaterialTheme.typography.bodySmall)
+                if (confirmStop) Text("Tap stop again to finish", style = MaterialTheme.typography.bodySmall, color = fg)
             }
         }
     }
@@ -248,7 +261,7 @@ private fun ActiveScreen(
 
 /** The phone's last announcement, for a few seconds after the watch buzzes. */
 @Composable
-private fun AnnouncementCaption() {
+private fun AnnouncementCaption(fg: Color) {
     val last by PhoneLink.announcement.collectAsStateWithLifecycle()
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(last) {
@@ -263,7 +276,7 @@ private fun AnnouncementCaption() {
         Text(
             last!!.first,
             style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFFD7DEE4),
+            color = fg,
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -275,8 +288,8 @@ private fun AnnouncementCaption() {
 private const val CAPTION_MS = 8_000L
 
 @Composable
-private fun Metric(text: String) {
-    Text(text, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color(0xFFD7DEE4))
+private fun Metric(text: String, fg: Color) {
+    Text(text, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = fg)
 }
 
 private fun stateLabel(state: String) = when (state) {
