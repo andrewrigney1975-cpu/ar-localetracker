@@ -8,6 +8,8 @@ export default defineConfig({
   root: fileURLToPath(new URL('./viewer', import.meta.url)),
   base: './',
   publicDir: false,
+  // Its own dependency cache, so it can run beside the app's dev server.
+  cacheDir: fileURLToPath(new URL('./node_modules/.vite-viewer', import.meta.url)),
   build: {
     outDir: fileURLToPath(new URL('./dist-viewer', import.meta.url)),
     emptyOutDir: true,
