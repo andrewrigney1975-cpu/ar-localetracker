@@ -224,6 +224,16 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - Opened courses are kept in their own list in View, apart from your workouts, so they
     never show up in History, Insights or your routines. View also opens other GPX
     tracks and routes, and GeoJSON lines, ignoring any timing in them.
+- **Locale Viewer** is a standalone web page with the same Map and 3D views, for people
+  who don't have the app. It works in any browser, phone or desktop, at any window width.
+  - Open a `.gpx` or GeoJSON file with **Open a course file**, or drop it on the page.
+  - The address then becomes a **course link** (`…/#c=…`) that holds the whole course,
+    deflated and base64url-encoded. City2Surf is about 2,100 characters. Send the link
+    and it opens straight in the browser. **Share link** copies it, or opens the share
+    sheet on a phone, and **Download .gpx** saves the course as a file.
+  - Nothing is uploaded. Files are read in the browser, and the course in a link sits
+    after the `#`, which browsers never send to a server, so the page can be hosted on
+    any static host.
 
 ### Insights
 - **Date range:** today, this week (Sunday to Saturday), this month, the last 3 or 12
@@ -357,6 +367,16 @@ npm run dev      # run in a browser with a simulated GPS route
 The browser build uses a GPS simulator that starts at Hyde Park, Sydney. Add `?sim=10` to
 the URL to run it 10× faster.
 
+### Locale Viewer (web)
+
+```sh
+npm run viewer         # serve viewer/ with hot reload
+npm run viewer:build   # static site in dist-viewer/
+```
+
+Host `dist-viewer/` on any static host, such as GitHub Pages, Netlify or a plain web
+server. It uses relative paths, so it also works from a subfolder.
+
 ### Build and install on a device
 
 ```sh
@@ -411,7 +431,9 @@ src/
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, insights,
              settings, courses + course (View)
-  course/    shared course files (write, name, parse) and the View course store
+  course/    shared course files (write, name, parse), course links, and the View
+             course store
+  viewer/    Locale Viewer, the standalone web page (entry: viewer/index.html)
   voice/     announcement triggers and phrases (mirrored natively in VoiceCoach)
   insights/  learned routines and goal prediction (matcher mirrored in RoutineMatcher);
              date-based reports with CSV/JSON export, calorie and load cache

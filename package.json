@@ -9,6 +9,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "viewer": "vite --config vite.viewer.config.js",
+    "viewer:build": "vite build --config vite.viewer.config.js",
     "test": "vitest run",
     "sync": "vite build && cap sync android",
     "android:build": "npm run sync && cd android && gradlew.bat assembleDebug"
