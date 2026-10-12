@@ -2,7 +2,6 @@ package app.locale.exercisetracker.wear
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -170,14 +169,14 @@ private fun ActiveScreen(
         }
     }
     val paused = status.state != "recording"
-    val dark = isSystemInDarkTheme()
-    val fg = if (dark) Color.White else Color.Black
-    val bg = if (dark) Color.Black else Color.White
+    // Always the dark theme, whatever the watch's setting: easiest to read mid-workout.
+    val fg = Color.White
+    val bg = Color.Black
     val goal = status.goalM?.takeIf { it > 0 }
     val progress = if (goal != null) (status.distance / goal).toFloat().coerceIn(0f, 1f) else null
     ScreenScaffold {
-        // Plain details (white on black, or black on white in a light theme); only heart rate (by zone)
-        // and the ring and buttons (by activity) are coloured.
+        // White-on-black details; only heart rate (by zone) and the ring and buttons (by activity)
+        // are coloured.
         Box(Modifier.fillMaxSize().background(bg))
         // Goal progress around the edge of the round screen.
         if (progress != null) {

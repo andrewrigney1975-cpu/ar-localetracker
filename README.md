@@ -154,7 +154,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   the phone about every 3 s. It's saved into the workout recording, so every GPS point
   has a heart rate.
 - **Watch screen:** elapsed time, distance, pace or speed, and heart rate. The details are
-  white on black (black on white in a light theme); only the heart rate is coloured, by
+  white on black, whatever the watch's theme; only the heart rate is coloured, by
   zone, matching the phone's zone colours (from your profile's max and resting heart rate).
   The goal ring and buttons keep the activity's colour. The workout also shows on the watch face as an ongoing activity.
 - **Starting with the phone in your pocket** needs location set to "Allow all the time"
