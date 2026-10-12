@@ -11,7 +11,7 @@ import { distanceMarkers } from '../stats/summary.js';
 import { rampRGB, speedRange } from '../ui/colors.js';
 import { cssVar, Disposer } from '../ui/dom.js';
 import { markerInfoHTML, Popover } from '../ui/popover.js';
-import { distanceUnit, formatPace, splitLength } from '../units.js';
+import { distanceUnit, formatAltitude, formatPace, splitLength } from '../units.js';
 import { IMAGERY, latToPx, loadImagery, lonToPx } from './imagery.js';
 import { SMOOTH_DISTANCE_M, SMOOTH_WINDOW_S, distanceAxis, smoothForDisplay } from './smooth.js';
 
@@ -258,6 +258,64 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
     sprites.forEach((s) => s.material.dispose());
   });
 
+  // Crest: a measured line from the ground plane (the route's lowest altitude) up to its
+  // highest point, with arrowheads at both ends and the real height, whatever the vertical
+  // exaggeration. It stands against the background and the curtain, so it takes the theme's
+  // text colour.
+  const crestColor = isDark ? 0xffffff : 0x121a21;
+  const crestMaterial = new LineMaterial({ color: crestColor, linewidth: 2, worldUnits: false });
+  const crestHeadMaterial = new THREE.MeshBasicMaterial({ color: crestColor });
+  const crest = { sprite: null, text: '' };
+  d.add(() => {
+    crestMaterial.dispose();
+    crestHeadMaterial.dispose();
+    crest.sprite?.material.map.dispose();
+    crest.sprite?.material.dispose();
+  });
+
+  function placeCrest() {
+    let top = -1;
+    for (let i = 0; i < n; i++) {
+      if (Number.isFinite(pts.alt[i]) && (top < 0 || pts.alt[i] > pts.alt[top])) top = i;
+    }
+    const rise = top < 0 ? 0 : pts.alt[top] - minAlt;
+    if (crest.sprite) crest.sprite.visible = false;
+    if (!(rise >= 1)) return; // a flat route has no crest worth measuring
+    const p = toScene(top);
+    const head = Math.min(2, p.y / 4);
+    const geom = new LineGeometry();
+    geom.setPositions([p.x, head, p.z, p.x, p.y - head, p.z]);
+    const line = new Line2(geom, crestMaterial);
+    line.renderOrder = 6;
+    group.add(line);
+    for (const up of [true, false]) {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(head * 0.4, head, 12), crestHeadMaterial);
+      if (!up) cone.rotation.x = Math.PI;
+      cone.position.set(p.x, up ? p.y - head / 2 : head / 2, p.z);
+      cone.renderOrder = 6;
+      group.add(cone);
+    }
+    const text = formatAltitude(rise, units);
+    if (text !== crest.text) {
+      crest.text = text;
+      if (crest.sprite) {
+        crest.sprite.material.map.dispose();
+        crest.sprite.material.dispose();
+        scene.remove(crest.sprite);
+      }
+      const { tex, aspect } = labelTexture(text);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, sizeAttenuation: false }));
+      sp.scale.set(0.032 * aspect, 0.032, 1);
+      sp.center.set(-0.12, 0.5); // just right of the line
+      sp.renderOrder = 11; // above the distance markers, which often crowd a summit
+      scene.add(sp);
+      crest.sprite = sp;
+    }
+    crest.sprite.userData = { data: sampleAtDistance(track, track.dist[top]), title: 'Highest point' };
+    crest.sprite.position.set(p.x, p.y / 2, p.z);
+    crest.sprite.visible = true;
+  }
+
   // ---- Build (re-run when exaggeration changes) -------------------------------------------
   function build() {
     group.children.forEach((c) => c.geometry?.dispose());
@@ -335,6 +393,7 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
       const p = atDistance(sp.userData.data.dist);
       sp.position.set(p.x, p.y + 1.2, p.z);
     }
+    placeCrest();
     render();
   }
 
@@ -362,7 +421,7 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
     const rect = renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
-    const hits = raycaster.intersectObjects(sprites, false);
+    const hits = raycaster.intersectObjects(crest.sprite?.visible ? [...sprites, crest.sprite] : sprites, false);
     if (hits.length) {
       const sp = hits[0].object;
       popTarget = sp;
@@ -413,6 +472,7 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
     fitCamera(camera.aspect);
     camera.updateProjectionMatrix();
     lineMaterial.resolution.set(w, h);
+    crestMaterial.resolution.set(w, h);
     render();
   };
   const ro = new ResizeObserver(resize);
@@ -458,6 +518,30 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
     renderer.domElement.remove();
   });
   return () => d.dispose();
+}
+
+/** A dark pill with the crest height, sized to its text; aspect is width / height. */
+function labelTexture(text) {
+  const h = 64;
+  const font = '700 30px "Google Sans Variable", system-ui, Roboto, sans-serif';
+  const c = document.createElement('canvas');
+  const g = c.getContext('2d');
+  g.font = font;
+  const w = Math.ceil(g.measureText(text).width) + 36;
+  c.width = w;
+  c.height = h;
+  g.fillStyle = 'rgba(17, 24, 32, 0.88)';
+  g.beginPath();
+  g.roundRect(2, 6, w - 4, h - 12, (h - 12) / 2);
+  g.fill();
+  g.font = font;
+  g.fillStyle = '#ffffff';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, w / 2, h / 2 + 1);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return { tex, aspect: w / h };
 }
 
 function markerTexture(label, fill) {
