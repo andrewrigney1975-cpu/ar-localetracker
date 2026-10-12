@@ -12,6 +12,8 @@ import { haversine } from '../geo/geo.js';
 import { verticalGainLoss } from '../stats/summary.js';
 
 export const LINK_PARAM = 'c';
+/** Where Locale Viewer is hosted (GitHub Pages, .github/workflows/viewer-pages.yml). */
+export const VIEWER_URL = 'https://andrewrigney1975-cpu.github.io/ar-localetracker/';
 const VERSION = 1;
 const DEG = 1e5;
 const ALT = 10;
@@ -89,6 +91,12 @@ export async function encodeCourseLink(course) {
   if (course.trimmed) payload.t = 1;
   const json = new TextEncoder().encode(JSON.stringify(payload));
   return toBase64Url(await pipe(json, new CompressionStream('deflate-raw')));
+}
+
+/** The full Locale Viewer link for a course, or null when it is too detailed for a link. */
+export async function courseLinkURL(course) {
+  const value = await encodeCourseLink(course);
+  return value.length <= MAX_LINK_CHARS ? `${VIEWER_URL}#${LINK_PARAM}=${value}` : null;
 }
 
 /**

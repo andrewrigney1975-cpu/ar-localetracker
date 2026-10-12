@@ -1,0 +1,51 @@
+# Publish Locale Viewer (viewer/index.html, built to dist-viewer/) to GitHub Pages at
+# https://andrewrigney1975-cpu.github.io/ar-localetracker/, the address course links use
+# (VIEWER_URL in src/course/courseLink.js). Needs Settings -> Pages -> Source: GitHub Actions.
+name: Locale Viewer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'viewer/**'
+      - 'src/**'
+      - 'vite.viewer.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/viewer-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vitest run tests/course.test.js tests/courseLink.test.js
+      - run: npm run viewer:build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-viewer
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

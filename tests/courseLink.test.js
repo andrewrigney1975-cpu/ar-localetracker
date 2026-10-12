@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseCourse, toCourseGPX } from '../src/course/courseFile.js';
-import { CourseLinkError, decodeCourseLink, encodeCourseLink } from '../src/course/courseLink.js';
+import { CourseLinkError, VIEWER_URL, courseLinkURL, decodeCourseLink, encodeCourseLink } from '../src/course/courseLink.js';
 import { buildWorkout } from '../src/services/buildWorkout.js';
 import { generateJournal } from '../src/tracker/synthetic.js';
 
@@ -43,6 +43,13 @@ describe('course links', () => {
     const back = parseCourse(gpx);
     expect(back).toMatchObject({ name: 'Harbour walk', sharedBy: null, activity: null });
     expect(back.track.n).toBe(3);
+  });
+
+  it('builds the Locale Viewer address the app shares', async () => {
+    const c = sharedCourse({ seconds: 600 });
+    const url = await courseLinkURL(c);
+    expect(url.startsWith(`${VIEWER_URL}#c=`)).toBe(true);
+    expect(parseCourse(await decodeCourseLink(new URL(url).hash.slice(3))).name).toBe('Bondi & back');
   });
 
   it('rejects a damaged link', async () => {

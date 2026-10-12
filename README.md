@@ -213,6 +213,9 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - The format is standard **GPX 1.1** with no timestamps, so Garmin Connect, Strava
     routes, Komoot or Google Earth can open it too. Locale's extra details (the activity,
     distance and climb) ride in a small `locale:course` extension that other apps ignore.
+  - **Share a link to view in a browser** sends the same course as a
+    [Locale Viewer](https://andrewrigney1975-cpu.github.io/ar-localetracker/) link, which
+    anyone can open in a browser without installing anything (see below).
 - **View**, the tile under Live on the Track screen, opens a course file someone shared
   with you. Tap a `.gpx` attachment in Messages, Gmail or Files and choose **Open with
   Locale**, or use **Open a course file** in View.
@@ -374,8 +377,10 @@ npm run viewer         # serve viewer/ with hot reload
 npm run viewer:build   # static site in dist-viewer/
 ```
 
-Host `dist-viewer/` on any static host, such as GitHub Pages, Netlify or a plain web
-server. It uses relative paths, so it also works from a subfolder.
+`.github/workflows/viewer-pages.yml` publishes it to GitHub Pages on every push to `main`
+that touches it (repository Settings → Pages → Source: **GitHub Actions**). Course links
+from the app point there (`VIEWER_URL` in `src/course/courseLink.js`). `dist-viewer/` also
+works on any other static host, or from a subfolder, since it uses relative paths.
 
 ### Build and install on a device
 
