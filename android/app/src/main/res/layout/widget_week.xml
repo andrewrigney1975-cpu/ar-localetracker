@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 2x2: total distance of this week's workouts, Sunday to Saturday. -->
+<!-- 2x2: total distance of this week's workouts, Sunday to Saturday, with the average split and speed. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -24,6 +24,24 @@
         android:maxLines="1"
         android:textColor="@color/widget_text_muted"
         android:textSize="12sp" />
+    <!-- Average split and speed: styled like week_count. -->
+    <TextView
+        android:id="@+id/week_split"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:maxLines="1"
+        android:textColor="@color/widget_text_secondary"
+        android:textSize="13sp"
+        android:visibility="gone" />
+    <TextView
+        android:id="@+id/week_speed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:textColor="@color/widget_text_secondary"
+        android:textSize="13sp"
+        android:visibility="gone" />
     <!-- Spacer: RemoteViews can't inflate a plain View. -->
     <FrameLayout
         android:layout_width="match_parent"

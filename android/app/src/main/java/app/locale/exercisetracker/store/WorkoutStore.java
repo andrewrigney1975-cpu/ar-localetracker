@@ -194,13 +194,31 @@ public final class WorkoutStore extends SQLiteOpenHelper {
         return w;
     }
 
-    /** Total distance (m) and count of workouts started in [fromMs, toMs), not counting the samples. */
+    /**
+     * Totals of workouts started in [fromMs, toMs), not counting the samples: distance (m),
+     * count, and moving time (s, from the summary; the duration when it has none).
+     */
     public double[] distanceBetween(long fromMs, long toMs) {
+        double meters = 0;
+        double moving = 0;
+        int count = 0;
         try (Cursor c = getReadableDatabase().rawQuery(
-            "SELECT COALESCE(SUM(distance_m), 0), COUNT(*) FROM workouts WHERE started_at >= ? AND started_at < ? AND id NOT LIKE 'sample-%'",
+            "SELECT distance_m, duration_s, summary_json FROM workouts WHERE started_at >= ? AND started_at < ? AND id NOT LIKE 'sample-%'",
             new String[] { Long.toString(fromMs), Long.toString(toMs) })) {
-            return c.moveToFirst() ? new double[] { c.getDouble(0), c.getInt(1) } : new double[] { 0, 0 };
+            while (c.moveToNext()) {
+                meters += c.getDouble(0);
+                double t = c.getDouble(1);
+                try {
+                    double m = new JSONObject(c.getString(2)).optDouble("movingTime", Double.NaN);
+                    if (m > 0) t = m;
+                } catch (JSONException | RuntimeException e) {
+                    // No usable summary: fall back to the duration.
+                }
+                moving += t;
+                count++;
+            }
         }
+        return new double[] { meters, count, moving };
     }
 
     public boolean has(String id) {

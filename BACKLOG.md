@@ -202,3 +202,37 @@ are, without recording a workout.
 - The map can reuse MapLibre (a single marker plus an accuracy circle layer), with no
   track.
 - Optional later: a "Mark this spot" button that saves a waypoint, if waypoints are added.
+
+---
+
+## 7. Week widget: average split and speed: ✅ done (October 2026)
+
+> Implemented in `LocaleWidgets.week()` and `widget_week.xml`, with the formatting in `tracker/WeekStats.java` (unit-tested). `WorkoutStore.distanceBetween` now also returns moving time. All activities count together, matching the distance figure; a workout being recorded counts by its elapsed time.
+
+**Request:** on the 2×2 weekly stats home-screen widget, add the week's **average split
+time** and **average speed**, as two lines of values below the dates and above the
+distance, in the same font as the workout count.
+
+- Line 1: average split for the week, e.g. `Avg split 6:12 /km` (`/mi` in imperial).
+- Line 2: average speed for the week, e.g. `Avg speed 9.7 km/h` (`mph` in imperial).
+- Same text style as `week_count`: 13sp, regular weight, the same theme colour.
+- With no workouts this week, hide both lines (or show `--`), so the widget doesn't claim a
+  pace of zero.
+
+*Notes:*
+- Layout: `android/app/src/main/res/layout/widget_week.xml`. Add two `TextView`s between
+  `week_range` and the distance row, styled like `week_count`. Check that they still fit
+  the smallest 2×2 size on the Pixel; the 58sp distance may need to shrink a little.
+- Data: `LocaleWidgets.week()` gets distance and count from
+  `WorkoutStore.distanceBetween(from, to)`. Extend it, or add a sibling query, to return
+  the week's total **moving time** too. Then average speed = distance ÷ moving time, and
+  average split = moving time ÷ distance × 1 km (or 1 mi): the distance-weighted average of
+  the week's splits, the same basis Insights uses for pace.
+- Include a workout being recorded now (as distance already does), using its `elapsedMs`
+  or moving time from the live status.
+- Decide on mixed activities: the week can mix walks, runs and rides, where one combined
+  pace means little. Options: all activities together (simplest, matches the distance
+  figure), or the most frequent activity only, labelled (e.g. `Run 5:28 /km`). Ask before
+  building.
+- Update the widget's content description so TalkBack reads the new values, and add a
+  unit test for the averaging, beside the existing widget tests if any.

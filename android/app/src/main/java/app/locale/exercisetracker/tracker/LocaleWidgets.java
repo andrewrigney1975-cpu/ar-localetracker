@@ -171,21 +171,27 @@ public final class LocaleWidgets {
         return c.getTimeInMillis();
     }
 
-    /** This week's distance, Sunday to Saturday, including a workout being recorded now. */
+    /**
+     * This week's distance, Sunday to Saturday, with its average split and speed, including
+     * a workout being recorded now (counted by its elapsed time).
+     */
     private static RemoteViews week(Context ctx, JSObject live) {
         long from = weekStart(System.currentTimeMillis());
         long to = addDays(from, 7);
         double meters = 0;
+        double movingS = 0;
         int count = 0;
         try {
             double[] r = WorkoutStore.get(ctx).distanceBetween(from, to);
             meters = r[0];
             count = (int) r[1];
+            movingS = r[2];
         } catch (Exception e) {
             // Store unavailable: show zero rather than fail the widget.
         }
         if (live != null && live.optLong("startedAt", 0) >= from) {
             meters += live.optDouble("distance", 0);
+            movingS += live.optLong("elapsedMs", 0) / 1000.0;
             count++;
         }
         boolean imperial = "imperial".equals(PhoneSettings.units(ctx));
@@ -196,8 +202,14 @@ public final class LocaleWidgets {
         SimpleDateFormat day = new SimpleDateFormat("d MMM", Locale.getDefault());
         v.setTextViewText(R.id.week_range, day.format(from) + " – " + day.format(addDays(from, 6)));
         v.setTextViewText(R.id.week_count, count == 0 ? "No workouts yet" : count == 1 ? "1 workout" : count + " workouts");
+        String split = WeekStats.split(meters, movingS, imperial);
+        String speed = WeekStats.speed(meters, movingS, imperial);
+        v.setTextViewText(R.id.week_split, split != null ? split : "");
+        v.setTextViewText(R.id.week_speed, speed != null ? speed : "");
+        v.setViewVisibility(R.id.week_split, split != null ? View.VISIBLE : View.GONE);
+        v.setViewVisibility(R.id.week_speed, speed != null ? View.VISIBLE : View.GONE);
         v.setContentDescription(R.id.widget_root, String.format(Locale.US, "This week %.1f %s, %d workouts",
-            value, imperial ? "miles" : "kilometres", count));
+            value, imperial ? "miles" : "kilometres", count) + (split != null ? ", " + split + ", " + speed : ""));
         v.setOnClickPendingIntent(R.id.widget_root, openApp(ctx));
         scheduleNewWeek(ctx, to);
         return v;
