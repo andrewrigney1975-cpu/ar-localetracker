@@ -4,7 +4,8 @@ import { EXPORT_FORMATS, renderExport } from '../export/index.js';
 import { navigate } from '../router.js';
 import { workoutShareText, smsUri } from '../export/text.js';
 import { changeActivity } from '../services/workoutService.js';
-import { COURSE_MIME, courseFilename, initialsOf, toCourseGPX } from '../course/courseFile.js';
+import { COURSE_MIME, courseFilename, initialsOf, parseCourse, toCourseGPX } from '../course/courseFile.js';
+import { courseLinkURL } from '../course/courseLink.js';
 import { openSms, shareFile, shareText } from '../services/share.js';
 import { settings, updateSettings } from '../settings.js';
 import { estimateCalories, loadLabel, profileComplete, trimp, ZONES, zoneSeconds } from '../stats/physio.js';
@@ -203,9 +204,10 @@ export async function mount(root, params, query, ctx) {
           <button class="btn ghost" data-v="text">${icons.share}Other apps</button>
         </div>
         <div class="section-title">Share course</div>
-        <p class="share-course-note">The route and its altitude, for someone to explore in Locale's View or another map app. No times, speeds or heart rate.</p>
+        <p class="share-course-note">The route and its altitude, for someone to explore in Locale's View, in a web browser or in another map app. No times, speeds or heart rate.</p>
         <label class="share-hide"><span>Hide start and finish<small>Leaves out the first and last 200 m</small></span><input type="checkbox" class="switch" data-hide /></label>
         <button class="btn ghost course-btn" data-v="course">${icons.route}<span data-ref="course-name"></span></button>
+        <button class="btn ghost course-btn" data-v="course-link">${icons.share}<span>Share a link to view in a browser</span></button>
         <div class="section-title">Export file</div>
         <div class="option-list"></div>
         <div class="actions"><button class="btn ghost" data-v="cancel">Cancel</button></div>`;
@@ -230,6 +232,10 @@ export async function mount(root, params, query, ctx) {
     }
     if (fmt === 'course') {
       await shareCourse(w, track, { hideEnds });
+      return;
+    }
+    if (fmt === 'course-link') {
+      await shareCourseLink(w, track, { hideEnds });
       return;
     }
     if (fmt === 'text') {
@@ -288,6 +294,24 @@ async function shareCourse(w, track, { hideEnds }) {
   try {
     const out = toCourseGPX(w, track, { initials, hideEnds });
     await shareFile({ filename: courseFilename(initials, w.name), content: out.text, mime: COURSE_MIME, title: w.name });
+  } catch (e) {
+    console.error(e);
+    toast(`Sharing failed: ${e?.message ?? e}`);
+  }
+}
+
+/** Share the course as a Locale Viewer link, which opens in any browser. */
+async function shareCourseLink(w, track, { hideEnds }) {
+  const name = settings().profile.name || (await askName());
+  if (!name) return;
+  try {
+    const course = parseCourse(toCourseGPX(w, track, { initials: initialsOf(name), hideEnds }).text);
+    const url = await courseLinkURL(course);
+    if (!url) {
+      toast('This course is too detailed for a link. Share the .gpx file instead.', 4000);
+      return;
+    }
+    if ((await shareText({ text: `${w.name}: ${url}`, title: w.name })) === 'copied') toast('Course link copied');
   } catch (e) {
     console.error(e);
     toast(`Sharing failed: ${e?.message ?? e}`);

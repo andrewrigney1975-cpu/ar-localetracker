@@ -95,6 +95,66 @@ function thin(track, from, to, tolerance) {
 }
 
 /**
+ * The points of a track to share: route and altitude, thinned (≤ 5,000 points), with the
+ * headline numbers measured on exactly those points so they match what the recipient sees.
+ * @returns {{segments:number[][][], points:number, distance:number, gain:number, loss:number}}
+ *   segments are [[lat, lon, alt], …] per segment
+ */
+export function courseSegments(track, { hideEnds = false } = {}) {
+  const ranges = sharedRanges(track, { hideEnds });
+  let tolerance = THIN_TOLERANCE_M;
+  let kept;
+  for (;;) {
+    kept = ranges.map(([a, b]) => thin(track, a, b, tolerance));
+    if (kept.reduce((s, x) => s + x.length, 0) <= MAX_SHARED_POINTS || tolerance > 500) break;
+    tolerance *= 1.6;
+  }
+  const points = kept.reduce((s, x) => s + x.length, 0);
+  let distance = 0;
+  let gain = 0;
+  let loss = 0;
+  for (const idx of kept) {
+    for (let k = 1; k < idx.length; k++) distance += haversine(track.lat[idx[k - 1]], track.lon[idx[k - 1]], track.lat[idx[k]], track.lon[idx[k]]);
+    const gl = verticalGainLoss(Float64Array.from(idx, (i) => track.alt[i]), 3);
+    gain += gl.gain;
+    loss += gl.loss;
+  }
+  const segments = kept.map((idx) => idx.map((i) => [track.lat[i], track.lon[i], track.alt[i]]));
+  return { segments, points, distance, gain, loss };
+}
+
+/**
+ * Course GPX text from points ([[lat, lon, alt], …] per segment). `activity` may be null
+ * (a route from another app), and is then left out.
+ */
+export function writeCourseGPX({ name, initials = '', activity = null, distance, gain, loss, trimmed = false }, segments) {
+  name = name || 'Course';
+  const act = activity ? activityProfile(activity).id : null;
+  const lines = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<gpx version="1.1" creator="Locale Exercise Tracker" xmlns="http://www.topografix.com/GPX/1/1" xmlns:locale="${COURSE_NS}">`,
+    '  <metadata>',
+    `    <name>${esc(name)}</name>`,
+    ...(initials ? [`    <author><name>${esc(initials)}</name></author>`] : []),
+    `    <extensions><locale:course v="1"${act ? ` activity="${act}"` : ''} distance="${distance.toFixed(1)}" gain="${Math.round(gain)}" loss="${Math.round(loss)}"${trimmed ? ' trimmed="1"' : ''}/></extensions>`,
+    '  </metadata>',
+    '  <trk>',
+    `    <name>${esc(name)}</name>`,
+    ...(act ? [`    <type>${act}</type>`] : []),
+  ];
+  for (const pts of segments) {
+    lines.push('    <trkseg>');
+    for (const [lat, lon, alt] of pts) {
+      const ele = Number.isFinite(alt) ? `<ele>${alt.toFixed(1)}</ele>` : '';
+      lines.push(`      <trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}">${ele}</trkpt>`);
+    }
+    lines.push('    </trkseg>');
+  }
+  lines.push('  </trk>', '</gpx>');
+  return lines.join('\n') + '\n';
+}
+
+/**
  * The course GPX for a workout: route and altitude only.
  * @param {object} workout  stored workout record (name, activity)
  * @param {object} track    processed track
@@ -102,49 +162,10 @@ function thin(track, from, to, tolerance) {
  * @returns {{text:string, points:number, distance:number, gain:number, loss:number}}
  */
 export function toCourseGPX(workout, track, { initials = '', hideEnds = false } = {}) {
-  const ranges = sharedRanges(track, { hideEnds });
-  let tolerance = THIN_TOLERANCE_M;
-  let segments;
-  for (;;) {
-    segments = ranges.map(([a, b]) => thin(track, a, b, tolerance));
-    if (segments.reduce((s, x) => s + x.length, 0) <= MAX_SHARED_POINTS || tolerance > 500) break;
-    tolerance *= 1.6;
-  }
-  const points = segments.reduce((s, x) => s + x.length, 0);
-  // Headline numbers from exactly what is written, so they match what the recipient sees.
-  let distance = 0;
-  let gain = 0;
-  let loss = 0;
-  for (const idx of segments) {
-    for (let k = 1; k < idx.length; k++) distance += haversine(track.lat[idx[k - 1]], track.lon[idx[k - 1]], track.lat[idx[k]], track.lon[idx[k]]);
-    const gl = verticalGainLoss(Float64Array.from(idx, (i) => track.alt[i]), 3);
-    gain += gl.gain;
-    loss += gl.loss;
-  }
-  const name = workout.name || 'Course';
-  const act = activityProfile(workout.activity).id;
-  const lines = [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    `<gpx version="1.1" creator="Locale Exercise Tracker" xmlns="http://www.topografix.com/GPX/1/1" xmlns:locale="${COURSE_NS}">`,
-    '  <metadata>',
-    `    <name>${esc(name)}</name>`,
-    ...(initials ? [`    <author><name>${esc(initials)}</name></author>`] : []),
-    `    <extensions><locale:course v="1" activity="${act}" distance="${distance.toFixed(1)}" gain="${Math.round(gain)}" loss="${Math.round(loss)}"${hideEnds ? ' trimmed="1"' : ''}/></extensions>`,
-    '  </metadata>',
-    '  <trk>',
-    `    <name>${esc(name)}</name>`,
-    `    <type>${act}</type>`,
-  ];
-  for (const idx of segments) {
-    lines.push('    <trkseg>');
-    for (const i of idx) {
-      const ele = Number.isFinite(track.alt[i]) ? `<ele>${track.alt[i].toFixed(1)}</ele>` : '';
-      lines.push(`      <trkpt lat="${track.lat[i].toFixed(6)}" lon="${track.lon[i].toFixed(6)}">${ele}</trkpt>`);
-    }
-    lines.push('    </trkseg>');
-  }
-  lines.push('  </trk>', '</gpx>');
-  return { text: lines.join('\n') + '\n', points, distance, gain, loss };
+  const { segments, points, distance, gain, loss } = courseSegments(track, { hideEnds });
+  const activity = activityProfile(workout.activity).id;
+  const text = writeCourseGPX({ name: workout.name, initials, activity, distance, gain, loss, trimmed: hideEnds }, segments);
+  return { text, points, distance, gain, loss };
 }
 
 // ---- Reading -----------------------------------------------------------------------------------

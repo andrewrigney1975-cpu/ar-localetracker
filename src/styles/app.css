@@ -2505,6 +2505,10 @@ a.stat.pb:active {
   justify-content: flex-start;
 }
 
+.course-btn + .course-btn {
+  margin-top: 8px;
+}
+
 .course-btn span {
   min-width: 0;
   overflow: hidden;
