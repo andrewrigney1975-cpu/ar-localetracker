@@ -47,14 +47,17 @@ sensors.
   <img src="docs/screenshots/voice-live.png" width="250" alt="Live workout screen showing the last spoken announcement as a caption under the controls">
 </p>
 <p align="center">
-  <img src="docs/screenshots/insights.png" width="250" alt="Insights: date range, grouping and activity filters, with totals for workouts, distance, activity time, speed, pace, heart rate, cardio load and calories">
+  <img src="docs/screenshots/insights.png" width="250" alt="Insights: date range, grouping, activity and routine filters, with totals for workouts, distance, activity time, speed, pace, heart rate, cardio load and calories">
   &nbsp;
   <img src="docs/screenshots/insights-split.png" width="250" alt="Insights: monthly distance stacked by activity, with a tooltip for July and a table broken down by activity">
   &nbsp;
   <img src="docs/screenshots/insights-weekly.png" width="250" alt="Insights: weekly cardio load for the last 3 months stacked by activity, with a tooltip for one week">
 </p>
 <p align="center">
-  <img src="docs/screenshots/view-share.png" width="250" alt="Share sheet: Share course section with a Hide start and finish switch and a Share AR City2Surf 2026.gpx button">
+  <img src="docs/screenshots/insights-bests.png" width="250" alt="Insights: personal bests per activity, with best average pace, best kilometre split, fastest speed and longest workout, each with its date">
+</p>
+<p align="center">
+  <img src="docs/screenshots/view-share.png" width="250" alt="Share sheet: Share course section with a Hide start and finish switch, a Share AR City2Surf 2026.gpx button and Share a link to view in a browser">
   &nbsp;
   <img src="docs/screenshots/view-list.png" width="250" alt="View: Open a course file, and the courses opened before with who shared them, distance and climb">
 </p>
@@ -62,6 +65,9 @@ sensors.
   <img src="docs/screenshots/view-map.png" width="250" alt="A shared course on the map in one colour, with a readout of distance, altitude, grade and climb so far, and the elevation profile">
   &nbsp;
   <img src="docs/screenshots/view-3d.png" width="250" alt="A shared course in 3D over satellite imagery, drawn in one colour">
+</p>
+<p align="center">
+  <img src="docs/screenshots/viewer.jpeg" width="760" alt="Locale Viewer in a desktop browser: the City2Surf course from a link, full width on the map with its elevation profile">
 </p>
 <p align="center">
   <img src="docs/screenshots/watch-home.png" width="200" alt="Pixel Watch: Locale start screen with Start Run and Start Walk">
@@ -74,7 +80,8 @@ City2Surf (Hyde Park to Bondi via Heartbreak Hill at 6:18/km, with simulated hea
 It is generated from the course map and is not a real recording. The voice screenshots
 come from the browser simulator. The Insights screenshots use a year of generated
 workouts in the browser build. The View screenshots show the sample shared as a course,
-and a generated walk shared with its start and finish hidden. The watch screenshots
+and a generated walk shared with its start and finish hidden; the Locale Viewer screenshot
+is the same course opened from a link in desktop Chrome. The watch screenshots
 are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</sub>
 
 ## Features
@@ -457,7 +464,7 @@ docs/        screenshots
 ```
 
 See [PLAN.md](PLAN.md) for the design and decisions, and [BACKLOG.md](BACKLOG.md) for
-the feature requests (all done so far).
+the feature requests.
 
 ## Credits
 
