@@ -24,6 +24,9 @@ data class PhoneStatus(
     val units: String = "metric",
     /** Goal distance for this workout (manual or predicted), when set; null otherwise. */
     val goalM: Double? = null,
+    /** Max and resting heart rate from the phone's profile, for zone colours; null without one. */
+    val hrMax: Int? = null,
+    val hrRest: Int = 60,
 ) {
     val active: Boolean get() = state == "recording" || state == "paused" || state == "autopaused"
 
@@ -69,6 +72,8 @@ object PhoneLink {
             distance = 7470.0,
             speed = 2.56,
             goalM = 10000.0,
+            hrMax = 185,
+            hrRest = 55,
         )
         heartRate.value = 158
         phoneReachable.value = true
@@ -131,6 +136,8 @@ object PhoneLink {
             speed = if (json.has("speed")) json.optDouble("speed") else null,
             units = json.optString("units", "metric"),
             goalM = if (json.has("goalM")) json.optDouble("goalM") else null,
+            hrMax = if (json.has("hrMax")) json.optInt("hrMax") else null,
+            hrRest = json.optInt("hrRest", 60),
         )
         val prev = status.value
         status.value = next

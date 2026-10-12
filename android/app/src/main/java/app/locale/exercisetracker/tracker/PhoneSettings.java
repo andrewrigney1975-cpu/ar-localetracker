@@ -68,6 +68,31 @@ final class PhoneSettings {
         }
     }
 
+    /**
+     * Adds the heart-rate range zones are based on (src/stats/physio.js), so the watch can colour
+     * heart rate by zone: hrMax (the profile's, else 208 - 0.7 x age) and hrRest (default 60).
+     * Without a max or a birth year, nothing is added.
+     */
+    static void putHeartRange(Context ctx, JSONObject o) {
+        JSONObject p = load(ctx).optJSONObject("profile");
+        if (p == null) return;
+        int max = p.optInt("maxHr", 0);
+        if (max <= 0) {
+            int year = p.optInt("birthYear", 0);
+            if (year <= 0) return;
+            int age = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) - year;
+            max = (int) Math.round(208 - 0.7 * age);
+        }
+        int rest = p.optInt("restingHr", 0);
+        if (rest <= 0) rest = 60;
+        if (max <= rest) return;
+        try {
+            o.put("hrMax", max);
+            o.put("hrRest", rest);
+        } catch (Exception ignored) {
+        }
+    }
+
     static boolean autoPause(Context ctx, String activity) {
         JSONObject ap = load(ctx).optJSONObject("autoPause");
         if (ap != null && ap.has(activity)) return ap.optBoolean(activity);

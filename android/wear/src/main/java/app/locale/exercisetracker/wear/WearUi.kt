@@ -54,6 +54,23 @@ private val ACCENT = mapOf(
 private val STOP_RED = Color(0xFFD93B3B)
 private val HEART = Color(0xFFFF5A6E)
 
+/** Heart-rate zone colours and lower bounds (% of heart-rate reserve), as ZONES in src/stats/physio.js. */
+private val HR_ZONES = listOf(
+    0.9 to Color(0xFFEF4444), // Z5 Max
+    0.8 to Color(0xFFF59E0B), // Z4 Threshold
+    0.7 to Color(0xFF22C55E), // Z3 Aerobic
+    0.6 to Color(0xFF3B82F6), // Z2 Fat burn
+)
+private val HR_EASY = Color(0xFF94A3B8) // Z1 Easy, and below it
+
+/** Colour for a heart rate by zone, or the plain heart colour when the phone has no max heart rate. */
+private fun heartColor(hr: Int?, status: PhoneStatus): Color {
+    val max = status.hrMax ?: return HEART
+    if (hr == null || max <= status.hrRest) return HEART
+    val reserve = (hr - status.hrRest).toDouble() / (max - status.hrRest)
+    return HR_ZONES.firstOrNull { reserve >= it.first }?.second ?: HR_EASY
+}
+
 @Composable
 fun LocaleWearApp(
     onStart: (String) -> Unit,
@@ -189,7 +206,7 @@ private fun ActiveScreen(
             Spacer(Modifier.height(2.dp))
             Text(
                 if (hr != null) "♥ $hr bpm" else "♥ --",
-                color = HEART,
+                color = heartColor(hr, status),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
             )

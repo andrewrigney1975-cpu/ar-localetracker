@@ -749,6 +749,7 @@ public class TrackingService extends Service {
             if (now - lastHrAt < HR_FRESH_MS) put(o, "hr", lastHr);
             if (goalM > 0 && !goalOffRoute) put(o, "goalM", goalM);
         }
+        PhoneSettings.putHeartRange(this, o);
         WearSync.send(this, WearSync.PATH_STATUS, o);
     }
 
