@@ -140,6 +140,7 @@ export async function mount(root) {
                 ['2x1', '2 × 1', 'Run and walk. One tap starts recording.'],
                 ['2x2', '2 × 2', 'Walk, run, cycle and ski. One tap starts recording.'],
                 ['week', '2 × 2 this week', 'Distance of your workouts this week, Sunday to Saturday.'],
+                ['week-chart', '4 × 2 this week', "This week's distance, with a chart of distance per day."],
               ]
                 .map(([size, label, desc]) => `<div class="setting"><div class="text">${label}<small>${desc}</small></div>
                   <button class="btn ghost" data-widget="${size}">Add</button></div>`)

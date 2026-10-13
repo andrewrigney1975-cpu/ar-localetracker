@@ -15,6 +15,9 @@
     <string name="widget_week_title">This week</string>
     <string name="widget_week_placeholder">0.0</string>
     <string name="widget_week_unit_km">km</string>
+    <string name="widget_week_chart_label">Locale: this week, per day</string>
+    <string name="widget_week_chart_description">This week\'s distance, with a chart of distance per day</string>
+    <string name="widget_week_chart_title_km">km per day</string>
     <string name="activity_walk">Walk</string>
     <string name="activity_run">Run</string>
     <string name="activity_cycle">Cycle</string>

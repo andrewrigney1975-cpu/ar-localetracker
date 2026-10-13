@@ -10,6 +10,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
+import android.graphics.Typeface;
+import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.TypedValue;
 import android.view.View;
@@ -25,10 +32,14 @@ import java.util.Locale;
 /**
  * Home-screen widgets: 1×1 (last-used activity), 2×1 (run, walk) and 2×2 (all four).
  * Idle widgets start a workout with one tap; while recording they show elapsed time and
- * distance and open the app. The 2×2 week widget shows this week's distance instead.
+ * distance and open the app. The 2×2 week widget shows this week's distance instead, and the
+ * 4×2 adds a chart of distance per day.
  */
 public final class LocaleWidgets {
-    enum Size { SMALL, WIDE, LARGE, WEEK }
+    enum Size { SMALL, WIDE, LARGE, WEEK, WEEK_CHART }
+
+    /** The day chart stacks bottom to top in this order, as STACK_ORDER in src/views/insights.js. */
+    private static final String[] STACK_ORDER = { "cycle", "run", "walk", "ski" };
 
     private static final String PREFS = "locale_widgets";
     private static final String KEY_LAST = "lastActivity";
@@ -43,8 +54,7 @@ public final class LocaleWidgets {
 
         @Override
         public void onUpdate(Context ctx, AppWidgetManager manager, int[] ids) {
-            RemoteViews views = build(ctx, size());
-            for (int id : ids) manager.updateAppWidget(id, views);
+            for (int id : ids) manager.updateAppWidget(id, build(ctx, size(), manager.getAppWidgetOptions(id)));
         }
     }
 
@@ -67,6 +77,7 @@ public final class LocaleWidgets {
         update(app, manager, Widget2x1Provider.class, Size.WIDE);
         update(app, manager, Widget2x2Provider.class, Size.LARGE);
         update(app, manager, WidgetWeekProvider.class, Size.WEEK);
+        update(app, manager, WidgetWeekChartProvider.class, Size.WEEK_CHART);
     }
 
     static Class<? extends Provider> providerFor(String size) {
@@ -77,6 +88,8 @@ public final class LocaleWidgets {
                 return Widget2x1Provider.class;
             case "week":
                 return WidgetWeekProvider.class;
+            case "week-chart":
+                return WidgetWeekChartProvider.class;
             default:
                 return Widget2x2Provider.class;
         }
@@ -85,8 +98,7 @@ public final class LocaleWidgets {
     private static void update(Context ctx, AppWidgetManager manager, Class<?> provider, Size size) {
         int[] ids = manager.getAppWidgetIds(new ComponentName(ctx, provider));
         if (ids.length == 0) return;
-        RemoteViews views = build(ctx, size);
-        for (int id : ids) manager.updateAppWidget(id, views);
+        for (int id : ids) manager.updateAppWidget(id, build(ctx, size, manager.getAppWidgetOptions(id)));
     }
 
     private static SharedPreferences prefs(Context ctx) {
@@ -95,11 +107,12 @@ public final class LocaleWidgets {
 
     // ---- Rendering --------------------------------------------------------------------------
 
-    static RemoteViews build(Context ctx, Size size) {
+    /** @param options the widget's AppWidgetManager options: its size, for the 4×2's chart. */
+    static RemoteViews build(Context ctx, Size size, Bundle options) {
         TrackingService svc = TrackingService.get();
         JSObject s = svc != null ? svc.snapshot() : null;
         String state = s != null ? s.getString("state", "idle") : "idle";
-        if (size == Size.WEEK) return week(ctx, "idle".equals(state) ? null : s);
+        if (size == Size.WEEK || size == Size.WEEK_CHART) return week(ctx, "idle".equals(state) ? null : s, size, options);
         if (!"idle".equals(state)) return active(ctx, size, s, state);
         switch (size) {
             case SMALL: {
@@ -175,7 +188,7 @@ public final class LocaleWidgets {
      * This week's distance, Sunday to Saturday, with its average split and speed, including
      * a workout being recorded now (counted by its elapsed time).
      */
-    private static RemoteViews week(Context ctx, JSObject live) {
+    private static RemoteViews week(Context ctx, JSObject live, Size size, Bundle options) {
         long from = weekStart(System.currentTimeMillis());
         long to = addDays(from, 7);
         double meters = 0;
@@ -196,7 +209,11 @@ public final class LocaleWidgets {
         }
         boolean imperial = "imperial".equals(PhoneSettings.units(ctx));
         double value = imperial ? meters / 1609.344 : meters / 1000;
-        RemoteViews v = new RemoteViews(ctx.getPackageName(), R.layout.widget_week);
+        RemoteViews v = new RemoteViews(ctx.getPackageName(), size == Size.WEEK_CHART ? R.layout.widget_week_chart : R.layout.widget_week);
+        if (size == Size.WEEK_CHART) {
+            v.setTextViewText(R.id.chart_title, imperial ? "mi per day" : "km per day");
+            v.setImageViewBitmap(R.id.chart, dayChart(ctx, from, live, imperial, options));
+        }
         v.setTextViewText(R.id.week_distance, String.format(Locale.US, value < 100 ? "%.1f" : "%.0f", value));
         v.setTextViewText(R.id.week_unit, imperial ? "mi" : "km");
         SimpleDateFormat day = new SimpleDateFormat("d MMM", Locale.getDefault());
@@ -213,6 +230,110 @@ public final class LocaleWidgets {
         v.setOnClickPendingIntent(R.id.widget_root, openApp(ctx));
         scheduleNewWeek(ctx, to);
         return v;
+    }
+
+    /**
+     * This week's distance per day, Sunday to Saturday, stacked by activity in the activity
+     * colours as in Insights' distance chart, with each day's initial under its bar (today's bold).
+     * Drawn at the space the 4×2 layout leaves it, so it isn't stretched.
+     */
+    private static Bitmap dayChart(Context ctx, long from, JSObject live, boolean imperial, Bundle options) {
+        long[] dayStarts = new long[8];
+        for (int i = 0; i <= 7; i++) dayStarts[i] = addDays(from, i);
+        double[][] byDay = new double[7][STACK_ORDER.length];
+        try {
+            byDay = WorkoutStore.get(ctx).distanceByDay(dayStarts, STACK_ORDER);
+        } catch (Exception e) {
+            // Store unavailable: an empty chart rather than a failed widget.
+        }
+        if (live != null) {
+            int d = WorkoutStore.dayOf(dayStarts, live.optLong("startedAt", 0));
+            int a = java.util.Arrays.asList(STACK_ORDER).indexOf(live.getString("activity", ""));
+            if (d >= 0 && a >= 0) byDay[d][a] += live.optDouble("distance", 0);
+        }
+        double unit = imperial ? 1609.344 : 1000;
+        double max = 0;
+        for (double[] day : byDay) {
+            double sum = 0;
+            for (double m : day) sum += m / unit;
+            max = Math.max(max, sum);
+        }
+
+        // The right half of the widget, less the 16dp padding, the 12dp gap and the title.
+        float dp = ctx.getResources().getDisplayMetrics().density;
+        int wDp = options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) : 0;
+        int hDp = options != null ? options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0) : 0;
+        if (wDp <= 0) wDp = 300;
+        if (hDp <= 0) hDp = 170;
+        int w = Math.round(Math.max(80, (wDp - 32 - 12) / 2f) * dp);
+        int h = Math.round(Math.max(50, hDp - 32 - 22) * dp);
+        Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bmp);
+
+        int muted = ctx.getColor(R.color.widget_text_muted);
+        Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
+        text.setTextSize(11 * dp);
+        text.setColor(muted);
+        Paint grid = new Paint(Paint.ANTI_ALIAS_FLAG);
+        grid.setColor(muted);
+        grid.setAlpha(70);
+        grid.setStrokeWidth(Math.max(1, dp));
+        Paint bar = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        double top = niceTop(max);
+        String topLabel = top == Math.floor(top) ? String.format(Locale.US, "%.0f", top) : String.format(Locale.US, "%.1f", top);
+        float plotTop = 6 * dp;
+        float plotBottom = h - 16 * dp; // day initials below
+        float plotRight = w - text.measureText(topLabel) - 4 * dp; // scale label on the right
+        c.drawLine(0, plotTop, plotRight, plotTop, grid);
+        c.drawLine(0, (plotTop + plotBottom) / 2, plotRight, (plotTop + plotBottom) / 2, grid);
+        c.drawLine(0, plotBottom, plotRight, plotBottom, grid);
+        c.drawText(topLabel, plotRight + 4 * dp, plotTop + 4 * dp, text);
+
+        float slot = plotRight / 7;
+        float barW = Math.min(16 * dp, slot * 0.6f);
+        float radius = 3 * dp;
+        int today = WorkoutStore.dayOf(dayStarts, System.currentTimeMillis());
+        // The first letter of the short name: "EEEEE" gives "Su." or "M." in some locales.
+        SimpleDateFormat dayName = new SimpleDateFormat("EEE", Locale.getDefault());
+        text.setTextAlign(Paint.Align.CENTER);
+        for (int d = 0; d < 7; d++) {
+            float cx = slot * (d + 0.5f);
+            int last = -1;
+            for (int a = 0; a < STACK_ORDER.length; a++) if (byDay[d][a] > 0) last = a;
+            double acc = 0;
+            for (int a = 0; a < STACK_ORDER.length; a++) {
+                double v = byDay[d][a] / unit;
+                if (v <= 0) continue;
+                float yBase = (float) (plotBottom - (plotBottom - plotTop) * acc / top);
+                float yTop = (float) (plotBottom - (plotBottom - plotTop) * (acc + v) / top);
+                if (acc > 0) yBase -= 2 * dp; // a 2dp gap between stacked segments
+                acc += v;
+                if (yBase - yTop < 0.5f) continue;
+                bar.setColor(accent(STACK_ORDER[a]));
+                c.drawPath(roundTop(cx - barW / 2, yTop, barW, yBase - yTop, a == last ? radius : 0), bar);
+            }
+            text.setTypeface(d == today ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+            text.setColor(d == today ? ctx.getColor(R.color.widget_text) : muted);
+            c.drawText(dayName.format(dayStarts[d]).substring(0, 1).toUpperCase(Locale.getDefault()), cx, h - 3 * dp, text);
+        }
+        return bmp;
+    }
+
+    /** A bar with rounded top corners (the data end) and a square base. */
+    private static Path roundTop(float x, float y, float w, float h, float r) {
+        r = Math.min(r, Math.min(w / 2, h));
+        Path p = new Path();
+        p.addRoundRect(new RectF(x, y, x + w, y + h), new float[] { r, r, r, r, 0, 0, 0, 0 }, Path.Direction.CW);
+        return p;
+    }
+
+    /** The smallest 1, 2 or 5 × 10^n at or above {@code max}, for a tidy scale (1 when empty). */
+    static double niceTop(double max) {
+        if (!(max > 0)) return 1;
+        double p = Math.pow(10, Math.floor(Math.log10(max)));
+        for (double m : new double[] { 1, 2, 5 }) if (m * p >= max - 1e-9) return m * p;
+        return 10 * p;
     }
 
     /** Refresh the week widget when the next week starts (inexact: may land a little late). */
