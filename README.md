@@ -109,6 +109,11 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 
   One tap starts recording, even with the app closed. While recording, the widget shows
   the activity, a running timer and distance. Add one from Settings → Home-screen widgets.
+
+  Two more show this week (Sunday to Saturday) and open the app when tapped:
+  - **2×2 this week:** distance, workout count, average split and speed
+  - **4×2 this week:** the same, with a chart of distance per day stacked by activity,
+    as in Insights
 - **Live screen:**
   - elapsed time
   - distance
@@ -456,7 +461,7 @@ src/
 android/app/src/main/java/app/locale/exercisetracker/tracker/
   LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
   WearListenerService  WearSync          (watch link)
-  LocaleWidgets  Widget1x1/2x1/2x2Provider  (home-screen widgets)
+  LocaleWidgets  Widget1x1/2x1/2x2/Week/WeekChartProvider  (home-screen widgets)
   VoiceCoach  Speaker                        (voice announcements, text-to-speech)
   RoutineMatcher  RouteGuard                 (auto goals from learned routines)
 android/app/src/main/java/app/locale/exercisetracker/store/

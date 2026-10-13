@@ -221,6 +221,32 @@ public final class WorkoutStore extends SQLiteOpenHelper {
         return new double[] { meters, count, moving };
     }
 
+    /**
+     * Distance (m) per day and activity, {@code [day][activity]}, not counting the samples.
+     * Day i runs from {@code dayStarts[i]} to {@code dayStarts[i + 1]}; the last entry is the end.
+     */
+    public double[][] distanceByDay(long[] dayStarts, String[] activities) {
+        int days = dayStarts.length - 1;
+        double[][] out = new double[days][activities.length];
+        java.util.List<String> acts = java.util.Arrays.asList(activities);
+        try (Cursor c = getReadableDatabase().rawQuery(
+            "SELECT activity, started_at, distance_m FROM workouts WHERE started_at >= ? AND started_at < ? AND id NOT LIKE 'sample-%'",
+            new String[] { Long.toString(dayStarts[0]), Long.toString(dayStarts[days]) })) {
+            while (c.moveToNext()) {
+                int a = acts.indexOf(c.getString(0));
+                int d = dayOf(dayStarts, c.getLong(1));
+                if (a >= 0 && d >= 0) out[d][a] += c.getDouble(2);
+            }
+        }
+        return out;
+    }
+
+    /** Index of the day (as in distanceByDay) containing {@code t}, or -1. */
+    public static int dayOf(long[] dayStarts, long t) {
+        for (int i = 0; i < dayStarts.length - 1; i++) if (t >= dayStarts[i] && t < dayStarts[i + 1]) return i;
+        return -1;
+    }
+
     public boolean has(String id) {
         try (Cursor c = getReadableDatabase().rawQuery("SELECT 1 FROM workouts WHERE id = ?", new String[] { id })) {
             return c.moveToFirst();

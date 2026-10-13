@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 4x2: this week's stats (as the 2x2) on the left, distance per day on the right. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:clipToOutline="true"
+    android:orientation="horizontal"
+    android:padding="16dp">
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1">
+        <include layout="@layout/widget_week_stats" />
+    </FrameLayout>
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/chart_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:text="@string/widget_week_chart_title_km"
+            android:textColor="@color/widget_text_muted"
+            android:textSize="12sp" />
+        <!-- Drawn by LocaleWidgets.dayChart at the widget's size. -->
+        <ImageView
+            android:id="@+id/chart"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="6dp"
+            android:layout_weight="1"
+            android:importantForAccessibility="no"
+            android:scaleType="fitXY" />
+    </LinearLayout>
+</LinearLayout>

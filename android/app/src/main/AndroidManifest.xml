@@ -137,6 +137,20 @@
                 android:resource="@xml/widget_week_info" />
         </receiver>
 
+        <receiver
+            android:name=".tracker.WidgetWeekChartProvider"
+            android:exported="false"
+            android:label="@string/widget_week_chart_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_week_chart_info" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
