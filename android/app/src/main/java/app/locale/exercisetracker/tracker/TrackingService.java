@@ -611,6 +611,7 @@ public class TrackingService extends Service {
     private void applyGoal(double m, String source, String routineId, String name, double confidence, org.json.JSONArray signature) {
         synchronized (this) {
             coach.setGoal(m, distanceM);
+            applyRoutineVoice(routineId, elapsedMs());
             goalM = m;
             goalSource = source;
             goalRoutineId = routineId;
@@ -620,7 +621,9 @@ public class TrackingService extends Service {
         }
         routeGuard = "route".equals(source) && signature != null && signature.length() > 1 ? new RouteGuard(signature) : null;
         journalGoal();
-        if (coach.cfg.confirmGoal) say(VoiceCoach.goalConfirmation(m, coach.cfg.imperial, source, name), "goal-set");
+        if (speaker == null && coach.enabled()) speaker = new Speaker(this, coach.cfg.duck);
+        // A routine with goal announcements turned off doesn't say the goal either.
+        if (coach.cfg.confirmGoal && coach.cfg.goal) say(VoiceCoach.goalConfirmation(m, coach.cfg.imperial, source, name), "goal-set");
         TrackerHub.emit("goal", goalJs());
         saveSnapshot();
         updateNotification(true);
@@ -678,13 +681,24 @@ public class TrackingService extends Service {
         goalConfidence = Double.longBitsToDouble(prefs.getLong("gConfBits", 0));
         goalOffRoute = prefs.getBoolean("gOffRoute", false);
         int mask = coach.goalMask;
+        long intervals = coach.intervalsDone;
         coach.setGoal(m, 0);
+        applyRoutineVoice(goalRoutineId, 0);
         coach.goalMask = mask;
+        coach.intervalsDone = intervals;
         if (goalOffRoute) coach.pauseGoal();
         else if ("route".equals(goalSource) && goalRoutineId != null) {
             org.json.JSONArray sig = RoutineMatcher.signatureOf(PhoneSettings.routineModel(this), profile.id, goalRoutineId);
             if (sig != null && sig.length() > 1) routeGuard = new RouteGuard(sig);
         }
+    }
+
+    /** The recognised routine's own announcement settings, when the user customised them. */
+    private void applyRoutineVoice(String routineId, long elapsed) {
+        JSONObject rv = PhoneSettings.routineVoice(this, routineId);
+        if (rv == null) return;
+        coach.applyRoutine(rv.optBoolean("splits"), rv.optBoolean("time"), rv.optBoolean("goal"),
+            rv.optInt("intervalMin", 0), elapsed);
     }
 
     /** Speak, caption on the live screen, and buzz the watch with a pattern for the kind. */

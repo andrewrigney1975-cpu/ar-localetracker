@@ -52,6 +52,14 @@ final class PhoneSettings {
         return c;
     }
 
+    /** A routine's own announcement settings (Settings → Learned routines → Customise), or null. */
+    static JSONObject routineVoice(Context ctx, String routineId) {
+        if (routineId == null) return null;
+        JSONObject v = load(ctx).optJSONObject("voice");
+        JSONObject routines = v != null ? v.optJSONObject("routines") : null;
+        return routines != null ? routines.optJSONObject(routineId) : null;
+    }
+
     private static boolean flag(JSONObject v, String kind, String activity, boolean def) {
         JSONObject o = v.optJSONObject(kind);
         return o != null && o.has(activity) ? o.optBoolean(activity) : def;

@@ -9,6 +9,7 @@ import { toast } from '../ui/toast.js';
 import { App } from '@capacitor/app';
 import { INTERVAL_OPTIONS, spokenAverage, spokenDistance } from '../voice/coach.js';
 import { getRoutineModel, rebuildRoutineModel } from '../insights/model.js';
+import { displayName } from '../insights/routines.js';
 import { confirmDialog, openDialog } from '../ui/dialog.js';
 
 const GOAL_MODES = ['auto', 'set', 'off'];
@@ -45,9 +46,10 @@ function routinesHTML(model, s) {
     for (const r of (a?.routines ?? []).filter((x) => (auto && a.ready && (x.eligible || x.suppressed)) || x.user)) {
       const goal = Math.round((r.goal[imperial ? 'imperial' : 'metric'] / (imperial ? 1609.344 : 1000)) * 10) / 10;
       const hit = r.predictions ? ` · goal hit ${r.hits} of ${r.predictions}` : '';
-      rows.push(`<div class="setting" data-activity="${id}"><span class="act-label">${ACTIVITIES[id].icon}<span class="text">${escapeHtml(r.name[0].toUpperCase() + r.name.slice(1))}
-          <small>${r.user ? 'Marked by you · ' : ''}${goal} ${unit} · ${r.count} times · ${usualDays(r.weekdays)} ~${clock(r.startMin)}${hit}${r.suppressed ? ' · paused: recent goals missed' : ''}</small></span></span>
-          <span class="voice-kinds"><button class="chip" data-rename="${escapeHtml(r.id)}">Rename</button><button class="chip" data-forget="${escapeHtml(r.id)}">${r.user ? 'Remove' : 'Forget'}</button></span></div>`);
+      const custom = s.voice.routines?.[r.id] ? ' · own announcements' : '';
+      rows.push(`<div class="setting stack routine" data-activity="${id}"><span class="act-label">${ACTIVITIES[id].icon}<span class="text">${escapeHtml(r.name[0].toUpperCase() + r.name.slice(1))}
+          <small>${r.user ? 'Marked by you · ' : ''}${goal} ${unit} · ${r.count} times · ${usualDays(r.weekdays)} ~${clock(r.startMin)}${hit}${r.suppressed ? ' · paused: recent goals missed' : ''}${custom}</small></span></span>
+          <span class="voice-kinds"><button class="chip" data-rename="${escapeHtml(r.id)}">Rename</button><button class="chip" data-customise="${escapeHtml(r.id)}">Customise</button><button class="chip" data-forget="${escapeHtml(r.id)}">${r.user ? 'Remove' : 'Forget'}</button></span></div>`);
     }
   }
   const excluded = s.routines.excluded.length;
@@ -317,6 +319,51 @@ export async function mount(root) {
           await updateSettings({ routines: { ...routines, names } });
         }
         await rebuildRoutineModel();
+        render();
+      })
+    );
+    root.querySelectorAll('[data-customise]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const r = findRoutine(b.dataset.customise);
+        if (!r) return;
+        const activity = Object.keys(model.activities).find((id) => model.activities[id].routines.includes(r));
+        const v = settings().voice;
+        const own = v.routines?.[r.id];
+        // Start from the routine's own settings, else the activity's.
+        const cur = own ?? { splits: Boolean(v.splits[activity]), time: Boolean(v.time[activity]), goal: v.goalMode[activity] !== 'off', intervalMin: v.intervalMin };
+        const result = await openDialog((dlg, close) => {
+          const chip = (kind, label) => `<button class="chip" data-kind="${kind}" aria-pressed="${Boolean(cur[kind])}">${label}</button>`;
+          dlg.classList.add('routine-voice');
+          dlg.innerHTML = `
+            <h2>Announcements for ${escapeHtml(displayName(r.name))}</h2>
+            <p>Used instead of the ${ACTIVITIES[activity]?.label ?? ''} settings when Locale recognises this routine at the start.</p>
+            <div class="voice-kinds">${chip('splits', 'Splits')}${chip('time', 'Time')}${chip('goal', 'Goal')}</div>
+            <p>Time announcements every</p>
+            ${segmented('interval', INTERVAL_OPTIONS.map((m) => [m, `${m} min`]), cur.intervalMin)}
+            <div class="actions">${own ? '<button class="btn ghost" data-v="reset">Use defaults</button>' : ''}<button class="btn ghost" data-v="cancel">Cancel</button><button class="btn primary" data-v="save">Save</button></div>`;
+          const next = { ...cur };
+          dlg.querySelectorAll('[data-kind]').forEach((c) =>
+            c.addEventListener('click', () => {
+              next[c.dataset.kind] = !next[c.dataset.kind];
+              c.setAttribute('aria-pressed', String(next[c.dataset.kind]));
+            })
+          );
+          dlg.querySelectorAll('[data-seg] button').forEach((c) =>
+            c.addEventListener('click', () => {
+              next.intervalMin = Number(c.dataset.v);
+              dlg.querySelectorAll('[data-seg] button').forEach((o) => o.setAttribute('aria-pressed', String(o === c)));
+            })
+          );
+          dlg.querySelector('[data-v="reset"]')?.addEventListener('click', () => close('reset'));
+          dlg.querySelector('[data-v="cancel"]').addEventListener('click', () => close(null));
+          dlg.querySelector('[data-v="save"]').addEventListener('click', () => close(next));
+        });
+        if (result == null) return;
+        const voice = settings().voice;
+        const routines = { ...voice.routines };
+        if (result === 'reset') delete routines[r.id];
+        else routines[r.id] = { splits: result.splits, time: result.time, goal: result.goal, intervalMin: result.intervalMin };
+        await updateSettings({ voice: { ...voice, routines } });
         render();
       })
     );

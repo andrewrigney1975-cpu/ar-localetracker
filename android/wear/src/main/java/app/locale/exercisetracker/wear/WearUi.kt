@@ -74,6 +74,7 @@ private fun heartColor(hr: Int?, status: PhoneStatus): Color {
 
 @Composable
 fun LocaleWearApp(
+    ambient: Boolean,
     onStart: (String) -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -84,6 +85,11 @@ fun LocaleWearApp(
     val error by PhoneLink.error.collectAsStateWithLifecycle()
     val hr by PhoneLink.heartRate.collectAsStateWithLifecycle()
     val reachable by PhoneLink.phoneReachable.collectAsStateWithLifecycle()
+    if (ambient) {
+        // Screen "off" (all black) until the wrist is raised; nothing to burn in or drain.
+        Box(Modifier.fillMaxSize().background(Color.Black))
+        return
+    }
     MaterialTheme {
         AppScaffold {
             if (status.active) {

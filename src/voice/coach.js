@@ -33,6 +33,14 @@ export function voiceConfig(s, activity) {
   };
 }
 
+/**
+ * A routine's own announcement settings ({splits, time, goal, intervalMin}, from Settings →
+ * Learned routines → Customise), or null to keep the activity's.
+ */
+export function routineVoice(s, routineId) {
+  return (routineId && s.voice.routines?.[routineId]) || null;
+}
+
 export class VoiceCoach {
   constructor(cfg) {
     this.cfg = cfg;
@@ -55,6 +63,15 @@ export class VoiceCoach {
     this.cfg = { ...this.cfg, goal: true, goalM };
     this.goalMask = 0;
     for (let q = 1; q <= 4; q++) if (distanceM >= (goalM * q) / 4) this.goalMask |= 1 << q;
+  }
+
+  /**
+   * Switch to a recognised routine's own settings (routineVoice). Intervals already passed at
+   * the new length are not announced.
+   */
+  applyRoutine(o, elapsedMs) {
+    this.cfg = { ...this.cfg, splits: Boolean(o.splits), time: Boolean(o.time), goal: Boolean(o.goal), intervalMin: o.intervalMin > 0 ? o.intervalMin : this.cfg.intervalMin };
+    this.intervalsDone = Math.floor(elapsedMs / (this.cfg.intervalMin * 60000));
   }
 
   /** Stop goal milestones (e.g. the user left their usual route); other kinds carry on. */
