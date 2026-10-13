@@ -85,6 +85,19 @@ public class VoiceCoachTest {
     }
 
     @Test
+    public void routineSettingsReplaceTheActivitys() {
+        VoiceCoach.Config cfg = new VoiceCoach.Config();
+        cfg.splits = true;
+        cfg.autoGoal = true;
+        VoiceCoach c = new VoiceCoach(cfg);
+        c.setGoal(4000, 0);
+        c.applyRoutine(false, true, false, 5, 420000);
+        assertEquals(1, c.intervalsDone);
+        assertNull(c.onProgress(1001, 540000));
+        assertEquals("10 minutes. Distance 1.1 kilometres. Average pace 9 minutes 5 seconds per kilometre.", c.onProgress(1100, 600000));
+    }
+
+    @Test
     public void phrases() {
         assertEquals("1 hour 3 minutes 5 seconds", VoiceCoach.spokenDuration(3785000));
         assertEquals("0 seconds", VoiceCoach.spokenDuration(0));

@@ -1988,6 +1988,20 @@ main#view {
   width: 100%;
 }
 
+/* Learned routines: the Rename / Customise / Forget chips go under the name. */
+.setting.routine .voice-kinds {
+  padding-left: 32px;
+}
+
+.dialog.routine-voice .voice-kinds {
+  margin-bottom: 18px;
+}
+
+.dialog.routine-voice .segmented {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
 .num-input {
   width: 92px;
   padding: 8px 10px;

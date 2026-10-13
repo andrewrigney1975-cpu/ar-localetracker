@@ -129,7 +129,9 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - **Goal:** at 25%, 50%, 75% and 100% of a goal distance set on the start screen.
 
   Each kind is on or off per activity (Settings → Voice announcements). Music is lowered
-  or paused while Locale speaks, and nothing is said while paused.
+  or paused while Locale speaks, and nothing is said while paused. A routine can have its
+  own (Settings → Learned routines → **Customise**): splits, time, goal and the time
+  interval, used instead of the activity's once Locale recognises the routine at the start.
 - **Watch vibration** with each announcement, so you can feel it without listening:
   - split: two taps
   - time: one longer tap
@@ -157,6 +159,8 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   white on black, whatever the watch's theme; only the heart rate is coloured, by
   zone, matching the phone's zone colours (from your profile's max and resting heart rate).
   The goal ring and buttons keep the activity's colour. The workout also shows on the watch face as an ongoing activity.
+  When the watch screen times out it goes black (effectively off, even with always-on
+  display); raise or turn your wrist, or tap, to bring the workout back.
 - **Starting with the phone in your pocket** needs location set to "Allow all the time"
   (Settings → Watch). Without it, the watch asks you to tap a notification on the phone.
 - **Pull to refresh** on the Track and History screens picks up workouts recorded from the watch, a

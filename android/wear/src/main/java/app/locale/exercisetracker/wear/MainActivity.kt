@@ -6,7 +6,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.lifecycleScope
+import androidx.wear.ambient.AmbientLifecycleObserver
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -18,6 +20,21 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_DEMO = "demo"
     }
 
+    /**
+     * Always-on: when the screen times out the watch goes ambient and we draw nothing (black), so
+     * the display is effectively off; raising or turning the wrist wakes it back to the workout.
+     */
+    private val ambient = mutableStateOf(false)
+    private val ambientObserver = AmbientLifecycleObserver(this, object : AmbientLifecycleObserver.AmbientLifecycleCallback {
+        override fun onEnterAmbient(ambientDetails: AmbientLifecycleObserver.AmbientDetails) {
+            ambient.value = true
+        }
+
+        override fun onExitAmbient() {
+            ambient.value = false
+        }
+    })
+
     private var afterPermissions: (() -> Unit)? = null
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -27,9 +44,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        lifecycle.addObserver(ambientObserver)
         if (BuildConfig.DEBUG && intent?.getBooleanExtra(EXTRA_DEMO, false) == true) PhoneLink.enterDemo()
         setContent {
             LocaleWearApp(
+                ambient = ambient.value,
                 onStart = ::startWorkout,
                 onPause = { send("/locale/pause") },
                 onResume = { send("/locale/resume") },

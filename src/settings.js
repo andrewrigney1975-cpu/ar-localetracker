@@ -35,6 +35,11 @@ export const DEFAULT_SETTINGS = {
     goalM: { walk: 5000, run: 10000, cycle: 40000, ski: 20000 },
     /** Lower other audio while speaking (true) or pause it (false). */
     duck: true,
+    /**
+     * Per-routine settings that replace the activity's once the routine is recognised:
+     * {[routineId]: {splits, time, goal, intervalMin}}.
+     */
+    routines: {},
   },
   /** For calories, heart-rate zones and cardio load (weight in kg); name labels shared courses. */
   profile: { name: null, birthYear: null, sex: null, heightCm: null, weightKg: null, restingHr: null, maxHr: null },
@@ -77,6 +82,7 @@ function mergeVoice(saved = {}) {
     time: { ...d.time, ...saved.time },
     goalMode: { ...d.goalMode, ...migrated, ...saved.goalMode },
     goalM: { ...d.goalM, ...saved.goalM },
+    routines: { ...saved.routines },
   };
 }
 

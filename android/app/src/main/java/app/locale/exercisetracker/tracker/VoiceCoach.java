@@ -62,6 +62,18 @@ final class VoiceCoach {
         for (int q = 1; q <= 4; q++) if (distanceM >= (goalM * q) / 4) goalMask |= 1 << q;
     }
 
+    /**
+     * Switch to a recognised routine's own settings (PhoneSettings.routineVoice). Intervals
+     * already passed at the new length are not announced. (applyRoutine in coach.js)
+     */
+    void applyRoutine(boolean splits, boolean time, boolean goal, int intervalMin, long elapsedMs) {
+        cfg.splits = splits;
+        cfg.time = time;
+        cfg.goal = goal;
+        if (intervalMin > 0) cfg.intervalMin = intervalMin;
+        intervalsDone = elapsedMs / (cfg.intervalMin * 60000L);
+    }
+
     /** Stop goal milestones (e.g. the user left their usual route); other kinds carry on. */
     void pauseGoal() {
         goalPaused = true;

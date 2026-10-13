@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { VoiceCoach, spokenAverage, spokenDistance, spokenDuration, voiceConfig } from '../src/voice/coach.js';
+import { VoiceCoach, routineVoice, spokenAverage, spokenDistance, spokenDuration, voiceConfig } from '../src/voice/coach.js';
 import { DEFAULT_SETTINGS } from '../src/settings.js';
 
 const FIXTURE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../android/app/src/test/resources/fixtures/voice.json');
@@ -137,6 +137,30 @@ describe('voice triggers', () => {
     expect(c.enabled).toBe(false);
     expect(c.onProgress(3000, 1200000)).toBeNull();
     expect(c.splitsDone).toBe(3);
+  });
+
+  it('keeps each kind independent: time off leaves splits and the goal speaking', () => {
+    const s = structuredClone(DEFAULT_SETTINGS);
+    s.voice.time.walk = false;
+    s.voice.splits.walk = true;
+    const c = new VoiceCoach(voiceConfig(s, 'walk'));
+    expect(c.enabled).toBe(true);
+    c.setGoal(4000, 0);
+    expect(c.onProgress(1001, 600000)).toMatch(/^1 kilometre\. Split time 10 minutes\. 25 percent of your 4 kilometre goal\./);
+    expect(c.onProgress(1500, 1200000)).toBeNull(); // 20 minutes: no time announcement
+  });
+
+  it("switches to a recognised routine's own settings", () => {
+    const s = structuredClone(DEFAULT_SETTINGS);
+    s.voice.routines = { r1: { splits: false, time: true, goal: false, intervalMin: 5 } };
+    expect(routineVoice(s, 'r2')).toBeNull();
+    expect(routineVoice(s, null)).toBeNull();
+    const c = new VoiceCoach(voiceConfig(s, 'walk'));
+    c.setGoal(4000, 0);
+    c.applyRoutine(routineVoice(s, 'r1'), 420000); // recognised at 7 minutes: the 5-minute mark has passed
+    expect(c.intervalsDone).toBe(1);
+    expect(c.onProgress(1001, 540000)).toBeNull(); // no split, no goal milestone
+    expect(c.onProgress(1100, 600000)).toMatch(/^10 minutes\. Distance 1\.1 kilometres\./);
   });
 
   it('builds the config from settings', () => {

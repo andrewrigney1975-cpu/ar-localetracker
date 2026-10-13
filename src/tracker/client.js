@@ -5,7 +5,7 @@ import { activity as activityProfile } from '../activities.js';
 import { haversine } from '../geo/geo.js';
 import { HeartModel, SyntheticRoute } from './synthetic.js';
 import { settings } from '../settings.js';
-import { OFF_ROUTE_PHRASE, VoiceCoach, goalConfirmation, voiceConfig } from '../voice/coach.js';
+import { OFF_ROUTE_PHRASE, VoiceCoach, goalConfirmation, routineVoice, voiceConfig } from '../voice/coach.js';
 import { cachedRoutineModel } from '../insights/model.js';
 import { predictGoal } from '../insights/routines.js';
 import { RouteGuard } from '../insights/routeGuard.js';
@@ -126,11 +126,13 @@ function simTracker() {
     }
     if (!g) return;
     coach.setGoal(g.goalM, 0);
+    const rv = routineVoice(settings(), g.routineId);
+    if (rv) coach.applyRoutine(rv, 0);
     goal = { goalM: g.goalM, source: g.source, ...(g.name ? { name: g.name } : {}) };
     if (g.signature) guard = new RouteGuard(g.signature);
     goalLine = { type: 'goal', goalM: g.goalM, source: g.source, routineId: g.routineId ?? null, ...(g.name ? { name: g.name } : {}), confidence: g.confidence ?? 1 };
     append(st.workoutId, { ...goalLine, t: now() });
-    if (cfg.confirmGoal) speakAndShow(goalConfirmation(g.goalM, cfg.imperial, g.source, g.name));
+    if (cfg.confirmGoal && coach.cfg.goal) speakAndShow(goalConfirmation(g.goalM, cfg.imperial, g.source, g.name));
     emit('goal', goal);
   }
   function setState(next, reason) {
