@@ -25,6 +25,8 @@ final class VoiceCoach {
         boolean imperial;
         /** Lower other audio while speaking (true) or pause it (false). Not used for phrasing. */
         boolean duck = true;
+        /** Media volume to full while speaking. Not used for phrasing. */
+        boolean loud;
         /** Goal mode Auto: the goal comes from RoutineMatcher once it decides. */
         boolean autoGoal;
         /** Say the goal when it is chosen. */

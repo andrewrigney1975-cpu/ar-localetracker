@@ -44,6 +44,7 @@ final class PhoneSettings {
         double defGoal = "walk".equals(activity) ? 5000 : "cycle".equals(activity) ? 40000 : "ski".equals(activity) ? 20000 : 10000;
         c.goalM = !c.goal ? 0 : goals != null ? goals.optDouble(activity, defGoal) : defGoal;
         c.duck = v.optBoolean("duck", true);
+        c.loud = v.optBoolean("loud", false);
         JSONObject speedModes = s.optJSONObject("liveSpeedMode");
         String speedMode = speedModes != null ? speedModes.optString(activity, "") : "";
         if (speedMode.isEmpty()) speedMode = "cycle".equals(activity) || "ski".equals(activity) ? "speed" : "pace";

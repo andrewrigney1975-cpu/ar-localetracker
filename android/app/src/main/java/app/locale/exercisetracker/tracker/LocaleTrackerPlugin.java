@@ -140,7 +140,14 @@ public class LocaleTrackerPlugin extends Plugin {
             call.reject("Nothing to say", "args");
             return;
         }
-        if (previewSpeaker == null) previewSpeaker = new Speaker(getContext(), call.getBoolean("duck", true));
+        boolean duck = call.getBoolean("duck", true);
+        boolean loud = call.getBoolean("loud", false);
+        // Settings may have changed since the last test.
+        if (previewSpeaker != null && !previewSpeaker.matches(duck, loud)) {
+            previewSpeaker.shutdown();
+            previewSpeaker = null;
+        }
+        if (previewSpeaker == null) previewSpeaker = new Speaker(getContext(), duck, loud);
         previewSpeaker.speak(text);
         String buzz = call.getString("buzz");
         if (buzz != null) {
