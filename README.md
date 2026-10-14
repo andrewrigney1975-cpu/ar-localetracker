@@ -324,19 +324,25 @@ run along the river after work on Tuesdays and Thursdays. Locale notices these
 your goal" without setting anything up.
 
 ### What it does
-- **When you start a workout**, Locale works out which routine you are probably doing.
-  It decides at the first good GPS fix, or from the time of day if there is no fix
-  after 90 seconds. If it is confident, it sets the goal and tells you:
-  *"Goal 4.7 kilometres, your usual Saturday morning loop."*
+- **When you start a workout**, from the phone, the watch or a widget, Locale picks the
+  routine you are probably doing straight away, whatever the goal mode. Its goal, the
+  watch's goal ring and the routine's own announcements apply from the first metre, and
+  Locale tells you: *"Goal 4.7 kilometres, your usual Saturday morning loop."* Without a
+  GPS fix yet it goes by the weekday and time, then checks the start place at the first
+  good fix (within 3 minutes) and switches routine if that says another.
 - **During the workout** it announces 25%, 50%, 75% and "Goal reached" at 100%, along
   with your distance and average pace or speed.
 - **If you leave the usual route**, meaning more than 250 m from it for over 2 minutes,
   it says *"Off your usual route. Goal announcements paused."* Splits and time
   announcements carry on.
-- **If it isn't sure, it says nothing.** It never guesses between two equally likely
-  routines, and it never sets a goal at a place it doesn't know.
-- **Afterwards**, the workout summary shows the goal and whether you finished within 10%
-  of it. The watch shows goal progress as a ring round the screen.
+- **It always picks one** when the activity has routines, even at an unusual time or
+  place. If it picked wrong, the off-route check above stops the goal announcements, and
+  you can take the workout out of the routine afterwards (the routine picker on the
+  workout's Distance tile).
+- **Afterwards**, the route's shape decides which routine the workout belongs to; when
+  it fits more than one, the routine picked at the start wins. The workout summary shows
+  the goal and whether you finished within 10% of it. The watch shows goal progress as a
+  ring round the screen.
 
 ### How it learns
 1. **It looks at your saved workouts**, on the phone only, nothing is sent anywhere.
@@ -360,25 +366,28 @@ your goal" without setting anything up.
 5. **It checks it has enough history first.** Auto goals start once an activity has 5
    workouts in the last 6 months. A routine counts once it has 3 workouts, 2 of them in
    the last 60 days, with distances that vary by no more than about 12%.
-6. **It picks one routine when you start.** Each routine that starts near you is scored
-   on how often you do it, how close you are to its usual start time, and whether today
-   is its usual day. Workouts from the same spot that fit no routine count against the
-   leader. A routine wins only with a clear lead: at least 70% of the score, and well
-   ahead of the next. Before a GPS fix, Locale can fall back to your usual distance for
-   that time of week, such as "weekend morning walks".
+6. **It picks one routine when you start.** Each routine of the activity is scored on
+   how often you do it, how close you are to its usual start time, whether today is its
+   usual day and, with a GPS fix, how close you are to its start. Being at a routine's
+   start counts for more than the time, and the highest score wins. An activity with no
+   routines falls back to your usual distance for that time of week, such as "weekend
+   morning walks" (Auto goal mode only).
 7. **It learns from its mistakes.** Each workout keeps the goal it was given. If a
    routine's recent auto goals mostly missed (fewer than half of the last 5 within 10%),
-   that routine is paused. If you also stopped doing it, its workouts are set aside, so
-   a new habit can take over quickly.
+   that learned routine is paused, so a new habit can take over quickly. Routines you
+   marked are never paused.
 
 The model is rebuilt whenever your workout list changes, including when you come back
 to the app after recording from the watch. The phone's tracking service reads it, so
-workouts started from the watch or a widget get an auto goal too.
+workouts started from the watch or a widget get their routine too.
 
 ### Your controls
 - **Settings → Voice announcements:** each activity's goal chip cycles between
   **Auto goal** (the default; ski is Off), **Set goal** (a distance you choose on the
-  start screen) and **Off**. You can also turn off "Say the goal at the start".
+  start screen) and **Off**. You can also turn off "Say the goal at the start". The
+  routine is picked in every mode: Set goal keeps your distance, and Off still shows
+  the routine's goal on the ring and the summary but only announces it if the routine's
+  own announcements (Customise) include the goal.
 - **Start screen:** shows the auto goal and the routine it came from, or "learning · 3
   of 5 runs". Use − or + to set a different goal for this workout only.
 - **Settings → Learned routines:** each routine's distance, how often you do it, the

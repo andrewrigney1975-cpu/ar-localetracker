@@ -112,21 +112,28 @@ function simTracker() {
     webSpeak(text);
     emit('announce', { text });
   };
-  /** Same goal flow as TrackingService: manual, or predicted from the routine model. */
+  /**
+   * Same flow as TrackingService: the routine is picked at the start whatever the goal mode,
+   * and brings its goal unless there is a manual one.
+   */
   function startGoal(activity, opts) {
     const cfg = coach.cfg;
     goal = null;
     guard = null;
+    const manualM = opts.goalM > 0 ? opts.goalM : cfg.goal && cfg.goalM > 0 ? cfg.goalM : 0;
+    const fix = opts.fix ?? { lat: START.lat, lon: START.lon };
+    const p = predictGoal(cachedRoutineModel(), { activity, now: st.startedAt, tzOffset: new Date(st.startedAt).getTimezoneOffset(), lat: fix.lat, lon: fix.lon, imperial: cfg.imperial });
     let g = null;
-    if (opts.goalM > 0 || (cfg.goal && cfg.goalM > 0)) g = { goalM: opts.goalM > 0 ? opts.goalM : cfg.goalM, source: 'manual', routineId: null, confidence: 1 };
-    else if (cfg.autoGoal) {
-      const fix = opts.fix ?? { lat: START.lat, lon: START.lon };
-      const p = predictGoal(cachedRoutineModel(), { activity, now: st.startedAt, tzOffset: new Date(st.startedAt).getTimezoneOffset(), lat: fix.lat, lon: fix.lon, imperial: cfg.imperial });
-      if (p.goalM) g = p;
-      else emit('goal', { reason: p.reason });
+    if (p.routineId) g = manualM ? { goalM: manualM, source: 'manual', routineId: p.routineId, name: p.name, confidence: p.confidence } : p;
+    else if (manualM) g = { goalM: manualM, source: 'manual', routineId: null, confidence: 1 };
+    else if (cfg.autoGoal && p.goalM) g = p;
+    if (!g) {
+      emit('goal', { reason: p.reason ?? 'unsure' });
+      return;
     }
-    if (!g) return;
     coach.setGoal(g.goalM, 0);
+    // Without the routine's own settings, its goal is announced only when goals aren't Off.
+    coach.cfg = { ...coach.cfg, goal: cfg.goal || cfg.autoGoal || g.source === 'manual' };
     const rv = routineVoice(settings(), g.routineId);
     if (rv) coach.applyRoutine(rv, 0);
     goal = { goalM: g.goalM, source: g.source, ...(g.name ? { name: g.name } : {}) };

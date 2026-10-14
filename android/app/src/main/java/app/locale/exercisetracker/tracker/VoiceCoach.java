@@ -76,6 +76,18 @@ final class VoiceCoach {
         intervalsDone = elapsedMs / (cfg.intervalMin * 60000L);
     }
 
+    /**
+     * Back to the activity's settings before another routine's apply (the routine picked at
+     * the start was swapped at the first GPS fix).
+     */
+    void restore(Config base, long elapsedMs) {
+        cfg.splits = base.splits;
+        cfg.time = base.time;
+        cfg.goal = base.goal;
+        cfg.intervalMin = base.intervalMin;
+        intervalsDone = elapsedMs / (cfg.intervalMin * 60000L);
+    }
+
     /** Stop goal milestones (e.g. the user left their usual route); other kinds carry on. */
     void pauseGoal() {
         goalPaused = true;

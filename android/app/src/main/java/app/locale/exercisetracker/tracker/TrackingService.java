@@ -62,10 +62,14 @@ public class TrackingService extends Service {
     static final String EXTRA_FIX_T = "fixT";
     static final String EXTRA_FIX_ACC = "fixAcc";
 
-    /** Auto goal: decide at the first fix this accurate, or without location after the timeout. */
+    /**
+     * Routine: picked at the start, with the warm-up fix if it is this accurate and recent;
+     * without one, from the time alone, then checked again at the first fix this accurate if
+     * it comes within the refine window (later, the user has left the start).
+     */
     private static final double GOAL_FIX_ACCURACY_M = 30;
-    private static final long GOAL_TIMEOUT_MS = 90_000;
     private static final long GOAL_FIX_MAX_AGE_MS = 120_000;
+    private static final long GOAL_REFINE_WINDOW_MS = 180_000;
 
     private static final String CHANNEL_ID = "tracking";
     private static final int NOTIFICATION_ID = 1001;
@@ -144,10 +148,14 @@ public class TrackingService extends Service {
 
     // Voice announcements (tracker thread; the coach's counters are read under `this`).
     private VoiceCoach coach;
+    /** The activity's announcement settings, under any routine's own. */
+    private VoiceCoach.Config baseVoice;
     private Speaker speaker;
 
-    // Goal for this workout (manual, or predicted from learned routines).
+    // Routine and goal for this workout (the goal manual, or the routine's).
+    /** Picked without a fix: check the routine again at the first good one. */
     private boolean goalPending;
+    private double manualGoalM;
     private double goalM;
     private String goalSource;
     private String goalRoutineId;
@@ -155,7 +163,6 @@ public class TrackingService extends Service {
     private double goalConfidence;
     private boolean goalOffRoute;
     private RouteGuard routeGuard;
-    private final Runnable goalTimeout = () -> decideGoal(Double.NaN, Double.NaN);
 
     // ---- Lifecycle --------------------------------------------------------------------------
 
@@ -294,6 +301,7 @@ public class TrackingService extends Service {
             autoPause = ap;
             units = "imperial".equals(u) ? "imperial" : "metric";
             coach = new VoiceCoach(PhoneSettings.voice(this, profile.id));
+            baseVoice = PhoneSettings.voice(this, profile.id);
             if (resume && id.equals(prefs.getString("workoutId", null))) {
                 startedAt = prefs.getLong("startedAt", System.currentTimeMillis());
                 elapsedBaseMs = prefs.getLong("elapsedBaseMs", 0);
@@ -353,7 +361,6 @@ public class TrackingService extends Service {
         registerSensors();
         setState(State.RECORDING, resume ? "restored" : "start");
         if (!resume) startGoal(gs);
-        else if (goalPending) handler.postDelayed(goalTimeout, GOAL_TIMEOUT_MS);
         requestLocationUpdates(Priority.PRIORITY_HIGH_ACCURACY);
     }
 
@@ -394,13 +401,10 @@ public class TrackingService extends Service {
             return;
         }
         setState(State.IDLE, "stop");
-        handler.removeCallbacks(goalTimeout);
         goalPending = false;
         routeGuard = null;
         synchronized (this) {
-            goalM = 0;
-            goalSource = null;
-            goalOffRoute = false;
+            clearGoal();
         }
         String id = workoutId;
         long count = seq;
@@ -537,7 +541,7 @@ public class TrackingService extends Service {
             journal.append(pointJson(loc, gnssAlt, fusedAlt), false);
             if (autoPause) handleAutoPause(speed, nowRt);
             if (goalPending && loc.hasAccuracy() && loc.getAccuracy() <= GOAL_FIX_ACCURACY_M) {
-                decideGoal(loc.getLatitude(), loc.getLongitude());
+                refineGoal(loc.getLatitude(), loc.getLongitude());
             }
             if (state == State.RECORDING) {
                 accumulateDistance(loc, speed);
@@ -571,47 +575,94 @@ public class TrackingService extends Service {
         say(text, kind);
     }
 
-    // ---- Goal (manual, or predicted from learned routines) -----------------------------------
+    // ---- Routine and goal (the goal manual, or the routine's) ---------------------------------
 
+    /**
+     * At the very start, whatever the goal mode: the routine this workout most likely is
+     * (RoutineMatcher), so its goal, goal ring and own announcements apply from the first
+     * metre. A manual goal (Set mode, or chosen on the start screen) replaces the routine's.
+     */
     private void startGoal(GoalStart gs) {
         goalPending = false;
         routeGuard = null;
-        if (gs != null && gs.goalM > 0) {
-            applyGoal(gs.goalM, "manual", null, null, 1, null);
-        } else if (coach.cfg.goal && coach.cfg.goalM > 0) {
-            applyGoal(coach.cfg.goalM, "manual", null, null, 1, null);
-        } else if (coach.cfg.autoGoal) {
+        synchronized (this) {
+            clearGoal();
+        }
+        manualGoalM = gs != null && gs.goalM > 0 ? gs.goalM : coach.cfg.goal && coach.cfg.goalM > 0 ? coach.cfg.goalM : 0;
+        boolean freshFix = gs != null && !Double.isNaN(gs.fixLat) && gs.fixAcc <= GOAL_FIX_ACCURACY_M
+            && System.currentTimeMillis() - gs.fixT <= GOAL_FIX_MAX_AGE_MS;
+        if (freshFix) {
+            decideGoal(gs.fixLat, gs.fixLon);
+        } else {
             goalPending = true;
-            boolean freshFix = gs != null && !Double.isNaN(gs.fixLat) && gs.fixAcc <= GOAL_FIX_ACCURACY_M
-                && System.currentTimeMillis() - gs.fixT <= GOAL_FIX_MAX_AGE_MS;
-            if (freshFix) decideGoal(gs.fixLat, gs.fixLon);
-            else handler.postDelayed(goalTimeout, GOAL_TIMEOUT_MS);
+            decideGoal(Double.NaN, Double.NaN);
         }
     }
 
-    /** Auto goal: ask the routine model once, with a good fix or (after the timeout) without one. */
-    private void decideGoal(double lat, double lon) {
-        if (!goalPending || state == State.IDLE) return;
-        goalPending = false;
-        handler.removeCallbacks(goalTimeout);
+    private RoutineMatcher.Prediction predictRoutine(double lat, double lon) {
         int tz = -java.util.TimeZone.getDefault().getOffset(startedAt) / 60000;
-        RoutineMatcher.Prediction p = new RoutineMatcher(PhoneSettings.routineModel(this))
+        return new RoutineMatcher(PhoneSettings.routineModel(this))
             .predict(profile.id, startedAt, tz, lat, lon, coach.cfg.imperial);
-        if (!p.hasGoal()) {
-            Log.i(TAG, "No auto goal: " + p.reason);
+    }
+
+    private void decideGoal(double lat, double lon) {
+        RoutineMatcher.Prediction p = predictRoutine(lat, lon);
+        if (p.routineId != null) {
+            Log.i(TAG, "Routine " + p.name + " (" + p.confidence + (Double.isNaN(lat) ? ", no fix yet)" : ")"));
+            if (manualGoalM > 0) applyGoal(manualGoalM, "manual", p.routineId, p.name, p.confidence, null);
+            else applyGoal(p.goalM, p.source, p.routineId, p.name, p.confidence, p.signature);
+        } else if (manualGoalM > 0) {
+            applyGoal(manualGoalM, "manual", null, null, 1, null);
+        } else if (coach.cfg.autoGoal && p.hasGoal()) {
+            applyGoal(p.goalM, p.source, null, p.name, p.confidence, null);
+        } else {
+            Log.i(TAG, "No routine or goal: " + p.reason);
             JSObject ev = new JSObject();
-            ev.put("reason", p.reason);
+            ev.put("reason", p.reason != null ? p.reason : "unsure");
             TrackerHub.emit("goal", ev);
             saveSnapshot();
-            return;
         }
-        applyGoal(p.goalM, p.source, p.routineId, p.name, p.confidence, p.signature);
+    }
+
+    /** The routine was picked without a fix: at the first good one, switch if the place says another. */
+    private void refineGoal(double lat, double lon) {
+        goalPending = false;
+        if (elapsedMs() <= GOAL_REFINE_WINDOW_MS) {
+            RoutineMatcher.Prediction p = predictRoutine(lat, lon);
+            if (p.routineId != null && !p.routineId.equals(goalRoutineId)) {
+                Log.i(TAG, "Routine changed at the first fix: " + goalName + " -> " + p.name);
+                decideGoal(lat, lon);
+                return;
+            }
+        }
+        saveSnapshot();
+    }
+
+    /** Caller holds the lock. */
+    private void clearGoal() {
+        goalM = 0;
+        goalSource = null;
+        goalRoutineId = null;
+        goalName = null;
+        goalConfidence = 0;
+        goalOffRoute = false;
+    }
+
+    /**
+     * Goal milestones, with the routine's own announcement settings over the activity's. A
+     * routine without its own announces its goal only when the activity's goal mode isn't Off;
+     * the goal still shows on the ring, the live screen and the summary.
+     */
+    private void configureCoach(double m, String source, String routineId, double distance, long elapsed) {
+        coach.restore(baseVoice, elapsed);
+        coach.setGoal(m, distance);
+        coach.cfg.goal = baseVoice.goal || baseVoice.autoGoal || "manual".equals(source);
+        applyRoutineVoice(routineId, elapsed);
     }
 
     private void applyGoal(double m, String source, String routineId, String name, double confidence, org.json.JSONArray signature) {
         synchronized (this) {
-            coach.setGoal(m, distanceM);
-            applyRoutineVoice(routineId, elapsedMs());
+            configureCoach(m, source, routineId, distanceM, elapsedMs());
             goalM = m;
             goalSource = source;
             goalRoutineId = routineId;
@@ -672,6 +723,7 @@ public class TrackingService extends Service {
     /** After a service restart: the goal and its state come back from the snapshot. */
     private void restoreGoal() {
         goalPending = prefs.getBoolean("gPending", false);
+        manualGoalM = Double.longBitsToDouble(prefs.getLong("gManualBits", 0));
         double m = Double.longBitsToDouble(prefs.getLong("gGoalBits", 0));
         if (m <= 0) return;
         goalM = m;
@@ -682,8 +734,7 @@ public class TrackingService extends Service {
         goalOffRoute = prefs.getBoolean("gOffRoute", false);
         int mask = coach.goalMask;
         long intervals = coach.intervalsDone;
-        coach.setGoal(m, 0);
-        applyRoutineVoice(goalRoutineId, 0);
+        configureCoach(m, goalSource, goalRoutineId, 0, 0);
         coach.goalMask = mask;
         coach.intervalsDone = intervals;
         if (goalOffRoute) coach.pauseGoal();
@@ -960,6 +1011,7 @@ public class TrackingService extends Service {
                 .putLong("vIntervals", coach != null ? coach.intervalsDone : 0)
                 .putInt("vGoal", coach != null ? coach.goalMask : 0)
                 .putBoolean("gPending", goalPending)
+                .putLong("gManualBits", Double.doubleToLongBits(manualGoalM))
                 .putLong("gGoalBits", Double.doubleToLongBits(goalM))
                 .putString("gSource", goalSource)
                 .putString("gRoutine", goalRoutineId)

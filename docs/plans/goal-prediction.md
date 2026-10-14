@@ -35,6 +35,22 @@ Status: **implemented** (October 2026), all three phases. Builds on voice announ
 >   "route".
 > - **Staleness:** there is no native stale flag. The model is rebuilt on every app resume
 >   and sync, which picks up workouts saved natively while the app was closed.
+>
+> **Superseded (15 October 2026): eager routine pick.** A 4 am watch-started walk got no
+> routine because its activity's goal mode was Off, and the conservative rules could
+> also leave a workout with none. Now `predictGoal` / `RoutineMatcher` **always pick a
+> routine** when the activity has any (learned or marked): weight × time match × day
+> factor × place match, where time and place have floors (0.01 and 0.001) so the
+> best-scoring routine always wins, and the start place outweighs the time. The share
+> and margin rules, the `others` competition and the stale-habit bookkeeping are gone.
+> `TrackingService` decides at the very start in every goal mode, from the time alone if
+> there is no warm-up fix. If the first good fix comes within 3 minutes, it decides again
+> and switches routine if the place says another. A manual goal replaces the routine's
+> goal but the routine's announcements still apply. In Off mode, a routine without its
+> own settings shows its goal but doesn't announce it. The time-of-day fallback now
+> applies only to an activity with no routines. Afterwards, clustering by shape still
+> decides membership, and the routine picked at the start wins a tie. Replay: typical
+> 81% coverage at 82% precision (one-offs now get a routine too); noise from home 2%.
 
 **Goal:** Locale learns your routines and sets the goal distance itself. A routine is the
 same activity from about the same place, at about the same time of week, over about the
