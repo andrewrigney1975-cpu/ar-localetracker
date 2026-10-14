@@ -488,7 +488,7 @@ export async function mount(root, params, query) {
       const g = goalAt[Number(rect.dataset.i)];
       if (g != null) {
         const v = total == null ? 0 : f.value(total);
-        lines.push(`<div class="tip-goal">${v >= g ? 'Goal reached' : `Goal ${f.text(g)} ${f.unit}`}<b>${v >= g ? '✓' : `${f.text(g - v)} to go`}</b></div>`);
+        lines.push(`<div class="tip-goal">${v >= g ? 'Goal reached' : `Goal ${f.text(g)} ${f.unit}`}<b>${v >= g ? '✓' : `${f.text(g - v)}${f.unit ? ` ${f.unit}` : ''} to go`}</b></div>`);
       }
       tip.innerHTML = `<div class="tip-head">${escapeHtml(p.label)}</div>${lines.join('')}`;
       tip.hidden = false;
