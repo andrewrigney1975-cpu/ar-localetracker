@@ -13,7 +13,8 @@ import java.util.Locale;
 /**
  * Text-to-speech for announcements. Holds transient audio focus only while speaking, so music
  * ducks (or pauses) for the phrase and then comes back. At most one phrase waits while the
- * engine starts; a newer one replaces it.
+ * engine starts; a newer one replaces it. When loud, the media volume goes to full for the
+ * phrase and back afterwards (unless the user changed it meanwhile).
  */
 final class Speaker {
     private static final String TAG = "LocaleSpeaker";
@@ -24,14 +25,18 @@ final class Speaker {
         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
         .build();
     private final boolean duck;
+    private final boolean loud;
+    /** Media volume to put back after a loud phrase, or -1. */
+    private int restoreVolume = -1;
     private TextToSpeech tts;
     private boolean ready;
     private String pending;
     private AudioFocusRequest focus;
     private int seq;
 
-    Speaker(Context ctx, boolean duck) {
+    Speaker(Context ctx, boolean duck, boolean loud) {
         this.duck = duck;
+        this.loud = loud;
         audio = ctx.getSystemService(AudioManager.class);
         tts = new TextToSpeech(ctx.getApplicationContext(), this::onInit);
     }
@@ -80,14 +85,45 @@ final class Speaker {
                 .setAudioAttributes(attrs)
                 .build();
             audio.requestAudioFocus(focus);
+            raiseVolume();
         }
         Bundle params = new Bundle();
         params.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC);
         tts.speak(text, TextToSpeech.QUEUE_ADD, params, "locale-" + (++seq));
     }
 
+    boolean matches(boolean duck, boolean loud) {
+        return this.duck == duck && this.loud == loud;
+    }
+
+    private void raiseVolume() {
+        if (!loud || restoreVolume >= 0 || audio.isVolumeFixed()) return;
+        int max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        int now = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+        if (now >= max) return;
+        try {
+            audio.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0);
+            restoreVolume = now;
+        } catch (SecurityException e) {
+            Log.w(TAG, "Could not raise the volume", e);
+        }
+    }
+
+    /** Back to the user's volume before music comes back, unless they changed it meanwhile. */
+    private void restoreVolume() {
+        if (restoreVolume < 0) return;
+        int max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        try {
+            if (audio.getStreamVolume(AudioManager.STREAM_MUSIC) == max) audio.setStreamVolume(AudioManager.STREAM_MUSIC, restoreVolume, 0);
+        } catch (SecurityException e) {
+            Log.w(TAG, "Could not restore the volume", e);
+        }
+        restoreVolume = -1;
+    }
+
     private synchronized void releaseFocus() {
         if (tts != null && tts.isSpeaking()) return; // more queued
+        restoreVolume();
         if (focus != null) {
             audio.abandonAudioFocusRequest(focus);
             focus = null;
@@ -100,6 +136,7 @@ final class Speaker {
         tts.shutdown();
         tts = null;
         pending = null;
+        restoreVolume();
         if (focus != null) {
             audio.abandonAudioFocusRequest(focus);
             focus = null;

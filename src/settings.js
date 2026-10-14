@@ -36,6 +36,8 @@ export const DEFAULT_SETTINGS = {
     goalM: { walk: 5000, run: 10000, cycle: 40000, ski: 20000 },
     /** Lower other audio while speaking (true) or pause it (false). */
     duck: true,
+    /** Turn the media volume up to full while speaking, then back. */
+    loud: false,
     /**
      * Per-routine settings that replace the activity's once the routine is recognised:
      * {[routineId]: {splits, time, goal, intervalMin}}.

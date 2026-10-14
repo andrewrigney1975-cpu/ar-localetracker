@@ -348,7 +348,7 @@ public class TrackingService extends Service {
             lastHr = 0;
             lastHrAt = 0;
         }
-        if (coach.enabled() && speaker == null) speaker = new Speaker(this, coach.cfg.duck);
+        if (coach.enabled() && speaker == null) speaker = new Speaker(this, coach.cfg.duck, coach.cfg.loud);
         wakeLock.acquire(WAKE_LEASE_MS);
         registerSensors();
         setState(State.RECORDING, resume ? "restored" : "start");
@@ -621,7 +621,7 @@ public class TrackingService extends Service {
         }
         routeGuard = "route".equals(source) && signature != null && signature.length() > 1 ? new RouteGuard(signature) : null;
         journalGoal();
-        if (speaker == null && coach.enabled()) speaker = new Speaker(this, coach.cfg.duck);
+        if (speaker == null && coach.enabled()) speaker = new Speaker(this, coach.cfg.duck, coach.cfg.loud);
         // A routine with goal announcements turned off doesn't say the goal either.
         if (coach.cfg.confirmGoal && coach.cfg.goal) say(VoiceCoach.goalConfirmation(m, coach.cfg.imperial, source, name), "goal-set");
         TrackerHub.emit("goal", goalJs());
