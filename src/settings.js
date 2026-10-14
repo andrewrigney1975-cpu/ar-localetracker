@@ -21,6 +21,8 @@ export const DEFAULT_SETTINGS = {
    * workoutIds}), and workouts the user took out of their routine.
    */
   routines: { names: {}, excluded: [], user: [], detached: [] },
+  /** Targets per activity ('all' or one) and period: {"run.week": {distance, time, cardioLoad, calories}} (src/insights/goals.js). */
+  goals: {},
   /** Spoken announcements during a workout, each kind on or off per activity. */
   voice: {
     splits: { walk: true, run: true, cycle: false, ski: false },

@@ -43,6 +43,7 @@ function nativeTracker() {
     speak: (text, duck = true, buzz = null, loud = false) => Native.speak({ text, duck, loud, ...(buzz ? { buzz } : {}) }),
     getWatchStatus: () => Native.getWatchStatus(),
     pinWidget: (size) => Native.pinWidget({ size }),
+    refreshWidgets: () => Native.refreshWidgets(),
     requestBackgroundLocation: () => Native.requestBackgroundLocation(),
     requestIgnoreBatteryOptimizations: () => Native.requestIgnoreBatteryOptimizations(),
     openAppSettings: () => Native.openAppSettings(),
@@ -325,6 +326,7 @@ function simTracker() {
     async pinWidget() {
       return { supported: false };
     },
+    async refreshWidgets() {},
     async getWatchStatus() {
       return { supported: true, connected: true, watches: [{ name: 'Simulated watch', nearby: true }], backgroundLocation: true };
     },

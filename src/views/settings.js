@@ -10,6 +10,7 @@ import { App } from '@capacitor/app';
 import { INTERVAL_OPTIONS, spokenAverage, spokenDistance } from '../voice/coach.js';
 import { getRoutineModel, rebuildRoutineModel } from '../insights/model.js';
 import { displayName } from '../insights/routines.js';
+import { GOAL_ACTIVITIES, GOAL_METRICS, GOAL_PERIODS, goalList, goalsFor, withGoals } from '../insights/goals.js';
 import { confirmDialog, openDialog } from '../ui/dialog.js';
 
 const GOAL_MODES = ['auto', 'set', 'off'];
@@ -31,6 +32,97 @@ function usualDays(weekdays) {
   const days = weekdays.map((n, d) => [n, d]).filter(([n]) => n >= total * 0.2).map(([, d]) => DAY_SHORT[d]);
   if (!days.length) return 'any day';
   return days.length === 1 ? days[0] : `${days.slice(0, -1).join(', ')} & ${days[days.length - 1]}`;
+}
+
+const M_PER_MI = 1609.344;
+const goalActivityLabel = (a) => (a === 'all' ? 'All activities' : ACTIVITIES[a].label);
+const goalPeriodLabel = (p) => GOAL_PERIODS.find((x) => x.id === p).label;
+const round1 = (v) => String(Math.round(v * 10) / 10);
+
+/** "20 km · 3:00 h · load 300 · 2,000 kcal" for one activity and period. */
+function goalSummary(values, imperial) {
+  const parts = [];
+  if (values.distance) parts.push(`${round1(values.distance / (imperial ? M_PER_MI : 1000))} ${imperial ? 'mi' : 'km'}`);
+  if (values.time) parts.push(`${Math.floor(values.time / 3600)}:${String(Math.round((values.time % 3600) / 60)).padStart(2, '0')} h`);
+  if (values.cardioLoad) parts.push(`load ${Math.round(values.cardioLoad).toLocaleString()}`);
+  if (values.calories) parts.push(`${Math.round(values.calories).toLocaleString()} kcal`);
+  return parts.join(' · ');
+}
+
+function goalsHTML(s) {
+  const imperial = s.units === 'imperial';
+  const rows = goalList(s.goals).map(
+    ({ activity, period, values }) => `<button class="setting goal-row" data-goal="${activity}.${period}" ${activity !== 'all' ? `data-activity="${activity}"` : ''}>
+      <span class="act-label">${activity === 'all' ? '' : ACTIVITIES[activity].icon}<span class="text">${goalActivityLabel(activity)} · ${goalPeriodLabel(period).toLowerCase()}<small>${goalSummary(values, imperial)}</small></span></span>
+      <span class="goal-edit">Edit</span></button>`
+  );
+  return `
+    <div class="section-title">Goals</div>
+    <div class="card settings-group">
+      ${rows.join('') || '<div class="setting"><div class="text">No goals yet<small>Set a distance, time, cardio load or calorie target per day, week or month. Insights charts show it, and the 4 × 2 widget tracks a distance goal through the week.</small></div></div>'}
+      <div class="setting"><div class="text">${rows.length ? 'Another goal' : 'Add a goal'}</div><button class="btn ghost" data-act="addgoal">Add</button></div>
+    </div>`;
+}
+
+/** Edit the goals for one activity and period; switching either loads that pair's goals. */
+async function editGoals(start) {
+  const imperial = settings().units === 'imperial';
+  const unitM = imperial ? M_PER_MI : 1000;
+  let activity = start.activity;
+  let period = start.period;
+  const result = await openDialog((dlg, close) => {
+    dlg.classList.add('goal-dialog');
+    dlg.innerHTML = `
+      <h2>Goal</h2>
+      <div class="field"><span>Activity</span>
+        <div class="chip-row" role="radiogroup" aria-label="Activity">
+          ${GOAL_ACTIVITIES.map((a) => `<button class="chip" role="radio" data-a="${a}" ${a !== 'all' ? `data-activity="${a}"` : ''}>${a === 'all' ? 'All' : ACTIVITIES[a].icon + ACTIVITIES[a].label}</button>`).join('')}
+        </div>
+      </div>
+      <div class="field"><span>Period</span>
+        <div class="segmented" role="group" aria-label="Period">${GOAL_PERIODS.map((p) => `<button data-p="${p.id}">${p.label}</button>`).join('')}</div>
+      </div>
+      <div class="goal-fields">
+        <label><b>Distance</b><i class="input-unit"><input class="num-input" type="number" inputmode="decimal" min="0" step="0.1" data-m="distance" placeholder="–" />${imperial ? 'mi' : 'km'}</i></label>
+        <label><b>Activity time</b><i class="input-unit"><input class="num-input short" type="number" inputmode="numeric" min="0" data-m="hours" placeholder="–" />h<input class="num-input short" type="number" inputmode="numeric" min="0" max="59" data-m="minutes" placeholder="–" />min</i></label>
+        <label><b>Cardio load</b><i class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="0" data-m="cardioLoad" placeholder="–" /></i></label>
+        <label><b>Calories</b><i class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="0" data-m="calories" placeholder="–" />kcal</i></label>
+      </div>
+      <p class="field-hint">Leave a box empty for no goal. Cardio load and calories need your profile.</p>
+      <div class="actions"><button class="btn ghost" data-v="remove">Remove</button><button class="btn ghost" data-v="cancel">Cancel</button><button class="btn primary" data-v="save">Save</button></div>`;
+    const input = (m) => dlg.querySelector(`[data-m="${m}"]`);
+    const removeBtn = dlg.querySelector('[data-v="remove"]');
+    const load = () => {
+      dlg.querySelectorAll('[data-a]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.a === activity)));
+      dlg.querySelectorAll('[data-p]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.p === period)));
+      const v = goalsFor(settings().goals, activity, period);
+      input('distance').value = v.distance ? round1(v.distance / unitM) : '';
+      input('hours').value = v.time ? Math.floor(v.time / 3600) : '';
+      input('minutes').value = v.time ? Math.round((v.time % 3600) / 60) : '';
+      input('cardioLoad').value = v.cardioLoad ? Math.round(v.cardioLoad) : '';
+      input('calories').value = v.calories ? Math.round(v.calories) : '';
+      removeBtn.hidden = !GOAL_METRICS.some((m) => v[m] > 0);
+    };
+    dlg.querySelectorAll('[data-a]').forEach((b) => b.addEventListener('click', () => ((activity = b.dataset.a), load())));
+    dlg.querySelectorAll('[data-p]').forEach((b) => b.addEventListener('click', () => ((period = b.dataset.p), load())));
+    load();
+    const num = (m) => Math.max(0, Number(input(m).value) || 0);
+    dlg.querySelector('[data-v="cancel"]').addEventListener('click', () => close(null));
+    removeBtn.addEventListener('click', () => close({}));
+    dlg.querySelector('[data-v="save"]').addEventListener('click', () =>
+      close({
+        distance: Math.round(num('distance') * unitM * 10) / 10,
+        time: Math.round(num('hours') * 3600 + num('minutes') * 60),
+        cardioLoad: num('cardioLoad'),
+        calories: num('calories'),
+      })
+    );
+  });
+  if (!result) return false;
+  await updateSettings({ goals: withGoals(settings().goals, activity, period, result) });
+  // The 4 × 2 widget shows progress against a distance goal.
+  tracker.refreshWidgets().catch(() => {});
+  return true;
 }
 
 function routinesHTML(model, s) {
@@ -96,6 +188,8 @@ export async function mount(root) {
         <header class="topbar"><h1>Settings</h1></header>
         <div class="body">
           <div class="page">
+            ${goalsHTML(s)}
+
             <div class="section-title">Units &amp; display</div>
             <div class="card settings-group">
               <div class="setting"><div class="text">Units<small>${s.units === 'metric' ? 'Kilometres, metres, km/h' : 'Miles, feet, mph'}</small></div>
@@ -294,6 +388,18 @@ export async function mount(root) {
     root.querySelector('[data-toggle="confirmGoal"]').addEventListener('change', (e) =>
       updateSettings({ voice: { ...settings().voice, confirmGoal: e.target.checked } })
     );
+    root.querySelectorAll('[data-goal]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const [activity, period] = b.dataset.goal.split('.');
+        if (await editGoals({ activity, period })) render();
+      })
+    );
+    root.querySelector('[data-act="addgoal"]').addEventListener('click', async () => {
+      // Start from the first pair without goals: weekly first, All before each activity.
+      const used = new Set(goalList(settings().goals).map((g) => `${g.activity}.${g.period}`));
+      const pairs = ['week', 'day', 'month'].flatMap((period) => GOAL_ACTIVITIES.map((activity) => ({ activity, period })));
+      if (await editGoals(pairs.find((p) => !used.has(`${p.activity}.${p.period}`)) ?? pairs[0])) render();
+    });
     root.querySelector('[data-toggle="loud"]').addEventListener('change', (e) => updateSettings({ voice: { ...settings().voice, loud: e.target.checked } }));
     const findRoutine = (id) => Object.values(model?.activities ?? {}).flatMap((a) => a.routines).find((r) => r.id === id);
     root.querySelectorAll('[data-rename]').forEach((b) =>

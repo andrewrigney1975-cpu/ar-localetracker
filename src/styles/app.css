@@ -2596,3 +2596,87 @@ a.stat.pb:active {
 .course-item .thumb {
   color: var(--accent);
 }
+
+/* Settings → Goals: each row opens the goal editor. */
+.setting.goal-row {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.setting + .setting.goal-row {
+  border-top: 1px solid var(--border);
+}
+
+.goal-row .goal-edit {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.dialog.goal-dialog .segmented {
+  width: 100%;
+}
+
+.goal-fields {
+  display: grid;
+  margin-top: 14px;
+}
+
+.goal-fields label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.goal-fields label + label {
+  border-top: 1px solid var(--border);
+}
+
+.goal-fields b {
+  font-weight: 600;
+}
+
+.goal-fields i {
+  font-style: normal;
+}
+
+.goal-fields .num-input.short {
+  width: 58px;
+}
+
+.dialog.goal-dialog [data-v='remove'] {
+  margin-right: auto;
+  color: var(--danger);
+}
+
+.dialog.goal-dialog [data-v='remove'][hidden] {
+  display: none;
+}
+
+/* Insights: the goal for the chart's activity, period and metric (Settings → Goals). */
+.chart-scroll .goal-line {
+  stroke: var(--text);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  opacity: 0.75;
+}
+
+.chart-legend .goal-key i {
+  width: 14px;
+  height: 0;
+  border-radius: 0;
+  border-top: 2px dashed var(--text);
+  opacity: 0.75;
+  vertical-align: 3px;
+}
+
+.chart-tip .tip-goal {
+  color: var(--text-dim);
+}

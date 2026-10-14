@@ -224,6 +224,13 @@ public class LocaleTrackerPlugin extends Plugin {
         call.resolve(o);
     }
 
+    /** Redraw placed widgets after a settings change they show (goals). */
+    @PluginMethod
+    public void refreshWidgets(PluginCall call) {
+        LocaleWidgets.updateAll(getContext());
+        call.resolve();
+    }
+
     // ---- Capabilities & system settings -----------------------------------------------------
 
     @PluginMethod

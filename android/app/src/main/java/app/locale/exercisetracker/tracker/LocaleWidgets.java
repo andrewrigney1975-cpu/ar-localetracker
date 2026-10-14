@@ -12,12 +12,16 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.text.Layout;
+import android.text.StaticLayout;
+import android.text.TextPaint;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -33,13 +37,17 @@ import java.util.Locale;
  * Home-screen widgets: 1×1 (last-used activity), 2×1 (run, walk) and 2×2 (all four).
  * Idle widgets start a workout with one tap; while recording they show elapsed time and
  * distance and open the app. The 2×2 week widget shows this week's distance instead, and the
- * 4×2 adds a chart of distance per day.
+ * 4×2 adds a chart of distance per day, with progress against a distance goal (WeekGoal).
  */
 public final class LocaleWidgets {
     enum Size { SMALL, WIDE, LARGE, WEEK, WEEK_CHART }
 
     /** The day chart stacks bottom to top in this order, as STACK_ORDER in src/views/insights.js. */
     private static final String[] STACK_ORDER = { "cycle", "run", "walk", "ski" };
+
+    /** The 4×2's goal message size, as in widget_week_chart.xml. */
+    private static final float GOAL_TEXT_SP = 11;
+    private static final int GOAL_MAX_LINES = 3;
 
     private static final String PREFS = "locale_widgets";
     private static final String KEY_LAST = "lastActivity";
@@ -184,6 +192,13 @@ public final class LocaleWidgets {
         return c.getTimeInMillis();
     }
 
+    /** Midnight at the start of each day of the week from {@code from}, and of the day after. */
+    private static long[] dayStarts(long from) {
+        long[] out = new long[8];
+        for (int i = 0; i <= 7; i++) out[i] = addDays(from, i);
+        return out;
+    }
+
     /**
      * This week's distance, Sunday to Saturday, with its average split and speed, including
      * a workout being recorded now (counted by its elapsed time).
@@ -210,9 +225,17 @@ public final class LocaleWidgets {
         boolean imperial = "imperial".equals(PhoneSettings.units(ctx));
         double value = imperial ? meters / 1609.344 : meters / 1000;
         RemoteViews v = new RemoteViews(ctx.getPackageName(), size == Size.WEEK_CHART ? R.layout.widget_week_chart : R.layout.widget_week);
+        String goalText = null;
         if (size == Size.WEEK_CHART) {
+            // Every activity's distance counts towards the goal, as in the chart.
+            Calendar now = Calendar.getInstance();
+            double goalM = WeekGoal.weeklyMeters(PhoneSettings.goals(ctx), now.getActualMaximum(Calendar.DAY_OF_MONTH));
+            int today = WorkoutStore.dayOf(dayStarts(from), now.getTimeInMillis());
+            if (goalM > 0) goalText = WeekGoal.message(goalM, meters, Math.max(0, today), imperial);
+            v.setTextViewText(R.id.goal_message, goalText != null ? goalText : "");
+            v.setViewVisibility(R.id.goal_message, goalText != null ? View.VISIBLE : View.GONE);
             v.setTextViewText(R.id.chart_title, imperial ? "mi per day" : "km per day");
-            v.setImageViewBitmap(R.id.chart, dayChart(ctx, from, live, imperial, options));
+            v.setImageViewBitmap(R.id.chart, dayChart(ctx, from, live, imperial, options, goalM / 7, goalText));
         }
         v.setTextViewText(R.id.week_distance, String.format(Locale.US, value < 100 ? "%.1f" : "%.0f", value));
         v.setTextViewText(R.id.week_unit, imperial ? "mi" : "km");
@@ -226,7 +249,7 @@ public final class LocaleWidgets {
         v.setViewVisibility(R.id.week_split, split != null ? View.VISIBLE : View.GONE);
         v.setViewVisibility(R.id.week_speed, speed != null ? View.VISIBLE : View.GONE);
         v.setContentDescription(R.id.widget_root, String.format(Locale.US, "This week %.1f %s, %d workouts",
-            value, imperial ? "miles" : "kilometres", count) + (split != null ? ", " + split + ", " + speed : ""));
+            value, imperial ? "miles" : "kilometres", count) + (split != null ? ", " + split + ", " + speed : "") + (goalText != null ? ". " + goalText : ""));
         v.setOnClickPendingIntent(R.id.widget_root, openApp(ctx));
         scheduleNewWeek(ctx, to);
         return v;
@@ -234,12 +257,12 @@ public final class LocaleWidgets {
 
     /**
      * This week's distance per day, Sunday to Saturday, stacked by activity in the activity
-     * colours as in Insights' distance chart, with each day's initial under its bar (today's bold).
-     * Drawn at the space the 4×2 layout leaves it, so it isn't stretched.
+     * colours as in Insights' distance chart, with each day's initial under its bar (today's bold)
+     * and a dashed line at the goal's share per day. Drawn at the space the 4×2 layout leaves
+     * it (less the goal message), so it isn't stretched.
      */
-    private static Bitmap dayChart(Context ctx, long from, JSObject live, boolean imperial, Bundle options) {
-        long[] dayStarts = new long[8];
-        for (int i = 0; i <= 7; i++) dayStarts[i] = addDays(from, i);
+    private static Bitmap dayChart(Context ctx, long from, JSObject live, boolean imperial, Bundle options, double goalPerDayM, String goalText) {
+        long[] dayStarts = dayStarts(from);
         double[][] byDay = new double[7][STACK_ORDER.length];
         try {
             byDay = WorkoutStore.get(ctx).distanceByDay(dayStarts, STACK_ORDER);
@@ -252,7 +275,8 @@ public final class LocaleWidgets {
             if (d >= 0 && a >= 0) byDay[d][a] += live.optDouble("distance", 0);
         }
         double unit = imperial ? 1609.344 : 1000;
-        double max = 0;
+        double goalPerDay = goalPerDayM / unit;
+        double max = goalPerDay;
         for (double[] day : byDay) {
             double sum = 0;
             for (double m : day) sum += m / unit;
@@ -267,6 +291,7 @@ public final class LocaleWidgets {
         if (hDp <= 0) hDp = 170;
         int w = Math.round(Math.max(80, (wDp - 32 - 12) / 2f) * dp);
         int h = Math.round(Math.max(50, hDp - 32 - 22) * dp);
+        if (goalText != null) h = Math.max(Math.round(40 * dp), h - goalTextHeight(ctx, goalText, w) - Math.round(4 * dp));
         Bitmap bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(bmp);
 
@@ -289,6 +314,20 @@ public final class LocaleWidgets {
         c.drawLine(0, (plotTop + plotBottom) / 2, plotRight, (plotTop + plotBottom) / 2, grid);
         c.drawLine(0, plotBottom, plotRight, plotBottom, grid);
         c.drawText(topLabel, plotRight + 4 * dp, plotTop + 4 * dp, text);
+
+        if (goalPerDay > 0) {
+            Paint goal = new Paint(Paint.ANTI_ALIAS_FLAG);
+            goal.setStyle(Paint.Style.STROKE);
+            goal.setColor(ctx.getColor(R.color.widget_text));
+            goal.setAlpha(190);
+            goal.setStrokeWidth(1.5f * dp);
+            goal.setPathEffect(new DashPathEffect(new float[] { 4 * dp, 3 * dp }, 0));
+            float gy = (float) (plotBottom - (plotBottom - plotTop) * goalPerDay / top);
+            Path line = new Path();
+            line.moveTo(0, gy);
+            line.lineTo(plotRight, gy);
+            c.drawPath(line, goal);
+        }
 
         float slot = plotRight / 7;
         float barW = Math.min(16 * dp, slot * 0.6f);
@@ -318,6 +357,17 @@ public final class LocaleWidgets {
             c.drawText(dayName.format(dayStarts[d]).substring(0, 1).toUpperCase(Locale.getDefault()), cx, h - 3 * dp, text);
         }
         return bmp;
+    }
+
+    /** Height in pixels of the goal message laid out at {@code widthPx}, up to its line limit. */
+    private static int goalTextHeight(Context ctx, String text, int widthPx) {
+        TextPaint p = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        p.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, GOAL_TEXT_SP, ctx.getResources().getDisplayMetrics()));
+        StaticLayout layout = StaticLayout.Builder.obtain(text, 0, text.length(), p, Math.max(1, widthPx))
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setMaxLines(GOAL_MAX_LINES)
+            .build();
+        return layout.getHeight();
     }
 
     /** A bar with rounded top corners (the data end) and a square base. */

@@ -17,6 +17,11 @@ final class PhoneSettings {
         }
     }
 
+    /** Goals by "activity.period" (src/insights/goals.js), or null when none are set. */
+    static JSONObject goals(Context ctx) {
+        return load(ctx).optJSONObject("goals");
+    }
+
     static String units(Context ctx) {
         return "imperial".equals(load(ctx).optString("units")) ? "imperial" : "metric";
     }
