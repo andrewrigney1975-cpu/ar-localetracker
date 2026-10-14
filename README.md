@@ -12,7 +12,9 @@ zones), splits, an interactive map with an elevation side view, or a 3D plot ove
 satellite imagery. Then you can export it as **FIT** (for Strava and Garmin Connect),
 GPX, TCX, KML, GeoJSON or CSV. **Insights** reports your totals and averages by day, week,
 month, quarter or year, per activity or routine, shows your **personal bests**, and
-exports the report as CSV or JSON. You can **share a
+exports the report as CSV or JSON. Set **goals** for distance, time, cardio load or
+calories per day, week or month: Insights charts draw them, and the 4×2 widget tells you
+whether you're ahead or behind for the week. You can **share a
 course** (the route and its altitude, with no times or speeds) by SMS, email or Quick
 Share, and the recipient explores it on the map and in 3D with Locale's **View** tool.
 
@@ -57,6 +59,16 @@ sensors.
   <img src="docs/screenshots/insights-bests.png" width="250" alt="Insights: personal bests per activity, with best average pace, best kilometre split, fastest speed and longest workout, each with its date">
 </p>
 <p align="center">
+  <img src="docs/screenshots/settings.png" width="250" alt="Settings: Units and display, then Goals listing all activities per week, walk per day, run per week and cycle per month, with an Add button">
+  &nbsp;
+  <img src="docs/screenshots/goals.png" width="250" alt="Goal editor: activity chips, Per day, Per week or Per month, and distance, activity time, cardio load and calorie targets">
+  &nbsp;
+  <img src="docs/screenshots/insights-goals.png" width="250" alt="Insights: weekly running distance with a dashed 25 km goal line, and a tooltip for a week 7.4 km short of the goal">
+</p>
+<p align="center">
+  <img src="docs/screenshots/widget-week-chart.png" width="490" alt="4×2 widget: this week's distance, average split and speed, a chart of distance per day with a dashed daily goal line, and You're 3 km ahead of your goal! Well done!!">
+</p>
+<p align="center">
   <img src="docs/screenshots/view-share.png" width="250" alt="Share sheet: Share course section with a Hide start and finish switch, a Share AR City2Surf 2026.gpx button and Share a link to view in a browser">
   &nbsp;
   <img src="docs/screenshots/view-list.png" width="250" alt="View: Open a course file, and the courses opened before with who shared them, distance and climb">
@@ -79,7 +91,8 @@ sensors.
 City2Surf (Hyde Park to Bondi via Heartbreak Hill at 6:18/km, with simulated heart rate).
 It is generated from the course map and is not a real recording. The voice screenshots
 come from the browser simulator. The Insights screenshots use a year of generated
-workouts in the browser build. The View screenshots show the sample shared as a course,
+workouts in the browser build, and the Goals screenshots 16 weeks of them. The 4×2
+widget is on a Pixel 10a. The View screenshots show the sample shared as a course,
 and a generated walk shared with its start and finish hidden; the Locale Viewer screenshot
 is the same course opened from a link in desktop Chrome. The watch screenshots
 are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</sub>
@@ -113,7 +126,9 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   Two more show this week (Sunday to Saturday) and open the app when tapped:
   - **2×2 this week:** distance, workout count, average split and speed
   - **4×2 this week:** the same, with a chart of distance per day stacked by activity,
-    as in Insights
+    as in Insights. With a distance [goal](#goals) it draws the goal's share per day as a
+    dashed line and says how the week is going: *"You're 3 km ahead of your goal! Well
+    done!!"* or *"You're a bit behind your goal – you need to go 4.5 km today to catch up"*.
 - **Live screen:**
   - elapsed time
   - distance
@@ -254,6 +269,20 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
     after the `#`, which browsers never send to a server, so the page can be hosted on
     any static host.
 
+### Goals
+- **Set in Settings → Goals:** pick all activities or one, and per day, week or month, then
+  set any of distance, activity time, cardio load and calories. Leave a box empty for no
+  target.
+- **Insights** draws the goal as a dashed line on the chart for the same activity and
+  metric. A goal set for another period is scaled to the chart's grouping: a weekly goal
+  is a seventh of it per day, and a monthly one is spread over the month's days. With all
+  activities in one bar, the line is the All-activities goal, else the activities' goals
+  added up. Tap a bar to see the goal and how much was left, or that it was reached.
+- **The 4×2 widget** counts every activity's distance against the All-activities distance
+  goal, else the activities' distance goals added up (a day or month goal counts as its
+  share of a week). It compares the week so far with an even share per day, Sunday to
+  Saturday, and tells you how far ahead you are, or how far to go today.
+
 ### Insights
 - **Date range:** today, this week (Sunday to Saturday), this month, the last 3 or 12
   months, this year, all time, or custom dates. The ‹ and › arrows step back and forward
@@ -265,6 +294,8 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Metrics:** distance, average speed and pace (over moving time), activity time,
   average heart rate (max too in exports), cardio load and calories. Totals sit at the top; the chart
   shows the metric you pick (tap a bar for its values), and a table lists every period.
+- **Goal line:** the chart shows your [goal](#goals) for its activity and metric as a
+  dashed line, with how much each period had left to go.
 - **Export** the report as **CSV** (one row per period, or per period and activity) or
   **JSON** (with totals) through the Android share sheet. Values are SI units.
 - **Personal bests**, per activity over all time (following the activity and routine
