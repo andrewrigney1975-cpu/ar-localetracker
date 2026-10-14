@@ -188,8 +188,6 @@ export async function mount(root) {
         <header class="topbar"><h1>Settings</h1></header>
         <div class="body">
           <div class="page">
-            ${goalsHTML(s)}
-
             <div class="section-title">Units &amp; display</div>
             <div class="card settings-group">
               <div class="setting"><div class="text">Units<small>${s.units === 'metric' ? 'Kilometres, metres, km/h' : 'Miles, feet, mph'}</small></div>
@@ -199,6 +197,8 @@ export async function mount(root) {
               <label class="setting"><span class="text">Keep screen on<small>While the live workout screen is open</small></span>
                 <input type="checkbox" class="switch" data-toggle="keepScreenOn" ${s.keepScreenOn ? 'checked' : ''} /></label>
             </div>
+
+            ${goalsHTML(s)}
 
             <div class="section-title">Profile</div>
             <div class="card settings-group">
