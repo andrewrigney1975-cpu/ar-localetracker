@@ -12,9 +12,9 @@ let cached = null;
 let timer = 0;
 
 export async function rebuildRoutineModel() {
-  const { excluded, names, user } = settings().routines;
+  const { excluded, names, user, detached } = settings().routines;
   const workouts = await listWorkouts();
-  cached = buildRoutineModel(workouts, { excluded, names, user });
+  cached = buildRoutineModel(workouts, { excluded, names, user, detached });
   await Preferences.set({ key: KEY, value: JSON.stringify(cached) });
   window.dispatchEvent(new CustomEvent('routines-changed'));
   await applyRoutineLabels(workouts);

@@ -1,6 +1,8 @@
 import { ACTIVITIES, ACTIVITY_IDS, activity as activityProfile } from '../activities.js';
 import { deleteWorkout, getTrack, getWorkout, updateWorkout } from '../db/workouts.js';
 import { EXPORT_FORMATS, renderExport } from '../export/index.js';
+import { getRoutineModel, rebuildRoutineModel } from '../insights/model.js';
+import { assignWorkout, displayName, isUsable, routineChoices, routineOf } from '../insights/routines.js';
 import { navigate } from '../router.js';
 import { workoutShareText, smsUri } from '../export/text.js';
 import { changeActivity } from '../services/workoutService.js';
@@ -87,7 +89,10 @@ export async function mount(root, params, query, ctx) {
     panel.replaceChildren();
     panel.classList.toggle('fill', id === 'map' || id === '3d');
     panel.scrollTop = 0;
-    if (id === 'summary') renderSummary(panel, w, track, units);
+    if (id === 'summary') {
+      renderSummary(panel, w, track, units);
+      fillRoutinePicker();
+    }
     else if (id === 'splits') renderSplits(panel, w, track, units, preferSpeed);
     else {
       panel.innerHTML = '<div class="saving-overlay"><div class="spinner"></div></div>';
@@ -124,6 +129,47 @@ export async function mount(root, params, query, ctx) {
     }
   }
   d.add(() => disposeTab?.());
+
+  // Routine picker on the Distance tile: the routine this workout was recognised as (or
+  // none), to leave as it is, take it out of, or swap for another of the same activity.
+  async function fillRoutinePicker() {
+    const select = panel.querySelector('[data-ref="routine"]');
+    if (!select || !isUsable(w)) return;
+    let model;
+    try {
+      model = await getRoutineModel();
+    } catch (e) {
+      console.error(e);
+      return;
+    }
+    const choices = routineChoices(model, w.activity);
+    const current = routineOf(model, w);
+    if (!choices.length || !select.isConnected) return;
+    select.innerHTML = [
+      `<option value="">No routine</option>`,
+      ...choices.map((r) => `<option value="${escapeHtml(r.id)}">${escapeHtml(displayName(r.name))}</option>`),
+    ].join('');
+    select.value = current?.id ?? '';
+    select.hidden = false;
+    select.onchange = async () => {
+      const routineId = select.value || null;
+      const picked = choices.find((r) => r.id === routineId);
+      select.disabled = true;
+      try {
+        await updateSettings({ routines: assignWorkout(settings().routines, model, w, routineId) });
+        await rebuildRoutineModel();
+        // The rebuild may rename the workout after its new routine (routineLabels).
+        w = (await getWorkout(w.id)) ?? w;
+        renderHead();
+        toast(picked ? `Added to “${displayName(picked.name)}”` : 'Taken out of its routine');
+      } catch (e) {
+        console.error(e);
+        toast(`Could not change the routine: ${e?.message ?? e}`);
+      }
+      if (tab === 'summary') fillRoutinePicker();
+      select.disabled = false;
+    };
+  }
 
   root.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
@@ -330,7 +376,7 @@ function renderSummary(panel, w, track, units) {
   const au = altitudeUnit(units);
   const pace = formatPace(sm.avgMovingSpeed, units, false);
   const rows = [
-    statHTML('Distance', distanceValue(sm.distance, units).toFixed(2), distanceUnit(units), 'feature'),
+    `<div class="stat feature distance-tile">${statHTML('Distance', distanceValue(sm.distance, units).toFixed(2), distanceUnit(units), 'bare')}<select class="select routine-pick" data-ref="routine" aria-label="Routine" hidden></select></div>`,
     statHTML('Time', formatDuration(sm.duration)),
     statHTML('Moving time', formatDuration(sm.movingTime)),
     statHTML('Avg speed', speedValue(sm.avgMovingSpeed, units).toFixed(1), speedUnit(units)),
