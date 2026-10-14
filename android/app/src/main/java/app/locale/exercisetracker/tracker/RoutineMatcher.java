@@ -4,7 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Predicts the goal distance for a new workout from the learned routine model. Port of
+ * Picks the routine and goal distance for a new workout from the learned routine model. Port of
  * predictGoal() in src/insights/routines.js; RoutineMatcherTest replays the shared fixture.
  * The model itself is built in JS and stored as "routines.v1" in CapacitorStorage.
  */
@@ -14,15 +14,14 @@ final class RoutineMatcher {
     // Same tunables as T in routines.js.
     private static final double SAME_START_M = 300;
     private static final double TIME_SIGMA_MIN = 75;
-    private static final double MIN_TIME_MATCH = 0.25;
-    private static final double MIN_SHARE = 0.7;
-    private static final double MIN_MARGIN = 0.3;
+    private static final double TIME_FLOOR = 0.01;
+    private static final double PLACE_FLOOR = 0.001;
     private static final int DEFAULT_NEED = 5;
 
-    /** A decision: goal set ({@code goalM > 0}) or not, with the reason. */
+    /** A decision: routine and goal, a time-of-day goal, or none with the reason. */
     static final class Prediction {
         double goalM;
-        String source; // route | time
+        String source; // route (routineId set) | time
         String routineId;
         String name;
         double confidence;
@@ -79,77 +78,62 @@ final class RoutineMatcher {
         return Math.round(v * 1e4) / 1e4;
     }
 
-    /** @param lat NaN when there is no good fix yet (time-only fallback). */
+    /**
+     * The routine this workout most likely is, and its goal: every routine of the activity
+     * competes, so one is always picked when there is any. Without routines, the usual
+     * distance for this time of week.
+     * @param lat NaN when there is no good fix yet (time and weekday only).
+     */
     Prediction predict(String activity, long now, int tzOffset, double lat, double lon, boolean imperial) {
         Prediction p = new Prediction();
         JSONObject acts = model != null ? model.optJSONObject("activities") : null;
         JSONObject a = acts != null ? acts.optJSONObject(activity) : null;
         p.need = model != null ? model.optInt("need", DEFAULT_NEED) : DEFAULT_NEED;
-        if (a == null || !a.optBoolean("ready")) {
-            p.reason = "learning";
-            p.have = a != null ? a.optInt("usable") : 0;
-            return p;
-        }
         int[] lt = localTime(now, tzOffset);
         int weekday = lt[0];
         int minute = lt[1];
         String units = imperial ? "imperial" : "metric";
         boolean hasFix = !Double.isNaN(lat) && !Double.isNaN(lon);
 
-        if (hasFix) {
-            double total = 0;
-            JSONObject best = null;
-            double bestTm = 0;
-            double bestScore = 0;
-            double secondScore = 0;
-            double othersScore = 0;
-            JSONArray routines = a.optJSONArray("routines");
-            for (int i = 0; routines != null && i < routines.length(); i++) {
-                JSONObject r = routines.optJSONObject(i);
-                if (!r.optBoolean("eligible")) continue;
+        double total = 0;
+        JSONObject best = null;
+        double bestScore = -1;
+        JSONArray routines = a != null ? a.optJSONArray("routines") : null;
+        for (int i = 0; routines != null && i < routines.length(); i++) {
+            JSONObject r = routines.optJSONObject(i);
+            if (!r.optBoolean("eligible") && !r.optBoolean("user")) continue; // routineChoices()
+            double tm = Math.max(TIME_FLOOR, timeMatch(minute, r.optDouble("startMin")));
+            JSONArray days = r.optJSONArray("weekdays");
+            boolean sameType = false;
+            for (int d = 0; d < 7; d++) if (days.optInt(d) > 0 && weekend(d) == weekend(weekday)) sameType = true;
+            double place = 1;
+            if (hasFix) {
                 JSONArray start = r.optJSONArray("start");
-                if (metres(lat, lon, start.optDouble(0), start.optDouble(1)) > SAME_START_M) continue;
-                double tm = timeMatch(minute, r.optDouble("startMin"));
-                JSONArray days = r.optJSONArray("weekdays");
-                boolean sameType = false;
-                for (int d = 0; d < 7; d++) if (days.optInt(d) > 0 && weekend(d) == weekend(weekday)) sameType = true;
-                double s = r.optDouble("weight") * tm * dayFactor(days.optInt(weekday) > 0, sameType);
-                total += s;
-                if (s > bestScore) {
-                    secondScore = bestScore;
-                    bestScore = s;
-                    best = r;
-                    bestTm = tm;
-                } else if (s > secondScore) {
-                    secondScore = s;
-                }
+                double z = metres(lat, lon, start.optDouble(0), start.optDouble(1)) / SAME_START_M;
+                place = Math.max(PLACE_FLOOR, Math.exp(-0.5 * z * z));
             }
-            if (best != null) {
-                JSONArray others = a.optJSONArray("others");
-                for (int i = 0; others != null && i < others.length(); i++) {
-                    JSONArray o = others.optJSONArray(i);
-                    if (metres(lat, lon, o.optDouble(0), o.optDouble(1)) > SAME_START_M) continue;
-                    int wd = o.optInt(4);
-                    double s = o.optDouble(2) * timeMatch(minute, o.optDouble(3)) * dayFactor(wd == weekday, weekend(wd) == weekend(weekday));
-                    total += s;
-                    othersScore += s;
-                }
-                double share = bestScore / total;
-                double margin = (bestScore - Math.max(secondScore, othersScore)) / total;
-                if (bestTm >= MIN_TIME_MATCH && share >= MIN_SHARE && margin >= MIN_MARGIN) {
-                    p.goalM = best.optJSONObject("goal").optDouble(units);
-                    p.source = "route";
-                    p.routineId = best.optString("id");
-                    p.name = best.optString("name");
-                    p.confidence = round4(share);
-                    p.signature = best.optJSONArray("signature");
-                    return p;
-                }
+            double s = r.optDouble("weight") * tm * dayFactor(days.optInt(weekday) > 0, sameType) * place;
+            total += s;
+            if (s > bestScore) {
+                bestScore = s;
+                best = r;
             }
-            p.reason = "unsure";
+        }
+        if (best != null) {
+            p.goalM = best.optJSONObject("goal").optDouble(units);
+            p.source = "route";
+            p.routineId = best.optString("id");
+            p.name = best.optString("name");
+            p.confidence = round4(total > 0 ? bestScore / total : 1);
+            p.signature = best.optJSONArray("signature");
             return p;
         }
 
+        if (a == null || !a.optBoolean("ready")) {
+            p.reason = "learning";
+            p.have = a != null ? a.optInt("usable") : 0;
+            return p;
+        }
         JSONArray buckets = a.optJSONArray("buckets");
         int dayType = weekend(weekday) ? 1 : 0;
         int part = dayPart(minute);

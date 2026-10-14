@@ -35,14 +35,13 @@ export const T = {
   bucketMinCount: 4,
   bucketMaxCv: 0.1,
   timeSigmaMin: 75,
-  minTimeMatch: 0.25,
-  minShare: 0.7,
-  minMargin: 0.3,
+  /** Lowest time and place factors when picking a routine at the start (predictGoal). */
+  timeFloor: 0.01,
+  placeFloor: 0.001,
   roundSnap: 0.03,
   hitTolerance: 0.1,
   minPredictionsForFeedback: 3,
   feedbackWindow: 5,
-  staleDays: 14,
   minHitRate: 0.5,
 };
 
@@ -277,7 +276,8 @@ function medoidOf(members) {
 
 /**
  * Group workouts by route. `seeds` are routines the user marked: their workouts stay
- * together whatever the geometry, and other workouts on the same route join them.
+ * together whatever the geometry, and other workouts on the same route join them. The shape
+ * decides; among the routes it fits, the routine the workout was given at the start wins.
  */
 function clusterRoutes(fs, seeds = []) {
   const pinned = new Set(seeds.flatMap((sd) => sd.members.map((m) => m.id)));
@@ -286,7 +286,8 @@ function clusterRoutes(fs, seeds = []) {
     let best = null;
     let bestD = Infinity;
     for (const c of list) {
-      const d = sameRoute(f, c.medoid);
+      let d = sameRoute(f, c.medoid);
+      if (d < Infinity && c.id != null && c.id === f.prediction?.routineId) d = -1;
       if (d < bestD) {
         bestD = d;
         best = c;
@@ -294,20 +295,21 @@ function clusterRoutes(fs, seeds = []) {
     }
     return best;
   };
-  const seeded = () => seeds.map((sd) => ({ medoid: medoidOf(sd.members), members: [...sd.members], user: sd }));
+  // `id` is the routine id each cluster will most likely get (see buildRoutineModel).
+  const seeded = () => seeds.map((sd) => ({ id: sd.id, medoid: medoidOf(sd.members), members: [...sd.members], user: sd }));
   const clusters = seeded();
   for (const f of free) {
     const c = assign(f, clusters);
     if (c) c.members.push(f);
-    else clusters.push({ medoid: f, members: [f] });
+    else clusters.push({ id: f.id, medoid: f, members: [f] });
   }
   // One reassignment pass against the settled medoids.
   const settled = seeded();
-  for (const c of clusters.slice(seeds.length)) settled.push({ medoid: medoidOf(c.members), members: [] });
+  for (const c of clusters.slice(seeds.length)) settled.push({ id: c.id, medoid: medoidOf(c.members), members: [] });
   for (const f of free) {
     const c = assign(f, settled);
     if (c) c.members.push(f);
-    else settled.push({ medoid: f, members: [f] });
+    else settled.push({ id: f.id, medoid: f, members: [f] });
   }
   return settled
     .filter((c) => c.members.length)
@@ -363,7 +365,6 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
     const fs = all.filter((f) => f.activity === act);
     const recentWindow = fs.filter((f) => now - f.at <= T.activityWindowDays * DAY_MS);
     const routines = [];
-    const inRoutine = new Set();
     const routable = fs.filter((f) => !det.has(f.id));
     const seeds = user
       .filter((u) => u.activity === act)
@@ -404,16 +405,9 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
         ? !suppressed && r.count >= T.userRoutineMinCount
         : !suppressed && r.count >= T.routineMinCount && recent >= T.routineMinRecent && r.cv <= T.routineMaxCv;
       if (c.user) r.user = true;
-      // Members of eligible routines are explained, and so are those of a suppressed routine
-      // the user has stopped doing (a stale habit). A suppressed routine that is still being
-      // done sometimes is a coin flip against another one, so it keeps competing as "others".
-      const stale = suppressed && now - r.lastAt > T.staleDays * DAY_MS;
-      if (r.eligible || stale) ms.forEach((m) => inRoutine.add(m.id));
       if (!r.eligible) delete r.signature;
       routines.push(r);
     }
-    // Workouts outside any eligible routine compete with routines that start nearby.
-    const others = fs.filter((f) => !inRoutine.has(f.id)).map((f) => [f.start[0], f.start[1], round4(weight(f)), f.minute, f.weekday]);
     const buckets = [];
     for (const dayType of [0, 1]) {
       for (let part = 0; part < 5; part++) {
@@ -438,7 +432,6 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
       // Marking a routine is enough to start predicting it.
       ready: recentWindow.length >= T.activityMinWorkouts || routines.some((r) => r.user && r.eligible),
       routines: routines.sort((a, b) => b.weight - a.weight || a.id.localeCompare(b.id)),
-      others,
       buckets,
     };
   }
@@ -533,66 +526,51 @@ export function assignWorkout(routines, model, workout, routineId) {
 // ---- Prediction (ported to RoutineMatcher.java) ----------------------------------------------
 
 /**
+ * The routine a new workout most likely is, and its goal. Every routine of the activity
+ * (routineChoices) competes on how often it is done, the start time and weekday, and, with
+ * a fix, how close it starts: one is always picked when the activity has any, so the
+ * routine's goal and announcements apply from the start (the user can take the workout out
+ * of it afterwards). Without routines, the usual distance for this time of week.
  * @param {object} model  from buildRoutineModel
  * @param {{activity:string, now:number, tzOffset:number, lat?:number, lon?:number, imperial?:boolean}} ctx
- *   lat/lon NaN or missing when there is no good fix yet (time-only fallback).
+ *   lat/lon NaN or missing when there is no good fix yet (time only).
  * @returns {{goalM:number, source:'route'|'time', routineId:string|null, name:string, confidence:number, signature?:number[][]}
  *   | {goalM:null, reason:'learning'|'unsure', have?:number, need?:number}}
  */
 export function predictGoal(model, ctx) {
   const a = model?.activities?.[ctx.activity];
   const need = model?.need ?? T.activityMinWorkouts;
-  if (!a || !a.ready) return { goalM: null, reason: 'learning', have: a ? a.usable : 0, need };
   const { weekday, minute } = localTime(ctx.now, ctx.tzOffset);
   const units = ctx.imperial ? 'imperial' : 'metric';
-  const timeMatch = (m) => Math.exp(-0.5 * (circDiff(minute, m) / T.timeSigmaMin) ** 2);
-  const dayFactor = (sameDay, sameType) => (sameDay ? 1 : sameType ? 0.6 : 0.3);
   const hasFix = Number.isFinite(ctx.lat) && Number.isFinite(ctx.lon);
-
-  if (hasFix) {
+  const choices = routineChoices(model, ctx.activity);
+  if (choices.length) {
     let total = 0;
     let best = null;
-    let bestScore = 0;
-    let secondScore = 0;
-    let othersScore = 0;
-    for (const r of a.routines) {
-      if (!r.eligible || metres(ctx.lat, ctx.lon, r.start[0], r.start[1]) > T.sameStartM) continue;
-      const tm = timeMatch(r.startMin);
+    let bestScore = -1;
+    for (const r of choices) {
+      // Floors keep every routine in the running; a routine starting here beats one at the right time elsewhere.
+      const tm = Math.max(T.timeFloor, Math.exp(-0.5 * (circDiff(minute, r.startMin) / T.timeSigmaMin) ** 2));
       const sameType = r.weekdays.some((n, d) => n > 0 && isWeekend(d) === isWeekend(weekday));
-      const s = r.weight * tm * dayFactor(r.weekdays[weekday] > 0, sameType);
+      const dayFactor = r.weekdays[weekday] > 0 ? 1 : sameType ? 0.6 : 0.3;
+      const place = hasFix ? Math.max(T.placeFloor, Math.exp(-0.5 * (metres(ctx.lat, ctx.lon, r.start[0], r.start[1]) / T.sameStartM) ** 2)) : 1;
+      const s = r.weight * tm * dayFactor * place;
       total += s;
       if (s > bestScore) {
-        secondScore = bestScore;
         bestScore = s;
-        best = { r, tm };
-      } else if (s > secondScore) secondScore = s;
-    }
-    if (best) {
-      for (const [lat, lon, w, m, wd] of a.others) {
-        if (metres(ctx.lat, ctx.lon, lat, lon) > T.sameStartM) continue;
-        const s = w * timeMatch(m) * dayFactor(wd === weekday, isWeekend(wd) === isWeekend(weekday));
-        total += s;
-        othersScore += s;
-      }
-      // Unexplained workouts from here compete as one group (they may be a routine forming).
-      const share = bestScore / total;
-      const margin = (bestScore - Math.max(secondScore, othersScore)) / total;
-      if (best.tm >= T.minTimeMatch && share >= T.minShare && margin >= T.minMargin) {
-        return {
-          goalM: best.r.goal[units],
-          source: 'route',
-          routineId: best.r.id,
-          name: best.r.name,
-          confidence: round4(share),
-          signature: best.r.signature,
-        };
+        best = r;
       }
     }
+    return {
+      goalM: best.goal[units],
+      source: 'route',
+      routineId: best.id,
+      name: best.name,
+      confidence: round4(total > 0 ? bestScore / total : 1),
+      ...(best.signature ? { signature: best.signature } : {}),
+    };
   }
-
-  // Time-only fallback only without a fix: at a known place with no matching routine, or a
-  // new place, the user is doing something else.
-  if (hasFix) return { goalM: null, reason: 'unsure' };
+  if (!a || !a.ready) return { goalM: null, reason: 'learning', have: a ? a.usable : 0, need };
   const b = a.buckets.find((x) => x.eligible && x.dayType === (isWeekend(weekday) ? 1 : 0) && x.part === dayPart(minute));
   if (b) return { goalM: b.goal[units], source: 'time', routineId: null, name: b.name, confidence: round4(1 - b.cv) };
   return { goalM: null, reason: 'unsure' };
