@@ -346,9 +346,12 @@ function hitStats(fs, routineId) {
  * @param {{now?: number, excluded?: string[], names?: Record<string,string>,
  *   user?: {id:string, name:string, activity:string, workoutIds:string[]}[]}} [opts]
  *   user: routines the user marked from History (see clusterRoutes)
+ *   detached: workouts the user took out of their routine; they join no routine but still
+ *   count for time-of-day goals
  */
-export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], names = {}, user = [] } = {}) {
+export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], names = {}, user = [], detached = [] } = {}) {
   const ex = new Set(excluded);
+  const det = new Set(detached);
   const all = workouts
     .filter((w) => isUsable(w, ex) && w.startedAt <= now)
     .sort((a, b) => a.startedAt - b.startedAt || String(a.id).localeCompare(String(b.id)))
@@ -361,11 +364,12 @@ export function buildRoutineModel(workouts, { now = Date.now(), excluded = [], n
     const recentWindow = fs.filter((f) => now - f.at <= T.activityWindowDays * DAY_MS);
     const routines = [];
     const inRoutine = new Set();
+    const routable = fs.filter((f) => !det.has(f.id));
     const seeds = user
       .filter((u) => u.activity === act)
-      .map((u) => ({ id: u.id, name: u.name, members: fs.filter((f) => u.workoutIds.includes(f.id)) }))
+      .map((u) => ({ id: u.id, name: u.name, members: routable.filter((f) => u.workoutIds.includes(f.id)) }))
       .filter((sd) => sd.members.length);
-    for (const c of clusterRoutes(fs, seeds)) {
+    for (const c of clusterRoutes(routable, seeds)) {
       const ms = c.members;
       const id = c.user ? c.user.id : ms[0].id;
       const dists = ms.map((m) => m.distance);
@@ -477,6 +481,53 @@ export function routineLabels(model, workouts) {
     }
   }
   return out;
+}
+
+// ---- Assigning a workout to a routine -------------------------------------------------------
+
+/** Routines a workout of this activity can be put in: recognised ones and those the user marked. */
+export function routineChoices(model, activity) {
+  return (model?.activities?.[activity]?.routines ?? []).filter((r) => r.eligible || r.user);
+}
+
+/** The routine a workout belongs to (see routineChoices), or null. */
+export function routineOf(model, workout) {
+  return routineChoices(model, workout.activity).find((r) => r.workoutIds.includes(workout.id)) ?? null;
+}
+
+/**
+ * Routine settings (settings().routines) with one workout put in a routine, or taken out of
+ * every routine when `routineId` is null. A workout belongs to one marked routine at a time.
+ * Joining a learned routine marks it as the user's under the same id, so its name, voice
+ * settings and workouts carry over. A learned routine is named after its first workout, so
+ * when that one leaves, the rest are marked too and keep the id. A workout taken out is
+ * `detached`: route matching won't pull it back in, but it still counts for time-of-day goals.
+ */
+export function assignWorkout(routines, model, workout, routineId) {
+  const id = workout.id;
+  const now = Date.now();
+  const mark = (r, workoutIds) => ({ id: r.id, name: r.name, activity: workout.activity, workoutIds, createdAt: now });
+  let user = (routines.user ?? []).map((u) => ({ ...u, workoutIds: u.workoutIds.filter((x) => x !== id) }));
+  const current = routineOf(model, workout);
+  if (current && !current.user && current.id === id && current.id !== routineId) {
+    const rest = current.workoutIds.filter((x) => x !== id);
+    if (rest.length) user.push(mark(current, rest));
+  }
+  if (routineId) {
+    const target = routineChoices(model, workout.activity).find((r) => r.id === routineId);
+    if (!target) throw new Error('That routine no longer exists');
+    const existing = user.find((u) => u.id === routineId);
+    if (existing) existing.workoutIds = [...existing.workoutIds, id];
+    else user.push(mark(target, [...target.workoutIds.filter((x) => x !== id), id]));
+  }
+  user = user.filter((u) => u.workoutIds.length);
+  const detached = (routines.detached ?? []).filter((x) => x !== id);
+  return {
+    ...routines,
+    user,
+    excluded: routines.excluded.filter((x) => x !== id),
+    detached: routineId ? detached : [...detached, id],
+  };
 }
 
 // ---- Prediction (ported to RoutineMatcher.java) ----------------------------------------------

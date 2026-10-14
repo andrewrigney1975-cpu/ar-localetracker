@@ -1438,6 +1438,33 @@ main#view {
   font-size: 2.2rem;
 }
 
+/* Workout detail: the routine picker sits on the right of the Distance tile. */
+.distance-tile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.distance-tile > .stat.bare {
+  padding: 0;
+  background: none;
+  min-width: 0;
+}
+
+.distance-tile .routine-pick {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 55%;
+  color: inherit;
+  border-color: color-mix(in srgb, currentColor 35%, transparent);
+  background-color: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.distance-tile .routine-pick[hidden] {
+  display: none;
+}
+
 .zones {
   margin-top: 10px;
   padding: 12px 14px;

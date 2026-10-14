@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { destination } from '../src/geo/geo.js';
 import {
+  assignWorkout,
   buildRoutineModel,
   distanceToPolyline,
   goalFor,
@@ -15,6 +16,7 @@ import {
   routineLabels,
   predictGoal,
   resample,
+  routineOf,
   routeDistance,
   sameRoute,
   features,
@@ -264,6 +266,53 @@ describe('routines the user marked', () => {
   it('only counts workouts of its own activity', () => {
     const m = buildRoutineModel(marked, { now, user: [{ ...user[0], activity: 'walk' }] });
     expect(m.activities.run.routines.some((x) => x.user)).toBe(false);
+  });
+});
+
+describe('putting a workout in a routine from its Distance tile', () => {
+  const rand = rng(23);
+  const loop = () => loopRoute(PARK, 6000, 80, rand);
+  const ws = [
+    record('a', loop(), 6000, at(2026, 8, 2, 18, 0)),
+    record('b', loop(), 6010, at(2026, 8, 9, 18, 0)),
+    record('c', loop(), 5990, at(2026, 8, 16, 18, 0)),
+    record('d', loop(), 6000, at(2026, 8, 23, 18, 0)),
+    record('x', loopRoute(HOME, 6000, 10, rand), 6000, at(2026, 8, 24, 18, 0)),
+  ];
+  const now = at(2026, 8, 25, 12, 0);
+  const base = { names: {}, excluded: [], user: [], detached: [] };
+  const build = (r) => buildRoutineModel(ws, { now, ...r });
+
+  it('takes a workout out of its learned routine, and keeps the routine under its id', () => {
+    const m = build(base);
+    const learned = routineOf(m, ws[0]);
+    expect(learned).toMatchObject({ id: 'a', eligible: true });
+    const out = assignWorkout(base, m, ws[0], null);
+    expect(out.detached).toEqual(['a']);
+    // 'a' named the routine, so the rest are marked under the same id.
+    expect(out.user).toMatchObject([{ id: 'a', workoutIds: ['b', 'c', 'd'] }]);
+    const after = build(out);
+    expect(routineOf(after, ws[0])).toBeNull();
+    expect(routineOf(after, ws[1])?.id).toBe('a');
+  });
+
+  it('puts an unassigned workout in a routine, and moves it back out again', () => {
+    const m = build(base);
+    expect(routineOf(m, ws[4])).toBeNull();
+    const added = assignWorkout(base, m, ws[4], 'a');
+    expect(added.user).toMatchObject([{ id: 'a', workoutIds: ['a', 'b', 'c', 'd', 'x'] }]);
+    const m2 = build(added);
+    expect(routineOf(m2, ws[4])?.id).toBe('a');
+    const removed = assignWorkout(added, m2, ws[4], null);
+    expect(removed.user[0].workoutIds).not.toContain('x');
+    expect(routineOf(build(removed), ws[4])).toBeNull();
+  });
+
+  it('moves a workout from one marked routine to another', () => {
+    const r = { ...base, user: [{ id: 'u1', name: 'one', activity: 'run', workoutIds: ['a', 'b'] }, { id: 'u2', name: 'two', activity: 'run', workoutIds: ['c', 'd'] }] };
+    const out = assignWorkout(r, build(r), ws[1], 'u2');
+    expect(out.user.map((u) => [u.id, u.workoutIds])).toEqual([['u1', ['a']], ['u2', ['c', 'd', 'b']]]);
+    expect(routineOf(build(out), ws[1])?.id).toBe('u2');
   });
 });
 

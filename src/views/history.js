@@ -154,7 +154,12 @@ export async function mount(root, params, query, ctx) {
       .filter((u) => u.workoutIds.length);
     const routine = { id: `u${Date.now().toString(36)}`, name, activity, workoutIds: ids, createdAt: Date.now() };
     await updateSettings({
-      routines: { ...routines, user: [...others, routine], excluded: routines.excluded.filter((id) => !pickedSet.has(id)) },
+      routines: {
+        ...routines,
+        user: [...others, routine],
+        excluded: routines.excluded.filter((id) => !pickedSet.has(id)),
+        detached: (routines.detached ?? []).filter((id) => !pickedSet.has(id)),
+      },
     });
     setSelecting(false);
     try {
