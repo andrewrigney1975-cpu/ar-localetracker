@@ -1,7 +1,8 @@
 // Goals: targets for distance, activity time, cardio load and calories per day, week or
 // month, for one activity or all of them. Stored in settings().goals as
 // {"run.week": {distance: 20000, time: 7200}} in SI units (metres, seconds). Insights draws
-// the goal matching its chart; LocaleWidgets.java reads distance goals for the 4×2 widget.
+// the goal for its chart's grouping, scaled from another period when that one isn't set;
+// WeekGoal.java reads distance goals for the 4×2 widget the same way.
 
 export const GOAL_PERIODS = [
   { id: 'day', label: 'Per day', noun: 'day' },
@@ -47,4 +48,34 @@ export function goalList(goals) {
     }
   }
   return out;
+}
+
+const DAY_MS = 86400000;
+/** Goal periods to scale from when the chart's own isn't set, as WeekGoal.java does. */
+const SCALE_ORDER = ['week', 'day', 'month'];
+
+/** Days in the goal period containing `ms`: 1, 7, or the length of its month (local time). */
+function periodDays(period, ms) {
+  if (period === 'day') return 1;
+  if (period === 'week') return 7;
+  const d = new Date(ms);
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+}
+
+/**
+ * The goal for one chart period: the goal set for that period, else one set for another
+ * period scaled by length (a week goal is 1/7 per day; a month goal is spread over its days).
+ * @param {number} start  the chart period's start (local midnight)
+ * @param {(start:number, group:string) => number} nextPeriod  report.js nextPeriod
+ * @returns {{value:number, from:string}|null} from: the period the goal was set for
+ */
+export function goalForPeriod(goals, activity, group, metric, start, nextPeriod) {
+  const exact = goalValue(goals, activity, group, metric);
+  if (exact != null) return { value: exact, from: group };
+  const days = Math.round((nextPeriod(start, group) - start) / DAY_MS);
+  for (const from of SCALE_ORDER) {
+    const v = goalValue(goals, activity, from, metric);
+    if (v != null) return { value: (v * days) / periodDays(from, start), from };
+  }
+  return null;
 }

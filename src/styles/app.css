@@ -2662,6 +2662,8 @@ a.stat.pb:active {
 
 /* Insights: the goal for the chart's activity, period and metric (Settings → Goals). */
 .chart-scroll .goal-line {
+  fill: none;
+  pointer-events: none;
   stroke: var(--text);
   stroke-width: 1.5;
   stroke-dasharray: 5 4;
