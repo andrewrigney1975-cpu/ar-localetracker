@@ -2,6 +2,7 @@ import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
 import { personalBests, pruneSplitCache, splitTimesFor } from '../insights/bests.js';
 import { effortAvailability, effortFor, pruneEffortCache } from '../insights/effort.js';
+import { combinedGoalForPeriod, GOAL_PERIODS, goalForPeriod, goalValue } from '../insights/goals.js';
 import { getRoutineModel } from '../insights/model.js';
 import {
   buildReport,
@@ -371,6 +372,21 @@ export async function mount(root, params, query) {
       host.innerHTML = `<div class="chart-title">${title}</div><div class="chart-empty">No ${def.label.toLowerCase()} data in this range.</div>`;
       return;
     }
+    // The goal for this activity and metric (Settings → Goals) per chart period, scaled from
+    // another period when none is set for this one. All activities in one bar adds up the
+    // activities' goals when there's no All-activities goal. Not for a routine: the goal covers
+    // all of the activity's workouts.
+    const combined = state.activity === 'all' && !report.split;
+    const goalOf = (p) =>
+      combined
+        ? combinedGoalForPeriod(settings().goals, state.group, metric, p.start, nextPeriod)
+        : goalForPeriod(settings().goals, state.activity, state.group, metric, p.start, nextPeriod);
+    const goals = state.routine === 'all' ? periods.map(goalOf) : [];
+    const goalAt = goals.map((g) => (g ? f.value(g.value) : null));
+    const goal = goalAt.find((v) => v != null) ?? null;
+    const goalFrom = goals.find(Boolean)?.from;
+    const goalActivities = goals.find(Boolean)?.activities;
+    if (goal) max = Math.max(max, ...goalAt.filter((v) => v != null));
     const ticks = niceTicks(max, metric === 'pace');
     const top = ticks[ticks.length - 1];
     const groupCount = stacked ? 1 : series.length;
@@ -421,11 +437,29 @@ export async function mount(root, params, query) {
     const grid = ticks
       .map((v) => `<line class="grid" x1="0" x2="${padL + plotW}" y1="${y(v)}" y2="${y(v)}"/>`)
       .join('');
+    // Drawn over the bars, and lets taps through to the tooltip's hit areas.
+    // A step per period, so months of different lengths each get their share.
+    if (goal) {
+      const d = goalAt.map((v, i) => (v == null ? '' : `M${padL + i * slot},${y(v)}H${padL + (i + 1) * slot}`)).join('');
+      marks.push(`<path class="goal-line" d="${d}"/>`);
+    }
     // The y-axis stays put while a long time axis scrolls.
     const axis = ticks.map((v) => `<text class="tick" x="${axisW - 6}" y="${y(v) + 4}" text-anchor="end">${axisText(v)}</text>`).join('');
+    // A goal scaled from another period is named as it was set ("Goal 127 km a week"); added-up
+    // goals by the latest period's total and whose goals they are ("Goal 23 km · Walk + Run").
+    let goalLabel = '';
+    if (goalActivities) {
+      const latest = goalAt.findLast((v) => v != null);
+      goalLabel = `Goal ${f.text(latest)}${f.unit ? ` ${f.unit}` : ''} · ${goalActivities.map((a) => ACTIVITIES[a].label).join(' + ')}`;
+    } else if (goal) {
+      const scaled = goalFrom !== state.group;
+      const setGoal = scaled ? f.value(goalValue(settings().goals, combined ? 'all' : state.activity, goalFrom, metric)) : goal;
+      goalLabel = `Goal ${f.text(setGoal)}${f.unit ? ` ${f.unit}` : ''}${scaled ? ` a ${GOAL_PERIODS.find((g) => g.id === goalFrom).noun}` : ''}`;
+    }
+    const goalKey = goal ? `<span class="goal-key"><i></i>${goalLabel}</span>` : '';
     const legend =
-      series.length > 1
-        ? `<div class="chart-legend">${series.map((a) => `<span><i style="background:var(--${a})"></i>${ACTIVITIES[a].label}</span>`).join('')}</div>`
+      series.length > 1 || goal
+        ? `<div class="chart-legend">${series.length > 1 ? series.map((a) => `<span><i style="background:var(--${a})"></i>${ACTIVITIES[a].label}</span>`).join('') : ''}${goalKey}</div>`
         : '';
     host.innerHTML = `
       <div class="chart-title">${title}</div>
@@ -451,6 +485,11 @@ export async function mount(root, params, query) {
       }
       const total = metricValue(p.total, metric);
       lines.push(`<div class="tip-total">${report.split ? 'All' : `${p.total.workouts} workout${p.total.workouts === 1 ? '' : 's'}`}<b>${total == null ? '–' : `${f.text(f.value(total))} ${f.unit}`}</b></div>`);
+      const g = goalAt[Number(rect.dataset.i)];
+      if (g != null) {
+        const v = total == null ? 0 : f.value(total);
+        lines.push(`<div class="tip-goal">${v >= g ? 'Goal reached' : `Goal ${f.text(g)} ${f.unit}`}<b>${v >= g ? '✓' : `${f.text(g - v)} to go`}</b></div>`);
+      }
       tip.innerHTML = `<div class="tip-head">${escapeHtml(p.label)}</div>${lines.join('')}`;
       tip.hidden = false;
       host.querySelectorAll('.hit').forEach((r) => r.classList.toggle('on', r === rect));

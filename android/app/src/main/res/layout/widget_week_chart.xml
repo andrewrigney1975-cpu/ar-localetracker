@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 4x2: this week's stats (as the 2x2) on the left, distance per day on the right. -->
+<!-- 4x2: this week's stats (as the 2x2) on the left, distance per day on the right, and how
+     the week is going against a distance goal under the chart. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
@@ -37,5 +38,16 @@
             android:layout_weight="1"
             android:importantForAccessibility="no"
             android:scaleType="fitXY" />
+        <!-- LocaleWidgets.goalTextSp; dayChart leaves room for it. -->
+        <TextView
+            android:id="@+id/goal_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxLines="3"
+            android:textColor="@color/widget_text_secondary"
+            android:textSize="11sp"
+            android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>
