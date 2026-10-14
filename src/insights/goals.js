@@ -79,3 +79,22 @@ export function goalForPeriod(goals, activity, group, metric, start, nextPeriod)
   }
   return null;
 }
+
+/**
+ * The goal for one chart period across every activity: the All-activities goal if set, else
+ * the activities' goals added up (each scaled as in goalForPeriod), as the 4×2 widget does.
+ * @returns {{value:number, from:string, activities?:string[]}|null} activities: whose goals were added
+ */
+export function combinedGoalForPeriod(goals, group, metric, start, nextPeriod) {
+  const all = goalForPeriod(goals, 'all', group, metric, start, nextPeriod);
+  if (all) return all;
+  let value = 0;
+  const activities = [];
+  for (const a of GOAL_ACTIVITIES.slice(1)) {
+    const g = goalForPeriod(goals, a, group, metric, start, nextPeriod);
+    if (!g) continue;
+    value += g.value;
+    activities.push(a);
+  }
+  return activities.length ? { value, from: group, activities } : null;
+}

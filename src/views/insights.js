@@ -2,7 +2,7 @@ import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
 import { personalBests, pruneSplitCache, splitTimesFor } from '../insights/bests.js';
 import { effortAvailability, effortFor, pruneEffortCache } from '../insights/effort.js';
-import { GOAL_PERIODS, goalForPeriod, goalValue } from '../insights/goals.js';
+import { combinedGoalForPeriod, GOAL_PERIODS, goalForPeriod, goalValue } from '../insights/goals.js';
 import { getRoutineModel } from '../insights/model.js';
 import {
   buildReport,
@@ -373,12 +373,19 @@ export async function mount(root, params, query) {
       return;
     }
     // The goal for this activity and metric (Settings → Goals) per chart period, scaled from
-    // another period when none is set for this one. Not for a routine: the goal covers all of
-    // the activity's workouts.
-    const goals = state.routine === 'all' ? periods.map((p) => goalForPeriod(settings().goals, state.activity, state.group, metric, p.start, nextPeriod)) : [];
+    // another period when none is set for this one. All activities in one bar adds up the
+    // activities' goals when there's no All-activities goal. Not for a routine: the goal covers
+    // all of the activity's workouts.
+    const combined = state.activity === 'all' && !report.split;
+    const goalOf = (p) =>
+      combined
+        ? combinedGoalForPeriod(settings().goals, state.group, metric, p.start, nextPeriod)
+        : goalForPeriod(settings().goals, state.activity, state.group, metric, p.start, nextPeriod);
+    const goals = state.routine === 'all' ? periods.map(goalOf) : [];
     const goalAt = goals.map((g) => (g ? f.value(g.value) : null));
     const goal = goalAt.find((v) => v != null) ?? null;
     const goalFrom = goals.find(Boolean)?.from;
+    const goalActivities = goals.find(Boolean)?.activities;
     if (goal) max = Math.max(max, ...goalAt.filter((v) => v != null));
     const ticks = niceTicks(max, metric === 'pace');
     const top = ticks[ticks.length - 1];
@@ -438,11 +445,18 @@ export async function mount(root, params, query) {
     }
     // The y-axis stays put while a long time axis scrolls.
     const axis = ticks.map((v) => `<text class="tick" x="${axisW - 6}" y="${y(v) + 4}" text-anchor="end">${axisText(v)}</text>`).join('');
-    // A goal scaled from another period is named as it was set: "Goal 126.6 km a week".
-    const setGoal = goal && goalFrom !== state.group ? f.value(goalValue(settings().goals, state.activity, goalFrom, metric)) : goal;
-    const goalKey = goal
-      ? `<span class="goal-key"><i></i>Goal ${f.text(setGoal)}${f.unit ? ` ${f.unit}` : ''}${goalFrom !== state.group ? ` a ${GOAL_PERIODS.find((g) => g.id === goalFrom).noun}` : ''}</span>`
-      : '';
+    // A goal scaled from another period is named as it was set ("Goal 127 km a week"); added-up
+    // goals by the latest period's total and whose goals they are ("Goal 23 km · Walk + Run").
+    let goalLabel = '';
+    if (goalActivities) {
+      const latest = goalAt.findLast((v) => v != null);
+      goalLabel = `Goal ${f.text(latest)}${f.unit ? ` ${f.unit}` : ''} · ${goalActivities.map((a) => ACTIVITIES[a].label).join(' + ')}`;
+    } else if (goal) {
+      const scaled = goalFrom !== state.group;
+      const setGoal = scaled ? f.value(goalValue(settings().goals, combined ? 'all' : state.activity, goalFrom, metric)) : goal;
+      goalLabel = `Goal ${f.text(setGoal)}${f.unit ? ` ${f.unit}` : ''}${scaled ? ` a ${GOAL_PERIODS.find((g) => g.id === goalFrom).noun}` : ''}`;
+    }
+    const goalKey = goal ? `<span class="goal-key"><i></i>${goalLabel}</span>` : '';
     const legend =
       series.length > 1 || goal
         ? `<div class="chart-legend">${series.length > 1 ? series.map((a) => `<span><i style="background:var(--${a})"></i>${ACTIVITIES[a].label}</span>`).join('') : ''}${goalKey}</div>`

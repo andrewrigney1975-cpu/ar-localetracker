@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { goalForPeriod, goalList, goalValue, withGoals } from '../src/insights/goals.js';
+import { combinedGoalForPeriod, goalForPeriod, goalList, goalValue, withGoals } from '../src/insights/goals.js';
 import { nextPeriod } from '../src/insights/report.js';
 
 describe('goals', () => {
@@ -32,5 +32,13 @@ describe('goals', () => {
     expect(goalForPeriod(g, 'walk', 'month', 'distance', new Date(2026, 10, 1).getTime(), nextPeriod).value).toBeCloseTo(540000);
     expect(goalForPeriod(g, 'run', 'week', 'time', new Date(2026, 9, 11).getTime(), nextPeriod).value).toBe(12600);
     expect(goalForPeriod(g, 'cycle', 'day', 'distance', tue, nextPeriod)).toBeNull();
+  });
+
+  it("adds up the activities' goals for all activities, unless an All goal is set", () => {
+    const tue = new Date(2026, 9, 13).getTime();
+    const g = { 'walk.week': { distance: 126000 }, 'run.day': { distance: 5000 }, 'cycle.week': { time: 3600 } };
+    expect(combinedGoalForPeriod(g, 'day', 'distance', tue, nextPeriod)).toEqual({ value: 23000, from: 'day', activities: ['walk', 'run'] });
+    expect(combinedGoalForPeriod({ ...g, 'all.week': { distance: 70000 } }, 'day', 'distance', tue, nextPeriod)).toEqual({ value: 10000, from: 'week' });
+    expect(combinedGoalForPeriod(g, 'day', 'calories', tue, nextPeriod)).toBeNull();
   });
 });
