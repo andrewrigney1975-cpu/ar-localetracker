@@ -1452,10 +1452,26 @@ main#view {
   min-width: 0;
 }
 
+.distance-side {
+  flex: 0 1 auto;
+  max-width: 55%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.distance-side .gps-error {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
 .distance-tile .routine-pick {
   flex: 0 1 auto;
   width: auto;
-  max-width: 55%;
+  max-width: 100%;
   color: inherit;
   border-color: color-mix(in srgb, currentColor 35%, transparent);
   background-color: color-mix(in srgb, currentColor 14%, transparent);

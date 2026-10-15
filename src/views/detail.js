@@ -370,13 +370,29 @@ function statHTML(label, value, unit = '', cls = '') {
   return `<div class="stat ${cls}"><label>${label}</label><div class="value">${value}${unit ? `<small>${unit}</small>` : ''}</div></div>`;
 }
 
+/** Average horizontal accuracy of the kept GPS fixes ("GPS ±8 m avg"), or '' without it. */
+function gpsErrorHTML(track, units) {
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < (track?.n ?? 0); i++) {
+    const a = track.acc[i];
+    if (Number.isFinite(a) && a > 0) {
+      sum += a;
+      n++;
+    }
+  }
+  if (!n) return '';
+  const v = Math.round(altitudeValue(sum / n, units));
+  return `<span class="gps-error" title="Average accuracy the phone reported for this workout's GPS fixes">GPS ±${v} ${altitudeUnit(units)} avg</span>`;
+}
+
 function renderSummary(panel, w, track, units) {
   const sm = w.summary;
   const alt = (m) => (m == null ? '–' : Math.round(altitudeValue(m, units)).toLocaleString());
   const au = altitudeUnit(units);
   const pace = formatPace(sm.avgMovingSpeed, units, false);
   const rows = [
-    `<div class="stat feature distance-tile">${statHTML('Distance', distanceValue(sm.distance, units).toFixed(2), distanceUnit(units), 'bare')}<select class="select routine-pick" data-ref="routine" aria-label="Routine" hidden></select></div>`,
+    `<div class="stat feature distance-tile">${statHTML('Distance', distanceValue(sm.distance, units).toFixed(2), distanceUnit(units), 'bare')}<div class="distance-side"><select class="select routine-pick" data-ref="routine" aria-label="Routine" hidden></select>${gpsErrorHTML(track, units)}</div></div>`,
     statHTML('Time', formatDuration(sm.duration)),
     statHTML('Moving time', formatDuration(sm.movingTime)),
     statHTML('Avg speed', speedValue(sm.avgMovingSpeed, units).toFixed(1), speedUnit(units)),
