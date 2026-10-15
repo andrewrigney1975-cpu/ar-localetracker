@@ -11,6 +11,8 @@ import { predictGoal } from '../insights/routines.js';
 import { RouteGuard } from '../insights/routeGuard.js';
 
 const Native = registerPlugin('LocaleTracker');
+/** Live distance counts straight-line steps of at least this far, as TrackingService. */
+const LIVE_STEP_M = 10;
 
 function nativeTracker() {
   return {
@@ -171,7 +173,7 @@ function simTracker() {
         if (!anchor || anchor.seg !== st.segment) anchor = { ...p, seg: st.segment };
         else {
           const d = haversine(anchor.lat, anchor.lon, p.lat, p.lon);
-          if (d >= Math.max(2, p.ha * 0.6) || (p.sp >= act.stationarySpeed && d >= 1)) {
+          if (d >= LIVE_STEP_M) {
             st.distance += d;
             anchor = { ...p, seg: st.segment };
           }

@@ -71,6 +71,9 @@ public class TrackingService extends Service {
     private static final long GOAL_FIX_MAX_AGE_MS = 120_000;
     private static final long GOAL_REFINE_WINDOW_MS = 180_000;
 
+    /** Live distance counts straight-line steps of at least this far (see accumulateDistance). */
+    private static final double LIVE_STEP_M = 10;
+
     private static final String CHANNEL_ID = "tracking";
     private static final int NOTIFICATION_ID = 1001;
     private static final String PREFS = "locale_tracker";
@@ -544,7 +547,7 @@ public class TrackingService extends Service {
                 refineGoal(loc.getLatitude(), loc.getLongitude());
             }
             if (state == State.RECORDING) {
-                accumulateDistance(loc, speed);
+                accumulateDistance(loc);
                 checkRoute(loc);
                 announce();
             }
@@ -855,7 +858,7 @@ public class TrackingService extends Service {
         }
     }
 
-    private void accumulateDistance(Location loc, float speed) {
+    private void accumulateDistance(Location loc) {
         if (!loc.hasAccuracy() || loc.getAccuracy() > profile.accuracyGate) return;
         synchronized (this) {
             if (anchor == null || anchorSegment != segment) {
@@ -867,8 +870,9 @@ public class TrackingService extends Service {
             double dt = (loc.getElapsedRealtimeNanos() - anchor.getElapsedRealtimeNanos()) / 1e9;
             if (dt <= 0) return;
             if (d / dt > profile.maxSpeed * 1.5) return; // position spike
-            double jitter = Math.max(2.0, loc.getAccuracy() * 0.6);
-            if (d >= jitter || (speed >= profile.stationarySpeed && d >= 1.0)) {
+            // Joining every fix adds the GPS wobble either side of the path (live ran 1-6% over
+            // the smoothed saved distance); counting 10 m steps follows the path without it.
+            if (d >= LIVE_STEP_M) {
                 distanceM += d;
                 anchor = loc;
             }
