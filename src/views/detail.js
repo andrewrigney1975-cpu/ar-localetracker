@@ -392,7 +392,7 @@ function renderSummary(panel, w, track, units) {
   const au = altitudeUnit(units);
   const pace = formatPace(sm.avgMovingSpeed, units, false);
   const rows = [
-    `<div class="stat feature distance-tile">${statHTML('Distance', distanceValue(sm.distance, units).toFixed(2), distanceUnit(units), 'bare')}<div class="distance-side"><select class="select routine-pick" data-ref="routine" aria-label="Routine" hidden></select>${gpsErrorHTML(track, units)}</div></div>`,
+    `<div class="stat feature distance-tile"><div class="distance-main">${statHTML('Distance', distanceValue(sm.distance, units).toFixed(2), distanceUnit(units), 'bare')}${gpsErrorHTML(track, units)}</div><select class="select routine-pick" data-ref="routine" aria-label="Routine" hidden></select></div>`,
     statHTML('Time', formatDuration(sm.duration)),
     statHTML('Moving time', formatDuration(sm.movingTime)),
     statHTML('Avg speed', speedValue(sm.avgMovingSpeed, units).toFixed(1), speedUnit(units)),

@@ -1446,23 +1446,20 @@ main#view {
   gap: 12px;
 }
 
-.distance-tile > .stat.bare {
+.distance-tile .stat.bare {
   padding: 0;
   background: none;
   min-width: 0;
 }
 
-.distance-side {
-  flex: 0 1 auto;
-  max-width: 55%;
+.distance-main {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+  gap: 2px;
 }
 
-.distance-side .gps-error {
+.distance-main .gps-error {
   font-size: 0.8rem;
   opacity: 0.8;
   white-space: nowrap;
@@ -1471,7 +1468,7 @@ main#view {
 .distance-tile .routine-pick {
   flex: 0 1 auto;
   width: auto;
-  max-width: 100%;
+  max-width: 55%;
   color: inherit;
   border-color: color-mix(in srgb, currentColor 35%, transparent);
   background-color: color-mix(in srgb, currentColor 14%, transparent);
