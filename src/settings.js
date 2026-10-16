@@ -31,6 +31,8 @@ export const DEFAULT_SETTINGS = {
     goalMode: { walk: 'auto', run: 'auto', cycle: 'auto', ski: 'off' },
     /** Say the goal when it is chosen. */
     confirmGoal: true,
+    /** On a recognised routine, say the metres to go: 1000, 500, 200 and 100. */
+    countdown: false,
     /** Vibrate a paired watch with each announcement (a pattern per kind). */
     watchBuzz: true,
     intervalMin: 10,

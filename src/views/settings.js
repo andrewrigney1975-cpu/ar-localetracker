@@ -270,6 +270,8 @@ export async function mount(root) {
                 <input type="checkbox" class="switch" data-toggle="watchBuzz" ${s.voice.watchBuzz ? 'checked' : ''} /></label>
               <label class="setting"><span class="text">Say the goal at the start<small>For example "Goal 4.7 kilometres, your usual Saturday morning loop"</small></span>
                 <input type="checkbox" class="switch" data-toggle="confirmGoal" ${s.voice.confirmGoal ? 'checked' : ''} /></label>
+              <label class="setting"><span class="text">Countdown<small>On your routines, the last kilometre to the goal: 1000, 500, 200 and 100 metres to go</small></span>
+                <input type="checkbox" class="switch" data-toggle="countdown" ${s.voice.countdown ? 'checked' : ''} /></label>
               <div class="setting"><div class="text">Splits every ${imperial ? 'mile' : 'kilometre'}; goal at 25, 50, 75 and 100%<small>Auto goal: learned from your usual routes and times. Set goal: the distance chosen on the start screen. Tap a goal chip to switch.</small></div>
                 <button class="btn ghost" data-act="voicetest">Test</button></div>
             </div>
@@ -387,6 +389,9 @@ export async function mount(root) {
     );
     root.querySelector('[data-toggle="confirmGoal"]').addEventListener('change', (e) =>
       updateSettings({ voice: { ...settings().voice, confirmGoal: e.target.checked } })
+    );
+    root.querySelector('[data-toggle="countdown"]').addEventListener('change', (e) =>
+      updateSettings({ voice: { ...settings().voice, countdown: e.target.checked } })
     );
     root.querySelectorAll('[data-goal]').forEach((b) =>
       b.addEventListener('click', async () => {

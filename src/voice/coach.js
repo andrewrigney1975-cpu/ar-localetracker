@@ -10,6 +10,8 @@ const MIN_AVG_DISTANCE_M = 50;
 
 export const GOAL_STEPS = { walk: 1, run: 1, cycle: 5, ski: 5 };
 export const INTERVAL_OPTIONS = [5, 10, 15, 30];
+/** Countdown: metres to go at which it speaks, over the last kilometre to the goal. */
+export const COUNTDOWN_M = [1000, 500, 200, 100];
 
 /**
  * Announcement settings for one activity, from the app settings object. Goal mode 'set' uses
@@ -30,6 +32,8 @@ export function voiceConfig(s, activity) {
     autoGoal: mode === 'auto',
     confirmGoal: v.confirmGoal !== false,
     watchBuzz: v.watchBuzz !== false,
+    // The setting; the tracker turns it on only for a workout recognised as a routine.
+    countdown: Boolean(v.countdown),
   };
 }
 
@@ -49,8 +53,10 @@ export class VoiceCoach {
     this.lastSplitMs = 0;
     this.intervalsDone = 0;
     this.goalMask = 0;
+    /** How many of COUNTDOWN_M have been passed. */
+    this.countdownDone = 0;
     this.goalPaused = false;
-    /** Kind of the last announcement (for the watch buzz): goal-reached | goal | split | time. */
+    /** Kind of the last announcement (for the watch buzz): goal-reached | goal | countdown | split | time. */
     this.lastKind = null;
   }
 
@@ -63,6 +69,7 @@ export class VoiceCoach {
     this.cfg = { ...this.cfg, goal: true, goalM };
     this.goalMask = 0;
     for (let q = 1; q <= 4; q++) if (distanceM >= (goalM * q) / 4) this.goalMask |= 1 << q;
+    this.countdownDone = countdownPassed(goalM, distanceM);
   }
 
   /**
@@ -87,6 +94,7 @@ export class VoiceCoach {
     this.intervalsDone = this.cfg.intervalMin > 0 ? Math.floor(elapsedMs / (this.cfg.intervalMin * 60000)) : 0;
     this.goalMask = 0;
     if (this.cfg.goalM > 0) for (let q = 1; q <= 4; q++) if (distanceM >= (this.cfg.goalM * q) / 4) this.goalMask |= 1 << q;
+    this.countdownDone = countdownPassed(this.cfg.goalM, distanceM);
   }
 
   /** Called while recording with the running totals. Returns the text to speak, or null. */
@@ -139,13 +147,34 @@ export class VoiceCoach {
           parts.push(saidDistance ? head : `${head} ${spokenDistance(distanceM, cfg.imperial)}.`);
         }
       }
+
+      // Countdown over the last kilometre; when several pass at once only the nearest is said,
+      // and none once the goal itself is reached.
+      const c = countdownPassed(cfg.goalM, distanceM);
+      if (c > this.countdownDone) {
+        if (cfg.countdown && cfg.goal && !this.goalPaused && distanceM < cfg.goalM) {
+          parts.push(`${COUNTDOWN_M[c - 1]} metres to go.`);
+          kinds.add('countdown');
+        }
+        this.countdownDone = c;
+      }
     }
 
-    this.lastKind = ['goal-reached', 'goal', 'split', 'time'].find((k) => kinds.has(k)) ?? null;
+    this.lastKind = ['goal-reached', 'goal', 'countdown', 'split', 'time'].find((k) => kinds.has(k)) ?? null;
     if (!parts.length) return null;
-    if (distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) parts.push(spokenAverage(distanceM, elapsedMs, cfg));
+    // A countdown on its own stays short: no average.
+    const onlyCountdown = kinds.size === 1 && kinds.has('countdown');
+    if (!onlyCountdown && distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) parts.push(spokenAverage(distanceM, elapsedMs, cfg));
     return parts.join(' ');
   }
+}
+
+/** How many of COUNTDOWN_M are passed at this distance (0 without a goal). */
+function countdownPassed(goalM, distanceM) {
+  if (!(goalM > 0)) return 0;
+  let n = 0;
+  while (n < COUNTDOWN_M.length && goalM - distanceM <= COUNTDOWN_M[n]) n++;
+  return n;
 }
 
 /**

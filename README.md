@@ -147,6 +147,9 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - **Time:** every 5, 10, 15 or 30 minutes of active time, with the workout's distance so
     far and average.
   - **Goal:** at 25%, 50%, 75% and 100% of a goal distance set on the start screen.
+  - **Countdown** (opt in, routines only): over the last kilometre to a recognised
+    routine's goal, *"1000 metres to go"*, then 500, 200 and 100, each short with no
+    average. It follows the routine's goal announcements, so it stops when you go off route.
 
   Each kind is on or off per activity (Settings → Voice announcements). Music is lowered
   or paused while Locale speaks, and nothing is said while paused. **Always loud** turns
@@ -160,6 +163,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - time: one longer tap
   - goal milestone: three taps
   - goal reached: long, short, long
+  - countdown: one quick tap
   - goal set: one short tap
   - off route: two long taps
 

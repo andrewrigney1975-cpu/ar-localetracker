@@ -14,6 +14,8 @@ final class VoiceCoach {
     private static final double KM = 1000;
     private static final double MILE = 1609.344;
     private static final double MIN_AVG_DISTANCE_M = 50;
+    /** Countdown: metres to go at which it speaks, over the last kilometre to the goal. */
+    static final int[] COUNTDOWN_M = {1000, 500, 200, 100};
 
     static final class Config {
         boolean splits;
@@ -33,6 +35,8 @@ final class VoiceCoach {
         boolean confirmGoal = true;
         /** Vibrate a paired watch with each announcement. */
         boolean watchBuzz = true;
+        /** Metres to go over the last kilometre; set only for a workout recognised as a routine. */
+        boolean countdown;
     }
 
     static final String OFF_ROUTE_PHRASE = "Off your usual route. Goal announcements paused.";
@@ -43,8 +47,10 @@ final class VoiceCoach {
     long lastSplitMs;
     long intervalsDone;
     int goalMask;
+    /** How many of COUNTDOWN_M have been passed. */
+    int countdownDone;
     boolean goalPaused;
-    /** Kind of the last announcement (for the watch buzz): goal-reached | goal | split | time. */
+    /** Kind of the last announcement (for the watch buzz): goal-reached | goal | countdown | split | time. */
     String lastKind;
 
     VoiceCoach(Config cfg) {
@@ -62,6 +68,7 @@ final class VoiceCoach {
         cfg.goalM = goalM;
         goalMask = 0;
         for (int q = 1; q <= 4; q++) if (distanceM >= (goalM * q) / 4) goalMask |= 1 << q;
+        countdownDone = countdownPassed(goalM, distanceM);
     }
 
     /**
@@ -114,6 +121,7 @@ final class VoiceCoach {
         if (cfg.goalM > 0) {
             for (int q = 1; q <= 4; q++) if (distanceM >= (cfg.goalM * q) / 4) goalMask |= 1 << q;
         }
+        countdownDone = countdownPassed(cfg.goalM, distanceM);
     }
 
     /** Called while recording with the running totals. Returns the text to speak, or null. */
@@ -124,6 +132,7 @@ final class VoiceCoach {
         boolean kTime = false;
         boolean kGoal = false;
         boolean kReached = false;
+        boolean kCountdown = false;
 
         int k = (int) Math.floor(distanceM / unit);
         if (k > splitsDone) {
@@ -172,12 +181,33 @@ final class VoiceCoach {
                     parts.add(saidDistance ? head : head + " " + spokenDistance(distanceM, cfg.imperial) + ".");
                 }
             }
+
+            // Countdown over the last kilometre; when several pass at once only the nearest is said,
+            // and none once the goal itself is reached.
+            int c = countdownPassed(cfg.goalM, distanceM);
+            if (c > countdownDone) {
+                if (cfg.countdown && cfg.goal && !goalPaused && distanceM < cfg.goalM) {
+                    parts.add(COUNTDOWN_M[c - 1] + " metres to go.");
+                    kCountdown = true;
+                }
+                countdownDone = c;
+            }
         }
 
-        lastKind = kReached ? "goal-reached" : kGoal ? "goal" : kSplit ? "split" : kTime ? "time" : null;
+        lastKind = kReached ? "goal-reached" : kGoal ? "goal" : kCountdown ? "countdown" : kSplit ? "split" : kTime ? "time" : null;
         if (parts.isEmpty()) return null;
-        if (distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) parts.add(spokenAverage(distanceM, elapsedMs, cfg.pace, cfg.imperial));
+        // A countdown on its own stays short: no average.
+        boolean onlyCountdown = kCountdown && !kReached && !kGoal && !kSplit && !kTime;
+        if (!onlyCountdown && distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) parts.add(spokenAverage(distanceM, elapsedMs, cfg.pace, cfg.imperial));
         return String.join(" ", parts);
+    }
+
+    /** How many of COUNTDOWN_M are passed at this distance (0 without a goal). */
+    static int countdownPassed(double goalM, double distanceM) {
+        if (!(goalM > 0)) return 0;
+        int n = 0;
+        while (n < COUNTDOWN_M.length && goalM - distanceM <= COUNTDOWN_M[n]) n++;
+        return n;
     }
 
     static String spokenAverage(double distanceM, double elapsedMs, boolean pace, boolean imperial) {
