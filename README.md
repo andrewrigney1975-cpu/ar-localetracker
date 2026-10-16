@@ -27,7 +27,7 @@ sensors.
   &nbsp;
   <img src="docs/screenshots/live.png" width="250" alt="Live workout screen with elapsed time, heart rate, distance, pace, heading, altitude and location">
   &nbsp;
-  <img src="docs/screenshots/summary.png" width="250" alt="Workout summary with distance, times, speed, pace, climb and altitude">
+  <img src="docs/screenshots/summary.png" width="250" alt="Workout summary with distance and the average GPS error, times, speed, pace, climb and altitude">
 </p>
 <p align="center">
   <img src="docs/screenshots/effort.png" width="250" alt="Effort: average and max heart rate, calories, cardio load and time in heart-rate zones">
@@ -44,7 +44,7 @@ sensors.
   <img src="docs/screenshots/live-position.png" width="250" alt="Live position screen: coordinates, barometric altitude, speed, compass heading and a map, with nothing recorded">
 </p>
 <p align="center">
-  <img src="docs/screenshots/voice-settings.png" width="250" alt="Voice announcement settings: Splits, Time and Goal per activity, time interval, lower or pause other audio, watch vibration and saying the goal at the start">
+  <img src="docs/screenshots/voice-settings.png" width="250" alt="Voice announcement settings: Splits, Time and Goal per activity, time interval, lower or pause other audio, always loud, and watch vibration">
   &nbsp;
   <img src="docs/screenshots/voice-live.png" width="250" alt="Live workout screen showing the last spoken announcement as a caption under the controls">
 </p>
@@ -149,7 +149,10 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - **Goal:** at 25%, 50%, 75% and 100% of a goal distance set on the start screen.
 
   Each kind is on or off per activity (Settings → Voice announcements). Music is lowered
-  or paused while Locale speaks, and nothing is said while paused. A routine can have its
+  or paused while Locale speaks, and nothing is said while paused. **Always loud** turns
+  the media volume up to full while Locale speaks, then back to where it was.
+  The distance spoken (and shown live) only counts movement of 10 m or more, so GPS
+  jitter while you walk doesn't run it ahead of the saved workout's distance. A routine can have its
   own (Settings → Learned routines → **Customise**): splits, time, goal and the time
   interval, used instead of the activity's once Locale recognises the routine at the start.
 - **Watch vibration** with each announcement, so you can feel it without listening:
@@ -189,7 +192,8 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 
 ### Review
 - **Stats:**
-  - distance
+  - distance, with the average GPS error the phone reported for the workout's fixes
+    ("GPS ±4 m avg")
   - time, moving time and stationary time
   - average speed and average pace
   - max speed
