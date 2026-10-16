@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { combinedGoalForPeriod, goalForPeriod, goalList, goalValue, withGoals } from '../src/insights/goals.js';
+import { combinedGoalForPeriod, goalForPeriod, goalForWindow, goalList, goalValue, withGoals } from '../src/insights/goals.js';
 import { nextPeriod } from '../src/insights/report.js';
 
 describe('goals', () => {
@@ -40,5 +40,28 @@ describe('goals', () => {
     expect(combinedGoalForPeriod(g, 'day', 'distance', tue, nextPeriod)).toEqual({ value: 23000, from: 'day', activities: ['walk', 'run'] });
     expect(combinedGoalForPeriod({ ...g, 'all.week': { distance: 70000 } }, 'day', 'distance', tue, nextPeriod)).toEqual({ value: 10000, from: 'week' });
     expect(combinedGoalForPeriod(g, 'day', 'calories', tue, nextPeriod)).toBeNull();
+  });
+});
+
+describe('goal for an Insights window', () => {
+  const day = (y, m, d) => new Date(y, m - 1, d).getTime();
+  const goals = { 'run.week': { distance: 21000 }, 'walk.month': { distance: 62000 } };
+
+  it("takes the window's own period, scaled when that one isn't set", () => {
+    expect(goalForWindow(goals, 'run', 'distance', 'week', day(2026, 10, 11), day(2026, 10, 17), nextPeriod)).toEqual({ value: 21000 });
+    expect(goalForWindow(goals, 'run', 'distance', 'day', day(2026, 10, 17), day(2026, 10, 17), nextPeriod)).toEqual({ value: 3000 });
+    expect(goalForWindow(goals, 'walk', 'distance', 'month', day(2026, 10, 1), day(2026, 10, 31), nextPeriod)).toEqual({ value: 62000 });
+    expect(goalForWindow(goals, 'cycle', 'distance', 'week', day(2026, 10, 11), day(2026, 10, 17), nextPeriod)).toBeNull();
+  });
+
+  it('adds up the days of a longer window, and the activities for All', () => {
+    // 1 Sep – 31 Oct: 61 days of 3 km.
+    expect(goalForWindow(goals, 'run', 'distance', null, day(2026, 9, 1), day(2026, 10, 31), nextPeriod).value).toBeCloseTo(61 * 3000, 6);
+    // All: run's 21 km a week plus walk's 62 km over October's 31 days, for one week.
+    const all = goalForWindow(goals, 'all', 'distance', 'week', day(2026, 10, 11), day(2026, 10, 17), nextPeriod);
+    expect(all.value).toBeCloseTo(21000 + 14000, 6);
+    expect(all.activities).toEqual(['walk', 'run']);
+    // An All-activities goal covers everything.
+    expect(goalForWindow({ ...goals, 'all.week': { distance: 50000 } }, 'all', 'distance', 'week', day(2026, 10, 11), day(2026, 10, 17), nextPeriod)).toEqual({ value: 50000 });
   });
 });

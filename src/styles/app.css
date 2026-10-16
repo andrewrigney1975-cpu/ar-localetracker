@@ -2186,6 +2186,42 @@ main#view {
   margin-top: 12px;
 }
 
+/* A figure at the right of a tile: distance against the goal, or the speed spread. */
+.stat.has-side {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: 8px;
+}
+
+.stat-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 0;
+  margin-left: auto;
+  text-align: right;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.stat-side b {
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--text-dim);
+}
+
+.stat-side.met b {
+  color: var(--ok);
+}
+
+.stat-side small {
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
 .insights .metric-row {
   margin-top: 16px;
 }

@@ -98,3 +98,24 @@ export function combinedGoalForPeriod(goals, group, metric, start, nextPeriod) {
   }
   return activities.length ? { value, from: group, activities } : null;
 }
+
+/**
+ * The goal for a whole Insights window (activity 'all' adds up the activities' goals when
+ * there's no All-activities goal). A day, week or month window takes that period's goal,
+ * scaled from another when it isn't set; any other window adds up its days' goals.
+ * @param {string|null} period  'day' | 'week' | 'month' for a window of exactly one, else null
+ * @param {number} from  first day (local midnight); to: last day, inclusive
+ * @returns {{value:number, activities?:string[]}|null} activities: whose goals were added up
+ */
+export function goalForWindow(goals, activity, metric, period, from, to, nextPeriod) {
+  const one = (group, start) =>
+    activity === 'all' ? combinedGoalForPeriod(goals, group, metric, start, nextPeriod) : goalForPeriod(goals, activity, group, metric, start, nextPeriod);
+  const days = [];
+  if (period) days.push(one(period, from));
+  else for (let d = from; d <= to; d = nextPeriod(d, 'day')) days.push(one('day', d));
+  const set = days.filter(Boolean);
+  if (!set.length) return null;
+  const value = set.reduce((s, g) => s + g.value, 0);
+  const added = set.flatMap((g) => g.activities ?? []);
+  return added.length ? { value, activities: [...new Set(added)] } : { value };
+}

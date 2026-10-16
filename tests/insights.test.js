@@ -113,6 +113,19 @@ describe('buildReport', () => {
     expect(r.total.workouts).toBe(4); // June is outside the range
   });
 
+  it("gives the spread of the workouts' speeds, weighted by moving time", () => {
+    const sep = buildReport(entries, opts).periods[0].total;
+    const v = [10000 / 2500, 5000 / 1500, 4000 / 2800];
+    const t = [2500, 1500, 2800];
+    const mean = 19000 / 6800;
+    const sd = Math.sqrt(v.reduce((s, x, i) => s + t[i] * (x - mean) ** 2, 0) / 6800);
+    expect(sep.speedSpreadPct).toBeCloseTo((sd / mean) * 100, 6);
+    // One workout has no spread to speak of.
+    expect(buildReport(entries, opts).periods[1].total.speedSpreadPct).toBeNull();
+    const same = [reportEntry(workout('x', 'run', at(2026, 9, 2), { distance: 5000, movingTime: 1500 })), reportEntry(workout('y', 'run', at(2026, 9, 3), { distance: 10000, movingTime: 3000 }))];
+    expect(buildReport(same, opts).total.speedSpreadPct).toBeCloseTo(0, 6);
+  });
+
   it('filters by activity and splits by activity', () => {
     const runs = buildReport(entries, { ...opts, activity: 'run' });
     expect(runs.total.workouts).toBe(2);
