@@ -49,7 +49,7 @@ sensors.
   <img src="docs/screenshots/voice-live.png" width="250" alt="Live workout screen showing the last spoken announcement as a caption under the controls">
 </p>
 <p align="center">
-  <img src="docs/screenshots/insights.png" width="250" alt="Insights: date range, grouping, activity and routine filters, with totals for workouts, distance, activity time, speed, pace, heart rate, cardio load and calories">
+  <img src="docs/screenshots/insights.png" width="250" alt="Insights: date range, grouping, activity and routine filters, with totals for workouts, distance against its goal, activity time, speed and pace with their ± variation, heart rate, cardio load and calories">
   &nbsp;
   <img src="docs/screenshots/insights-split.png" width="250" alt="Insights: monthly distance stacked by activity, with a tooltip for July and a table broken down by activity">
   &nbsp;
