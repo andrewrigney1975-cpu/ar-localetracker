@@ -12,6 +12,7 @@ import android.os.VibratorManager
  * - time: one medium tap
  * - goal (25/50/75%): three short taps
  * - goal reached: long, short, long
+ * - countdown (metres to go): one quick tap
  * - goal set: one short tap
  * - off route: two long taps
  */
@@ -25,6 +26,7 @@ object Buzz {
         "goal" -> longArrayOf(0, 70, 110, 70, 110, 70)
         "goal-reached" -> longArrayOf(0, 320, 120, 110, 120, 320)
         "goal-set" -> longArrayOf(0, 90)
+        "countdown" -> longArrayOf(0, 50)
         "off-route" -> longArrayOf(0, 260, 180, 260)
         else -> longArrayOf(0, 120)
     }

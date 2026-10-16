@@ -31,6 +31,8 @@ const SCENARIOS = [
   { name: 'walk-goal-only', cfg: cfg({ goal: true, goalM: 5000 }), samples: samples({ seconds: 3800, stepS: 3, speed: 1.4 }) },
   { name: 'ski-time-only', cfg: cfg({ time: true, intervalMin: 30, pace: false }), samples: samples({ seconds: 3700, stepS: 5, speed: 5, wobble: 0.6 }) },
   // Service restarted mid-run without saved coach state: nothing already passed is repeated.
+  // Routine with the countdown: 1000, 500, 200 and 100 metres to go, then the goal.
+  { name: 'walk-countdown', cfg: cfg({ goal: true, goalM: 4700, countdown: true }), samples: samples({ seconds: 3600, stepS: 3, speed: 1.4 }) },
   { name: 'run-resumed', cfg: cfg({ splits: true, goal: true, goalM: 5000 }), sync: [2600, 900000], samples: samples({ seconds: 900, stepS: 2, speed: 2.8, startM: 2600, startMs: 900000 }) },
 ];
 
@@ -132,6 +134,61 @@ describe('voice triggers', () => {
     expect(s.lastKind).toBe('split');
   });
 
+  it('counts down the last kilometre, short and once each', () => {
+    const c = new VoiceCoach(cfg({ goal: true, goalM: 4700, countdown: true }));
+    c.onProgress(3600, 2630000); // past 75%
+    expect(c.onProgress(3690, 2700000)).toBeNull();
+    expect(c.onProgress(3700, 2710000)).toBe('1000 metres to go.');
+    expect(c.lastKind).toBe('countdown');
+    expect(c.onProgress(3710, 2720000)).toBeNull();
+    expect(c.onProgress(4200, 3080000)).toBe('500 metres to go.');
+    expect(c.onProgress(4500, 3300000)).toBe('200 metres to go.');
+    expect(c.onProgress(4600, 3370000)).toBe('100 metres to go.');
+    expect(c.onProgress(4700, 3440000)).toMatch(/^Goal reached: 4\.7 kilometre goal/);
+  });
+
+  it('merges the countdown with a milestone or split on the same fix', () => {
+    const c = new VoiceCoach(cfg({ splits: true, goal: true, goalM: 4000, countdown: true }));
+    for (let d = 10; d < 3000; d += 10) c.onProgress(d, d * 378);
+    expect(c.onProgress(3000, 1134000)).toBe(
+      '3 kilometres. Split time 6 minutes 18 seconds. 75 percent of your 4 kilometre goal. 1000 metres to go. Average pace 6 minutes 18 seconds per kilometre.'
+    );
+    expect(c.lastKind).toBe('goal');
+  });
+
+  it('says only the nearest when a jump passes several, and nothing past the goal', () => {
+    const c = new VoiceCoach(cfg({ goal: true, goalM: 5000, countdown: true }));
+    c.onProgress(3900, 1400000);
+    expect(c.onProgress(4850, 1800000)).toBe('200 metres to go.');
+    const g = new VoiceCoach(cfg({ goal: true, goalM: 5000, countdown: true }));
+    g.onProgress(4850, 1800000);
+    expect(g.onProgress(5010, 1860000)).toMatch(/^Goal reached/);
+  });
+
+  it('skips steps longer than the goal, and keeps quiet off route or with goals off', () => {
+    const short = new VoiceCoach(cfg({ goal: true, goalM: 800, countdown: true }));
+    short.setGoal(800, 0);
+    expect(short.onProgress(300, 120000)).toMatch(/0\.3 kilometres\. 500 metres to go\./);
+    const off = new VoiceCoach(cfg({ goal: true, goalM: 5000, countdown: true }));
+    off.pauseGoal();
+    expect(off.onProgress(4000, 1500000)).toBeNull();
+    const silent = new VoiceCoach(cfg({ goal: false, goalM: 5000, countdown: true }));
+    expect(silent.onProgress(4000, 1500000)).toBeNull();
+    const none = new VoiceCoach(cfg({ goal: true, goalM: 5000 }));
+    expect(none.onProgress(4000, 1500000)).not.toMatch(/to go/);
+  });
+
+  it('does not repeat the countdown after a goal set mid-way or a resume', () => {
+    const c = new VoiceCoach(cfg({ goal: true, goalM: 0, countdown: true }));
+    c.setGoal(5000, 4600);
+    expect(c.countdownDone).toBe(2);
+    expect(c.onProgress(4910, 1800000)).toMatch(/^100 metres to go\./);
+    const r = new VoiceCoach(cfg({ goal: true, goalM: 5000, countdown: true }));
+    r.syncTo(4300, 1600000);
+    expect(r.onProgress(4310, 1604000)).toBeNull();
+    expect(r.onProgress(4500, 1680000)).toBe('500 metres to go.');
+  });
+
   it('stays quiet when every kind is off, but keeps counting', () => {
     const c = new VoiceCoach(cfg({}));
     expect(c.enabled).toBe(false);
@@ -183,6 +240,16 @@ describe('JS ↔ Java voice fixture', () => {
       'Goal reached: 5 kilometre goal, in 59 minutes 30 seconds',
     ]);
     expect(byName['run-resumed'][0].text).toMatch(/^3 kilometres\./);
+    expect(byName['walk-countdown'].map((e) => e.text.split('.')[0])).toEqual([
+      '25 percent of your 4',
+      'Halfway to your 4',
+      '75 percent of your 4',
+      '1000 metres to go',
+      '500 metres to go',
+      '200 metres to go',
+      '100 metres to go',
+      'Goal reached: 4',
+    ]);
   });
 
   it('matches the committed fixture', () => {

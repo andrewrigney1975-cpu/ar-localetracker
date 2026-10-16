@@ -660,6 +660,8 @@ public class TrackingService extends Service {
         coach.restore(baseVoice, elapsed);
         coach.setGoal(m, distance);
         coach.cfg.goal = baseVoice.goal || baseVoice.autoGoal || "manual".equals(source);
+        // The countdown is for routines only (spoken when its goal announcements are on).
+        coach.cfg.countdown = baseVoice.countdown && routineId != null;
         applyRoutineVoice(routineId, elapsed);
     }
 
@@ -739,6 +741,7 @@ public class TrackingService extends Service {
         long intervals = coach.intervalsDone;
         configureCoach(m, goalSource, goalRoutineId, 0, 0);
         coach.goalMask = mask;
+        coach.countdownDone = VoiceCoach.countdownPassed(m, distanceM); // depends on distance alone
         coach.intervalsDone = intervals;
         if (goalOffRoute) coach.pauseGoal();
         else if ("route".equals(goalSource) && goalRoutineId != null) {
