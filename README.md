@@ -285,7 +285,8 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   metric. A goal set for another period is scaled to the chart's grouping: a weekly goal
   is a seventh of it per day, and a monthly one is spread over the month's days. With all
   activities in one bar, the line is the All-activities goal, else the activities' goals
-  added up. Tap a bar to see the goal and how much was left, or that it was reached.
+  added up. Tap a bar to see the goal and how much was left, or that it was reached. The
+  Distance tile shows the window's total against its goal.
 - **The 4×2 widget** counts every activity's distance against the All-activities distance
   goal, else the activities' distance goals added up (a day or month goal counts as its
   share of a week). It compares the week so far with an even share per day, Sunday to
@@ -302,6 +303,16 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Metrics:** distance, average speed and pace (over moving time), activity time,
   average heart rate (max too in exports), cardio load and calories. Totals sit at the top; the chart
   shows the metric you pick (tap a bar for its values), and a table lists every period.
+- **Totals tiles:**
+  - **Distance**, to one decimal. With a distance [goal](#goals), the right of the tile
+    shows how far above or below it you are (*"−20.4 of 25.0 goal"*, green once reached).
+    A day, week or month window uses that period's goal, scaled from another when it isn't
+    set. Longer windows add up each day's goal. With all activities and no All-activities
+    goal, the activities' goals are added up and compared with those activities' distance
+    only (*"of 45.0 walk + run"*). Not shown for a single routine.
+  - **Avg speed** and **Avg pace** show **±%** on the right: how much the workouts' speeds
+    vary about the average (one standard deviation, weighted by moving time as the average
+    is). Shown from two workouts.
 - **Goal line:** the chart shows your [goal](#goals) for its activity and metric as a
   dashed line, with how much each period had left to go.
 - **Export** the report as **CSV** (one row per period, or per period and activity) or
