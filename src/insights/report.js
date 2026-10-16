@@ -248,7 +248,7 @@ export function reportEntry(w, effort = {}) {
 }
 
 function emptyBucket() {
-  return { workouts: 0, distance: 0, duration: 0, movingTime: 0, hrWeighted: 0, hrTime: 0, hrMax: null, kcal: null, load: null };
+  return { workouts: 0, distance: 0, duration: 0, movingTime: 0, speedN: 0, speedSq: 0, hrWeighted: 0, hrTime: 0, hrMax: null, kcal: null, load: null };
 }
 
 function addTo(b, e) {
@@ -256,6 +256,11 @@ function addTo(b, e) {
   b.distance += e.distance;
   b.duration += e.duration;
   b.movingTime += e.movingTime;
+  if (e.movingTime > 0) {
+    // Σ t·v² with v = d / t, for the spread of the workouts' speeds about the average.
+    b.speedN++;
+    b.speedSq += (e.distance * e.distance) / e.movingTime;
+  }
   if (e.hrAvg != null && e.duration > 0) {
     b.hrWeighted += e.hrAvg * e.duration;
     b.hrTime += e.duration;
@@ -268,6 +273,9 @@ function addTo(b, e) {
 function finish(b) {
   // Speed over moving time, as on a workout's summary; pace is its inverse.
   const speed = b.movingTime > 0 ? b.distance / b.movingTime : null;
+  // The workouts' speeds weighted by moving time, as the average is: their standard deviation
+  // as a percentage of it (null below two workouts).
+  const variance = speed && b.speedN >= 2 ? Math.max(0, b.speedSq / b.movingTime - speed * speed) : null;
   return {
     workouts: b.workouts,
     distanceM: b.distance,
@@ -276,6 +284,7 @@ function finish(b) {
     avgSpeedMps: speed,
     avgPaceSPerKm: speed ? 1000 / speed : null,
     avgPaceSPerMi: speed ? MI / speed : null,
+    speedSpreadPct: variance != null ? (Math.sqrt(variance) / speed) * 100 : null,
     avgHrBpm: b.hrTime > 0 ? b.hrWeighted / b.hrTime : null,
     maxHrBpm: b.hrMax,
     cardioLoad: b.load,

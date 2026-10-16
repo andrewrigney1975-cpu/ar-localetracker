@@ -2,7 +2,7 @@ import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
 import { personalBests, pruneSplitCache, splitTimesFor } from '../insights/bests.js';
 import { effortAvailability, effortFor, pruneEffortCache } from '../insights/effort.js';
-import { combinedGoalForPeriod, GOAL_PERIODS, goalForPeriod, goalValue } from '../insights/goals.js';
+import { combinedGoalForPeriod, GOAL_PERIODS, goalForPeriod, goalForWindow, goalValue } from '../insights/goals.js';
 import { getRoutineModel } from '../insights/model.js';
 import {
   buildReport,
@@ -82,6 +82,18 @@ function metricFormat(metric, units) {
     default:
       return { unit: 'kcal', value: (v) => v, text: (v) => Math.round(v).toLocaleString() };
   }
+}
+
+/**
+ * Right side of the Distance tile: "+1.2 / of 20.0 goal", green once the goal is met. Goals
+ * added up from activities name them ("of 45.0 walk + run").
+ */
+function distanceSide(diffM, goalM, units, activities) {
+  const v = distanceValue(Math.abs(diffM), units).toFixed(1);
+  const met = diffM >= 0;
+  const of = `of ${distanceValue(goalM, units).toFixed(1)}`;
+  const caption = activities ? `<small>${of}</small><small>${activities.map((a) => ACTIVITIES[a].label.toLowerCase()).join(' + ')}</small>` : `<small>${of} goal</small>`;
+  return `<span class="stat-side${met ? ' met' : ''}"><b>${met ? '+' : '−'}${v}</b>${caption}</span>`;
 }
 
 const round = (v) => (Math.abs(v) >= 10 ? Math.round(v) : Math.round(v * 10) / 10);
@@ -286,12 +298,26 @@ export async function mount(root, params, query) {
     const t = report.total;
     const can = effortAvailability(settings().profile);
     const pace = metricFormat('pace', units);
+    // Distance against the window's goal; not for a routine, as the goal covers all of the
+    // activity's workouts.
+    const [from, to] = bounds();
+    const period = { today: 'day', week: 'week', month: 'month' }[state.range] ?? null;
+    const goal = state.routine === 'all' ? goalForWindow(settings().goals, state.activity, 'distance', period, from, to, nextPeriod) : null;
+    // Added-up activities' goals are compared with those activities' distance only.
+    const goalDistance = goal?.activities
+      ? scoped()
+          .filter((w) => goal.activities.includes(w.activity) && w.startedAt >= from && w.startedAt < nextPeriod(to, 'day'))
+          .reduce((s, w) => s + (w.summary?.distance ?? 0), 0)
+      : t.distanceM;
+    const goalSide = goal ? distanceSide(goalDistance - goal.value, goal.value, units, goal.activities) : '';
+    // How much the workouts' speeds vary about the average (one standard deviation).
+    const spread = t.speedSpreadPct != null ? `<span class="stat-side"><b>±${Math.round(t.speedSpreadPct)}%</b><small>std dev</small></span>` : '';
     const tiles = [
       ['Workouts', String(t.workouts), ''],
-      ['Distance', metricFormat('distance', units).text(distanceValue(t.distanceM, units)), distanceUnit(units)],
+      ['Distance', distanceValue(t.distanceM, units).toFixed(1), distanceUnit(units), goalSide],
       ['Activity time', formatDuration(t.activityTimeS), ''],
-      ['Avg speed', t.avgSpeedMps ? speedValue(t.avgSpeedMps, units).toFixed(1) : '–', speedUnit(units)],
-      ['Avg pace', t.avgPaceSPerKm ? pace.text(pace.value(t.avgPaceSPerKm)) : '–', paceUnit(units)],
+      ['Avg speed', t.avgSpeedMps ? speedValue(t.avgSpeedMps, units).toFixed(1) : '–', speedUnit(units), spread],
+      ['Avg pace', t.avgPaceSPerKm ? pace.text(pace.value(t.avgPaceSPerKm)) : '–', paceUnit(units), spread],
       ['Avg heart rate', t.avgHrBpm ? String(Math.round(t.avgHrBpm)) : '–', 'bpm'],
       ['Cardio load', t.cardioLoad != null ? Math.round(t.cardioLoad).toLocaleString() : pending && can.cardioLoad ? '…' : '–', ''],
       ['Calories', t.caloriesKcal != null ? Math.round(t.caloriesKcal).toLocaleString() : pending && can.calories ? '…' : '–', 'kcal'],
@@ -301,7 +327,12 @@ export async function mount(root, params, query) {
         ? `<p class="effort-hint">Add your sex, birth year and weight in <a href="#/settings">Settings → Profile</a> to include calories and cardio load.</p>`
         : '';
     content.innerHTML = `
-      <div class="stat-grid num insights-totals">${tiles.map(([label, value, unit]) => `<div class="stat"><label>${label}</label><div class="value">${value}${unit ? `<small>${unit}</small>` : ''}</div></div>`).join('')}</div>
+      <div class="stat-grid num insights-totals">${tiles
+        .map(
+          ([label, value, unit, side = '']) =>
+            `<div class="stat${side ? ' has-side' : ''}"><div><label>${label}</label><div class="value">${value}${unit ? `<small>${unit}</small>` : ''}</div></div>${side}</div>`
+        )
+        .join('')}</div>
       ${pending ? '<p class="about" data-ref="progress"></p>' : ''}
       ${hint}
       <div class="filter-row metric-row" role="radiogroup" aria-label="Chart">
@@ -310,7 +341,7 @@ export async function mount(root, params, query) {
       <div class="card chart-card" data-ref="chart"></div>
       <div class="section-title">By ${GROUPINGS.find((g) => g.id === state.group).label.toLowerCase()}</div>
       <div class="table-scroll">${tableHTML()}</div>
-      <p class="about">Speed and pace use moving time. Heart rate is averaged over workouts that recorded it, weighted by their length. Calories and cardio load are estimates.</p>`;
+      <p class="about">Speed and pace use moving time; ± is how much the workouts' speeds vary about the average (one standard deviation). Heart rate is averaged over workouts that recorded it, weighted by their length. Calories and cardio load are estimates.</p>`;
     content.querySelectorAll('[data-metric]').forEach((b) =>
       b.addEventListener('click', () => {
         state.metric = b.dataset.metric;
