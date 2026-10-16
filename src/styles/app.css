@@ -2184,11 +2184,20 @@ main#view {
 
 .insights-totals {
   margin-top: 12px;
+  /* Equal columns however long a value is; a side figure wraps under it instead. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 560px) {
+  .insights-totals {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 /* A figure at the right of a tile: distance against the goal, or the speed spread. */
 .stat.has-side {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   column-gap: 8px;

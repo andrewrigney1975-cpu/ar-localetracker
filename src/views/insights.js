@@ -311,7 +311,7 @@ export async function mount(root, params, query) {
       : t.distanceM;
     const goalSide = goal ? distanceSide(goalDistance - goal.value, goal.value, units, goal.activities) : '';
     // How much the workouts' speeds vary about the average (one standard deviation).
-    const spread = t.speedSpreadPct != null ? `<span class="stat-side"><b>±${Math.round(t.speedSpreadPct)}%</b><small>std dev</small></span>` : '';
+    const spread = t.speedSpreadPct != null ? `<span class="stat-side"><b>±${Math.round(t.speedSpreadPct)}%</b><small>variance</small></span>` : '';
     const tiles = [
       ['Workouts', String(t.workouts), ''],
       ['Distance', distanceValue(t.distanceM, units).toFixed(1), distanceUnit(units), goalSide],
