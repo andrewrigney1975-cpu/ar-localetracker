@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { VoiceCoach, routineVoice, spokenAverage, spokenDistance, spokenDuration, voiceConfig } from '../src/voice/coach.js';
+import { VoiceCoach, routineVoice, spokenAverage, spokenDistance, spokenDuration, spokenTimeToGo, voiceConfig } from '../src/voice/coach.js';
 import { DEFAULT_SETTINGS } from '../src/settings.js';
 
 const FIXTURE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../android/app/src/test/resources/fixtures/voice.json');
@@ -32,7 +32,9 @@ const SCENARIOS = [
   { name: 'ski-time-only', cfg: cfg({ time: true, intervalMin: 30, pace: false }), samples: samples({ seconds: 3700, stepS: 5, speed: 5, wobble: 0.6 }) },
   // Service restarted mid-run without saved coach state: nothing already passed is repeated.
   // Routine with the countdown: 1000, 500, 200 and 100 metres to go, then the goal.
-  { name: 'walk-countdown', cfg: cfg({ goal: true, goalM: 4700, countdown: true }), samples: samples({ seconds: 3600, stepS: 3, speed: 1.4 }) },
+  { name: 'walk-countdown', cfg: cfg({ goal: true, goalM: 4700, countdown: true, routine: true }), samples: samples({ seconds: 3600, stepS: 3, speed: 1.4 }) },
+  // Routine of 10 km or more: thirds as well as quarters, each with the time to go.
+  { name: 'run-routine-12k', cfg: cfg({ splits: true, goal: true, goalM: 12000, routine: true }), samples: samples({ seconds: 4800, stepS: 2, speed: 2.7 }) },
   { name: 'run-resumed', cfg: cfg({ splits: true, goal: true, goalM: 5000 }), sync: [2600, 900000], samples: samples({ seconds: 900, stepS: 2, speed: 2.8, startM: 2600, startMs: 900000 }) },
 ];
 
@@ -62,6 +64,13 @@ describe('voice phrases', () => {
     expect(spokenDistance(1500, false)).toBe('1.5 kilometres');
     expect(spokenDistance(999.9, false)).toBe('0.99 kilometres');
     expect(spokenDistance(5 * 1609.344, true)).toBe('5 miles');
+  });
+
+  it('speaks the time to go to the minute', () => {
+    expect(spokenTimeToGo(3785000)).toBe('1 hour and 3 minutes to go.');
+    expect(spokenTimeToGo(31 * 60000 - 20000)).toBe('31 minutes to go.');
+    expect(spokenTimeToGo(7200000)).toBe('2 hours to go.');
+    expect(spokenTimeToGo(5000)).toBe('1 minute to go.');
   });
 
   it('speaks average pace or speed', () => {
@@ -103,6 +112,49 @@ describe('voice triggers', () => {
     expect(c.onProgress(7500, 2835000)).toMatch(/^75 percent/);
     expect(c.onProgress(10000, 3780000)).toMatch(/^Goal reached: 10 kilometre goal, in 1 hour 3 minutes\./);
     expect(c.onProgress(11000, 4200000)).toBeNull();
+  });
+
+  it('says the time to go instead of the average at a routine milestone', () => {
+    const c = new VoiceCoach(cfg({ goal: true }));
+    c.setGoal(8000, 0, true);
+    expect(c.onProgress(2000, 756000)).toBe('25 percent of your 8 kilometre goal. 2 kilometres. 38 minutes to go.');
+    expect(c.onProgress(4000, 1512000)).toBe('Halfway to your 8 kilometre goal. 4 kilometres. 25 minutes to go.');
+    expect(c.onProgress(8000, 3024000)).toBe('Goal reached: 8 kilometre goal, in 50 minutes 24 seconds. Average pace 6 minutes 18 seconds per kilometre.');
+    const plain = new VoiceCoach(cfg({ goal: true }));
+    plain.setGoal(8000, 0);
+    expect(plain.onProgress(2000, 756000)).toMatch(/Average pace/);
+  });
+
+  it('adds 33 and 66 percent for routines of 10 kilometres or more', () => {
+    const c = new VoiceCoach(cfg({ goal: true, imperial: false }));
+    c.setGoal(21000, 0, true);
+    const heads = [5250, 7000, 10500, 14000, 15750, 21000].map((d) => c.onProgress(d, d * 360).split('.')[0]);
+    expect(heads).toEqual([
+      '25 percent of your 21 kilometre goal',
+      '33 percent of your 21 kilometre goal',
+      'Halfway to your 21 kilometre goal',
+      '66 percent of your 21 kilometre goal',
+      '75 percent of your 21 kilometre goal',
+      'Goal reached: 21 kilometre goal, in 2 hours 6 minutes',
+    ]);
+    expect(c.onProgress(7000, 7000 * 360 + 1000)).toBeNull();
+    // Not for a shorter routine, nor a 10 km goal that isn't a routine.
+    const short = new VoiceCoach(cfg({ goal: true }));
+    short.setGoal(9000, 0, true);
+    short.onProgress(2250, 810000);
+    expect(short.onProgress(3000, 1080000)).toBeNull();
+    const manual = new VoiceCoach(cfg({ goal: true }));
+    manual.setGoal(12000, 0);
+    manual.onProgress(3000, 1080000);
+    expect(manual.onProgress(4000, 1440000)).toBeNull();
+    // A goal set mid-way (or a resume) doesn't repeat the thirds already passed.
+    const mid = new VoiceCoach(cfg({ goal: true }));
+    mid.setGoal(12000, 4100, true);
+    expect(mid.onProgress(4200, 1500000)).toBeNull();
+    const r = new VoiceCoach(cfg({ goal: true, goalM: 12000, routine: true }));
+    r.syncTo(8100, 2900000);
+    expect(r.onProgress(8200, 2950000)).toBeNull();
+    expect(r.onProgress(9000, 3240000)).toMatch(/^75 percent/);
   });
 
   it('merges announcements that fall together, speaking the average once', () => {
@@ -240,6 +292,15 @@ describe('JS ↔ Java voice fixture', () => {
       'Goal reached: 5 kilometre goal, in 59 minutes 30 seconds',
     ]);
     expect(byName['run-resumed'][0].text).toMatch(/^3 kilometres\./);
+    expect(byName['run-routine-12k'].filter((e) => /percent|Halfway/.test(e.text)).map((e) => e.text.replace(/^\d+ kilometres\. Split time [^.]+\. /, ''))).toMatchInlineSnapshot(`
+      [
+        "25 percent of your 12 kilometre goal. 55 minutes to go.",
+        "33 percent of your 12 kilometre goal. 49 minutes to go.",
+        "Halfway to your 12 kilometre goal. 37 minutes to go.",
+        "66 percent of your 12 kilometre goal. 25 minutes to go.",
+        "75 percent of your 12 kilometre goal. 18 minutes to go.",
+      ]
+    `);
     expect(byName['walk-countdown'].map((e) => e.text.split('.')[0])).toEqual([
       '25 percent of your 4',
       'Halfway to your 4',

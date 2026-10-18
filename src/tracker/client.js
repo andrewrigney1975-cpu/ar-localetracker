@@ -133,7 +133,7 @@ function simTracker() {
       emit('goal', { reason: p.reason ?? 'unsure' });
       return;
     }
-    coach.setGoal(g.goalM, 0);
+    coach.setGoal(g.goalM, 0, Boolean(g.routineId));
     // Without the routine's own settings, its goal is announced only when goals aren't Off.
     // The countdown is for routines only (spoken when its goal announcements are on).
     coach.cfg = { ...coach.cfg, goal: cfg.goal || cfg.autoGoal || g.source === 'manual', countdown: cfg.countdown && Boolean(g.routineId) };

@@ -16,6 +16,14 @@ final class VoiceCoach {
     private static final double MIN_AVG_DISTANCE_M = 50;
     /** Countdown: metres to go at which it speaks, over the last kilometre to the goal. */
     static final int[] COUNTDOWN_M = {1000, 500, 200, 100};
+    /** Routines at least this long also get 33% and 66% goal milestones. */
+    static final double THIRDS_MIN_GOAL_M = 10000;
+    /**
+     * Goal milestones as {numerator, denominator, percent, mask bit}, in order. Bits 1–4 are the
+     * quarters (the saved goalMask predates the thirds), 5–6 the thirds for long routines.
+     */
+    private static final int[][] QUARTERS = {{1, 4, 25, 1}, {1, 2, 50, 2}, {3, 4, 75, 3}, {1, 1, 100, 4}};
+    private static final int[][] WITH_THIRDS = {{1, 4, 25, 1}, {1, 3, 33, 5}, {1, 2, 50, 2}, {2, 3, 66, 6}, {3, 4, 75, 3}, {1, 1, 100, 4}};
 
     static final class Config {
         boolean splits;
@@ -37,6 +45,8 @@ final class VoiceCoach {
         boolean watchBuzz = true;
         /** Metres to go over the last kilometre; set only for a workout recognised as a routine. */
         boolean countdown;
+        /** Set by setGoal for a workout recognised as a routine (thirds, time to go). */
+        boolean routine;
     }
 
     static final String OFF_ROUTE_PHRASE = "Off your usual route. Goal announcements paused.";
@@ -62,12 +72,15 @@ final class VoiceCoach {
         return cfg.splits || cfg.time || (cfg.goal && cfg.goalM > 0) || cfg.autoGoal;
     }
 
-    /** Set (or replace) the goal mid-workout; milestones already passed are not announced. */
-    void setGoal(double goalM, double distanceM) {
+    /**
+     * Set (or replace) the goal mid-workout; milestones already passed are not announced.
+     * routine: the workout was recognised as a routine.
+     */
+    void setGoal(double goalM, double distanceM, boolean routine) {
         cfg.goal = true;
         cfg.goalM = goalM;
-        goalMask = 0;
-        for (int q = 1; q <= 4; q++) if (distanceM >= (goalM * q) / 4) goalMask |= 1 << q;
+        cfg.routine = routine;
+        goalMask = goalMaskAt(distanceM);
         countdownDone = countdownPassed(goalM, distanceM);
     }
 
@@ -117,10 +130,7 @@ final class VoiceCoach {
         // Estimate when the last split was passed from the average pace so far.
         lastSplitMs = distanceM > 0 ? Math.round(elapsedMs * ((splitsDone * unit) / distanceM)) : 0;
         intervalsDone = cfg.intervalMin > 0 ? (long) Math.floor(elapsedMs / (cfg.intervalMin * 60000.0)) : 0;
-        goalMask = 0;
-        if (cfg.goalM > 0) {
-            for (int q = 1; q <= 4; q++) if (distanceM >= (cfg.goalM * q) / 4) goalMask |= 1 << q;
-        }
+        goalMask = goalMaskAt(distanceM);
         countdownDone = countdownPassed(cfg.goalM, distanceM);
     }
 
@@ -163,21 +173,21 @@ final class VoiceCoach {
 
         if (cfg.goalM > 0) {
             int reached = 0;
-            for (int q = 1; q <= 4; q++) {
-                int bit = 1 << q;
-                if ((goalMask & bit) == 0 && distanceM >= (cfg.goalM * q) / 4) {
+            for (int[] ms : milestones()) {
+                int bit = 1 << ms[3];
+                if ((goalMask & bit) == 0 && distanceM >= (cfg.goalM * ms[0]) / ms[1]) {
                     goalMask |= bit;
-                    reached = q;
+                    reached = ms[2];
                 }
             }
             if (reached != 0 && cfg.goal && !goalPaused) {
                 String goal = spokenNumber(cfg.goalM / unit) + (cfg.imperial ? " mile goal" : " kilometre goal");
-                if (reached == 4) kReached = true;
+                if (reached == 100) kReached = true;
                 else kGoal = true;
-                if (reached == 4) {
+                if (reached == 100) {
                     parts.add("Goal reached: " + goal + ", in " + spokenDuration(elapsedMs) + ".");
                 } else {
-                    String head = reached == 2 ? "Halfway to your " + goal + "." : (reached * 25) + " percent of your " + goal + ".";
+                    String head = reached == 50 ? "Halfway to your " + goal + "." : reached + " percent of your " + goal + ".";
                     parts.add(saidDistance ? head : head + " " + spokenDistance(distanceM, cfg.imperial) + ".");
                 }
             }
@@ -198,8 +208,26 @@ final class VoiceCoach {
         if (parts.isEmpty()) return null;
         // A countdown on its own stays short: no average.
         boolean onlyCountdown = kCountdown && !kReached && !kGoal && !kSplit && !kTime;
-        if (!onlyCountdown && distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) parts.add(spokenAverage(distanceM, elapsedMs, cfg.pace, cfg.imperial));
+        if (!onlyCountdown && distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) {
+            // A routine's percent milestone says the time left at the average pace instead.
+            if (cfg.routine && kGoal) parts.add(spokenTimeToGo(((cfg.goalM - distanceM) * elapsedMs) / distanceM));
+            else parts.add(spokenAverage(distanceM, elapsedMs, cfg.pace, cfg.imperial));
+        }
         return String.join(" ", parts);
+    }
+
+    /** The goal milestones for this config: quarters, plus thirds for a routine of 10 km or more. */
+    private int[][] milestones() {
+        return cfg.routine && cfg.goalM >= THIRDS_MIN_GOAL_M ? WITH_THIRDS : QUARTERS;
+    }
+
+    /** goalMask with every milestone passed at this distance (0 without a goal). */
+    private int goalMaskAt(double distanceM) {
+        int mask = 0;
+        if (cfg.goalM > 0) {
+            for (int[] ms : milestones()) if (distanceM >= (cfg.goalM * ms[0]) / ms[1]) mask |= 1 << ms[3];
+        }
+        return mask;
     }
 
     /** How many of COUNTDOWN_M are passed at this distance (0 without a goal). */
@@ -219,6 +247,15 @@ final class VoiceCoach {
         double perHour = distanceM / unit / (elapsedMs / 3600000);
         double v = Math.round(perHour * 10) / 10.0;
         return "Average speed " + spokenNumber(v) + (imperial ? " miles" : " kilometres") + " per hour.";
+    }
+
+    /** "1 hour and 3 minutes to go", "31 minutes to go": to the minute, at least 1. (spokenTimeToGo in coach.js) */
+    static String spokenTimeToGo(double ms) {
+        long total = Math.max(1, Math.round(ms / 60000));
+        long h = total / 60;
+        long m = total % 60;
+        String words = h != 0 && m != 0 ? part(h, "hour") + " and " + part(m, "minute") : h != 0 ? part(h, "hour") : part(m, "minute");
+        return words + " to go.";
     }
 
     static String spokenDistance(double m, boolean imperial) {

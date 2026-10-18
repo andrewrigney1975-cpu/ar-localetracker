@@ -658,7 +658,7 @@ public class TrackingService extends Service {
      */
     private void configureCoach(double m, String source, String routineId, double distance, long elapsed) {
         coach.restore(baseVoice, elapsed);
-        coach.setGoal(m, distance);
+        coach.setGoal(m, distance, routineId != null);
         coach.cfg.goal = baseVoice.goal || baseVoice.autoGoal || "manual".equals(source);
         // The countdown is for routines only (spoken when its goal announcements are on).
         coach.cfg.countdown = baseVoice.countdown && routineId != null;
