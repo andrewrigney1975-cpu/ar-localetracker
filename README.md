@@ -146,7 +146,9 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - **Splits:** every km or mile, with the split time and average pace or speed.
   - **Time:** every 5, 10, 15 or 30 minutes of active time, with the workout's distance so
     far and average.
-  - **Goal:** at 25%, 50%, 75% and 100% of a goal distance set on the start screen.
+  - **Goal:** at 25%, 50%, 75% and 100% of a goal distance set on the start screen. For a
+    recognised routine each milestone says the time left at your average pace instead of
+    the average, *"31 minutes to go"*, and routines of 10 km or more add 33% and 66%.
   - **Countdown** (opt in, routines only): over the last kilometre to a recognised
     routine's goal, *"1000 metres to go"*, then 500, 200 and 100, each short with no
     average. It follows the routine's goal announcements, so it stops when you go off route.
@@ -349,8 +351,10 @@ your goal" without setting anything up.
   Locale tells you: *"Goal 4.7 kilometres, your usual Saturday morning loop."* Without a
   GPS fix yet it goes by the weekday and time, then checks the start place at the first
   good fix (within 3 minutes) and switches routine if that says another.
-- **During the workout** it announces 25%, 50%, 75% and "Goal reached" at 100%, along
-  with your distance and average pace or speed.
+- **During the workout** it announces 25%, 50%, 75% (plus 33% and 66% for routines of
+  10 km or more) and "Goal reached" at 100%, along with your distance and the time to go
+  at your average pace so far: *"Halfway to your 12 kilometre goal. 6 kilometres. 37
+  minutes to go."*
 - **If you leave the usual route**, meaning more than 250 m from it for over 2 minutes,
   it says *"Off your usual route. Goal announcements paused."* Splits and time
   announcements carry on.

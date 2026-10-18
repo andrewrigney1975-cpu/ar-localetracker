@@ -12,6 +12,14 @@ export const GOAL_STEPS = { walk: 1, run: 1, cycle: 5, ski: 5 };
 export const INTERVAL_OPTIONS = [5, 10, 15, 30];
 /** Countdown: metres to go at which it speaks, over the last kilometre to the goal. */
 export const COUNTDOWN_M = [1000, 500, 200, 100];
+/** Routines at least this long also get 33% and 66% goal milestones. */
+export const THIRDS_MIN_GOAL_M = 10000;
+/**
+ * Goal milestones as [numerator, denominator, percent, mask bit], in order. Bits 1–4 are the
+ * quarters (the saved goalMask predates the thirds), 5–6 the thirds for long routines.
+ */
+const QUARTERS = [[1, 4, 25, 1], [1, 2, 50, 2], [3, 4, 75, 3], [1, 1, 100, 4]];
+const WITH_THIRDS = [[1, 4, 25, 1], [1, 3, 33, 5], [1, 2, 50, 2], [2, 3, 66, 6], [3, 4, 75, 3], [1, 1, 100, 4]];
 
 /**
  * Announcement settings for one activity, from the app settings object. Goal mode 'set' uses
@@ -34,6 +42,8 @@ export function voiceConfig(s, activity) {
     watchBuzz: v.watchBuzz !== false,
     // The setting; the tracker turns it on only for a workout recognised as a routine.
     countdown: Boolean(v.countdown),
+    // Set by setGoal for a workout recognised as a routine (thirds, time to go).
+    routine: false,
   };
 }
 
@@ -64,11 +74,13 @@ export class VoiceCoach {
     return this.cfg.splits || this.cfg.time || (this.cfg.goal && this.cfg.goalM > 0) || Boolean(this.cfg.autoGoal);
   }
 
-  /** Set (or replace) the goal mid-workout; milestones already passed are not announced. */
-  setGoal(goalM, distanceM) {
-    this.cfg = { ...this.cfg, goal: true, goalM };
-    this.goalMask = 0;
-    for (let q = 1; q <= 4; q++) if (distanceM >= (goalM * q) / 4) this.goalMask |= 1 << q;
+  /**
+   * Set (or replace) the goal mid-workout; milestones already passed are not announced.
+   * routine: the workout was recognised as a routine.
+   */
+  setGoal(goalM, distanceM, routine = false) {
+    this.cfg = { ...this.cfg, goal: true, goalM, routine };
+    this.goalMask = goalMaskAt(this.cfg, distanceM);
     this.countdownDone = countdownPassed(goalM, distanceM);
   }
 
@@ -92,8 +104,7 @@ export class VoiceCoach {
     // Estimate when the last split was passed from the average pace so far.
     this.lastSplitMs = distanceM > 0 ? Math.round(elapsedMs * ((this.splitsDone * this.unit) / distanceM)) : 0;
     this.intervalsDone = this.cfg.intervalMin > 0 ? Math.floor(elapsedMs / (this.cfg.intervalMin * 60000)) : 0;
-    this.goalMask = 0;
-    if (this.cfg.goalM > 0) for (let q = 1; q <= 4; q++) if (distanceM >= (this.cfg.goalM * q) / 4) this.goalMask |= 1 << q;
+    this.goalMask = goalMaskAt(this.cfg, distanceM);
     this.countdownDone = countdownPassed(this.cfg.goalM, distanceM);
   }
 
@@ -131,19 +142,19 @@ export class VoiceCoach {
 
     if (cfg.goalM > 0) {
       let reached = 0;
-      for (let q = 1; q <= 4; q++) {
-        const bit = 1 << q;
-        if (!(this.goalMask & bit) && distanceM >= (cfg.goalM * q) / 4) {
+      for (const [num, den, pct, b] of milestones(cfg)) {
+        const bit = 1 << b;
+        if (!(this.goalMask & bit) && distanceM >= (cfg.goalM * num) / den) {
           this.goalMask |= bit;
-          reached = q;
+          reached = pct;
         }
       }
       if (reached && cfg.goal && !this.goalPaused) {
         const goal = `${spokenNumber(cfg.goalM / unit)} ${cfg.imperial ? 'mile' : 'kilometre'} goal`;
-        kinds.add(reached === 4 ? 'goal-reached' : 'goal');
-        if (reached === 4) parts.push(`Goal reached: ${goal}, in ${spokenDuration(elapsedMs)}.`);
+        kinds.add(reached === 100 ? 'goal-reached' : 'goal');
+        if (reached === 100) parts.push(`Goal reached: ${goal}, in ${spokenDuration(elapsedMs)}.`);
         else {
-          const head = reached === 2 ? `Halfway to your ${goal}.` : `${reached * 25} percent of your ${goal}.`;
+          const head = reached === 50 ? `Halfway to your ${goal}.` : `${reached} percent of your ${goal}.`;
           parts.push(saidDistance ? head : `${head} ${spokenDistance(distanceM, cfg.imperial)}.`);
         }
       }
@@ -164,9 +175,25 @@ export class VoiceCoach {
     if (!parts.length) return null;
     // A countdown on its own stays short: no average.
     const onlyCountdown = kinds.size === 1 && kinds.has('countdown');
-    if (!onlyCountdown && distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) parts.push(spokenAverage(distanceM, elapsedMs, cfg));
+    if (!onlyCountdown && distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) {
+      // A routine's percent milestone says the time left at the average pace instead.
+      if (cfg.routine && kinds.has('goal')) parts.push(spokenTimeToGo(((cfg.goalM - distanceM) * elapsedMs) / distanceM));
+      else parts.push(spokenAverage(distanceM, elapsedMs, cfg));
+    }
     return parts.join(' ');
   }
+}
+
+/** The goal milestones for this config: quarters, plus thirds for a routine of 10 km or more. */
+function milestones(cfg) {
+  return cfg.routine && cfg.goalM >= THIRDS_MIN_GOAL_M ? WITH_THIRDS : QUARTERS;
+}
+
+/** goalMask with every milestone passed at this distance (0 without a goal). */
+function goalMaskAt(cfg, distanceM) {
+  let mask = 0;
+  if (cfg.goalM > 0) for (const [num, den, , b] of milestones(cfg)) if (distanceM >= (cfg.goalM * num) / den) mask |= 1 << b;
+  return mask;
 }
 
 /** How many of COUNTDOWN_M are passed at this distance (0 without a goal). */
@@ -203,6 +230,16 @@ export function spokenAverage(distanceM, elapsedMs, { pace, imperial }) {
   const perHour = distanceM / unit / (elapsedMs / 3600000);
   const v = Math.round(perHour * 10) / 10;
   return `Average speed ${spokenNumber(v)} ${imperial ? 'miles' : 'kilometres'} per hour.`;
+}
+
+/** "1 hour and 3 minutes to go", "31 minutes to go": to the minute, at least 1. */
+export function spokenTimeToGo(ms) {
+  const total = Math.max(1, Math.round(ms / 60000));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  const part = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const words = h && m ? `${part(h, 'hour')} and ${part(m, 'minute')}` : h ? part(h, 'hour') : part(m, 'minute');
+  return `${words} to go.`;
 }
 
 /** "5 kilometres", "1 kilometre", "3.25 miles". */

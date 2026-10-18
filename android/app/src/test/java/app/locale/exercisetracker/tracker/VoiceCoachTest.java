@@ -27,7 +27,7 @@ public class VoiceCoachTest {
     @Test
     public void replaysSharedScenarios() throws Exception {
         JSONArray scenarios = fixture();
-        assertEquals(6, scenarios.length());
+        assertEquals(7, scenarios.length());
         for (int s = 0; s < scenarios.length(); s++) {
             JSONObject sc = scenarios.getJSONObject(s);
             JSONObject c = sc.getJSONObject("cfg");
@@ -40,6 +40,7 @@ public class VoiceCoachTest {
             cfg.pace = c.getBoolean("pace");
             cfg.imperial = c.getBoolean("imperial");
             cfg.countdown = c.optBoolean("countdown", false);
+            cfg.routine = c.optBoolean("routine", false);
             VoiceCoach coach = new VoiceCoach(cfg);
             JSONArray sync = sc.optJSONArray("sync");
             if (sync != null) coach.syncTo(sync.getDouble(0), sync.getLong(1));
@@ -91,7 +92,7 @@ public class VoiceCoachTest {
         cfg.splits = true;
         cfg.autoGoal = true;
         VoiceCoach c = new VoiceCoach(cfg);
-        c.setGoal(4000, 0);
+        c.setGoal(4000, 0, false);
         c.applyRoutine(false, true, false, 5, 420000);
         assertEquals(1, c.intervalsDone);
         assertNull(c.onProgress(1001, 540000));
@@ -105,6 +106,10 @@ public class VoiceCoachTest {
         assertEquals("1.5 kilometres", VoiceCoach.spokenDistance(1500, false));
         assertEquals("5 miles", VoiceCoach.spokenDistance(5 * 1609.344, true));
         assertEquals("Average speed 24.3 kilometres per hour.", VoiceCoach.spokenAverage(24300, 3600000, false, false));
+        assertEquals("1 hour and 3 minutes to go.", VoiceCoach.spokenTimeToGo(3785000));
+        assertEquals("31 minutes to go.", VoiceCoach.spokenTimeToGo(31 * 60000 - 20000));
+        assertEquals("2 hours to go.", VoiceCoach.spokenTimeToGo(7200000));
+        assertEquals("1 minute to go.", VoiceCoach.spokenTimeToGo(5000));
         assertNull(new VoiceCoach(new VoiceCoach.Config()).onProgress(500, 60000));
     }
 }

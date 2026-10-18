@@ -95,7 +95,7 @@ public class RoutineMatcherTest {
         cfg.autoGoal = true;
         VoiceCoach c = new VoiceCoach(cfg);
         assertTrue(c.enabled());
-        c.setGoal(4000, 1200);
+        c.setGoal(4000, 1200, false);
         assertNull(c.onProgress(1500, 540_000));
         assertTrue(c.onProgress(2000, 720_000).startsWith("Halfway to your 4 kilometre goal"));
         c.pauseGoal();
