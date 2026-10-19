@@ -310,7 +310,7 @@ fun formatDuration(ms: Long): String {
 
 /** "4.7 km", "10 km", "3.1 mi" */
 fun formatGoal(m: Double, units: String): String {
-    val v = Math.round(m / (if (units == "imperial") 1609.344 else 1000.0) * 10) / 10.0
+    val v = Math.round(m / (if (units == "imperial") 1609.344 else 1000.0) * 100) / 100.0
     val text = if (v == Math.floor(v)) v.toLong().toString() else v.toString()
     return "$text ${if (units == "imperial") "mi" else "km"}"
 }

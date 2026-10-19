@@ -382,7 +382,7 @@ your goal" without setting anything up.
    - the usual weekday and start time
    - the usual distance and how much it varies
    - a name such as "Saturday morning loop" or "weekday evening route"
-4. **It works out the goal:** the usual (median) distance, rounded to 0.1 km or mi.
+4. **It works out the goal:** the usual (median) distance, to two decimals (0.01 km or mi).
    Recent workouts count most (one from 3 weeks ago counts half), so the goal follows a
    routine you have lengthened or shortened. If your distances cluster around a round
    number, such as 4.9–5.1 km, the goal is that number: "5 kilometres".

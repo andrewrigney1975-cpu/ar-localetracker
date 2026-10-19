@@ -431,7 +431,7 @@ function goalHTML(w, units) {
   const p = w.prediction;
   if (!p?.goalM) return '';
   const unitM = units === 'imperial' ? 1609.344 : 1000;
-  const goal = Math.round((p.goalM / unitM) * 10) / 10;
+  const goal = Math.round((p.goalM / unitM) * 100) / 100;
   const done = (w.summary.distance / unitM).toFixed(2);
   const hit = Math.abs(w.summary.distance - p.goalM) / p.goalM <= 0.1;
   const how = p.source === 'manual' ? 'set by you' : p.source === 'route' ? `auto, usual ${p.name ?? 'route'}` : `auto, ${p.name ?? 'usual time'}`;
