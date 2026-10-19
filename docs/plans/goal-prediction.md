@@ -165,7 +165,8 @@ Initial thresholds, to be tuned with the replay evaluation in §7:
 4. **Confidence:** normalise the scores. Accept the top routine only if it has at least
    **0.6** of the total and leads the second by at least **0.2**. Otherwise use the
    time-only fallback if it qualifies. Otherwise set **no goal**.
-5. **Goal value:** the routine's median distance, rounded to 0.1 km (or 0.1 mi). It is not
+5. **Goal value:** the routine's median distance, rounded to 0.01 km (or 0.01 mi; was 0.1
+   until 2026-10-20, changed at the user's request). It is not
    rounded to whole kilometres, because percentages of a 4.7 km loop should land where
    the user actually is.
 6. **Confirmation, spoken once** after the decision. Example: *"Goal 4.7 kilometres, your

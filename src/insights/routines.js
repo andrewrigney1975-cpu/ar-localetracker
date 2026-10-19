@@ -7,7 +7,8 @@
 import { makeProjection } from '../geo/geo.js';
 import { defaultName } from '../services/buildWorkout.js';
 
-export const MODEL_VERSION = 1;
+/** Bump when the model changes shape or how goals are worked out, so the app rebuilds it on start (2: goals to 0.01). */
+export const MODEL_VERSION = 2;
 const DAY_MS = 86400000;
 const KM = 1000;
 const MILE = 1609.344;
@@ -244,7 +245,7 @@ export function weightedQuantile(xs, ws, q) {
 }
 
 /**
- * Goal in metres for one unit system: the median rounded to 0.1, or to a whole number when
+ * Goal in metres for one unit system: the median rounded to 0.01, or to a whole number when
  * the history clusters around one (e.g. 4.9–5.1 km → 5 km). With `weights` (recency), recent
  * workouts count for more, so the goal follows a routine that has grown or shrunk.
  */
@@ -255,7 +256,7 @@ export function goalFor(distances, imperial, weights = null) {
   const whole = Math.round(med);
   const lo = weightedQuantile(distances, ws, 0.25) / unit - 0.05;
   const hi = weightedQuantile(distances, ws, 0.75) / unit + 0.05;
-  const value = whole > 0 && Math.abs(whole - med) <= T.roundSnap * med && whole >= lo && whole <= hi ? whole : Math.round(med * 10) / 10;
+  const value = whole > 0 && Math.abs(whole - med) <= T.roundSnap * med && whole >= lo && whole <= hi ? whole : Math.round(med * 100) / 100;
   return Math.round(value * unit * 10) / 10;
 }
 

@@ -112,10 +112,12 @@ describe('goal rounding', () => {
   it('snaps to a round number when the history clusters around one', () => {
     expect(goalFor([4900, 4980, 5020, 5100, 5050], false)).toBe(5000);
   });
-  it('otherwise uses tenths, so percentages of a 4.7 km loop land in the right place', () => {
-    expect(goalFor([4650, 4700, 4720, 4690], false)).toBe(4700);
+  it('otherwise uses hundredths, so percentages of a 14.65 km loop land in the right place', () => {
+    expect(goalFor([4650, 4700, 4720, 4690], false)).toBe(4700); // median 4.695 → 4.7
     expect(goalFor([8000, 8050, 7950], true)).toBeCloseTo(5 * 1609.344, 1); // 4.97 mi → 5 mi
-    expect(goalFor([6400, 6450, 6420], false)).toBe(6400);
+    expect(goalFor([6400, 6450, 6420], false)).toBe(6420);
+    expect(goalFor([14630, 14640, 14650, 14652.9, 14680, 14940], false)).toBe(14650);
+    expect(goalFor([3000, 3100, 3120], true)).toBeCloseTo(1.93 * 1609.344, 1);
   });
   it('leans towards recent workouts when weighted', () => {
     expect(goalFor([5000, 5000, 5000, 5500, 5500], false)).toBe(5000);
@@ -136,7 +138,7 @@ describe('routine goal follows the history', () => {
     const r = buildRoutineModel(history, { now }).activities.run.routines[0];
     expect(r.count).toBe(14);
     expect(r.medianM).toBeLessThan(5100); // most of its history is still 5 km
-    expect(r.goal.metric).toBe(5500);
+    expect(r.goal.metric).toBe(5470); // the recent 5.5 km workouts, to two decimals
   });
 
   it('a goal from all-time history alone would have stayed at 5 km', () => {
@@ -154,7 +156,7 @@ describe('learning routines', () => {
     const eligible = (act) => model.activities[act].routines.filter((r) => r.eligible);
     const walk = eligible('walk');
     expect(walk).toHaveLength(1);
-    expect(walk[0].goal.metric).toBe(4700);
+    expect(walk[0].goal.metric).toBe(4690);
     expect(walk[0].name).toBe('Saturday morning loop');
     const runs = eligible('run').map((r) => r.goal.metric).sort((a, b) => a - b);
     expect(runs).toEqual([8000, 10000]);
@@ -163,7 +165,7 @@ describe('learning routines', () => {
 
   it('predicts from the start place, weekday and time', () => {
     const p = predictGoal(model, { activity: 'walk', now: at(2026, 9, 10, 7, 10), tzOffset: TZ, lat: HOME.lat, lon: HOME.lon });
-    expect(p).toMatchObject({ goalM: 4700, source: 'route', name: 'Saturday morning loop' });
+    expect(p).toMatchObject({ goalM: 4690, source: 'route', name: 'Saturday morning loop' });
     const tue = predictGoal(model, { activity: 'run', now: at(2026, 9, 13, 18, 0), tzOffset: TZ, lat: HOME.lat, lon: HOME.lon });
     expect(tue.goalM).toBe(8000);
     const sun = predictGoal(model, { activity: 'run', now: at(2026, 9, 11, 8, 40), tzOffset: TZ, lat: PARK.lat, lon: PARK.lon });
@@ -172,7 +174,7 @@ describe('learning routines', () => {
 
   it('always picks a routine, even at an odd time or an unknown place', () => {
     const night = predictGoal(model, { activity: 'walk', now: at(2026, 9, 10, 22, 30), tzOffset: TZ, lat: HOME.lat, lon: HOME.lon });
-    expect(night).toMatchObject({ goalM: 4700, source: 'route', name: 'Saturday morning loop' });
+    expect(night).toMatchObject({ goalM: 4690, source: 'route', name: 'Saturday morning loop' });
     expect(night.confidence).toBe(1); // the only walking routine
     const [lat, lon] = destination(HOME.lat, HOME.lon, 0, 5000);
     expect(predictGoal(model, { activity: 'run', now: at(2026, 9, 13, 18, 0), tzOffset: TZ, lat, lon }).source).toBe('route');
@@ -180,7 +182,7 @@ describe('learning routines', () => {
 
   it('picks from the time and weekday before there is a GPS fix', () => {
     const p = predictGoal(model, { activity: 'walk', now: at(2026, 9, 10, 7, 10), tzOffset: TZ });
-    expect(p).toMatchObject({ source: 'route', goalM: 4700, name: 'Saturday morning loop' });
+    expect(p).toMatchObject({ source: 'route', goalM: 4690, name: 'Saturday morning loop' });
     const tue = predictGoal(model, { activity: 'run', now: at(2026, 9, 13, 18, 0), tzOffset: TZ });
     expect(tue.goalM).toBe(8000);
   });
@@ -197,12 +199,12 @@ describe('learning routines', () => {
     const m = buildRoutineModel(walks, { now, excluded: [], detached: walks.filter((w) => model.activities.walk.routines.find((r) => r.id === id).workoutIds.includes(w.id)).map((w) => w.id) });
     expect(m.activities.walk.routines.filter((r) => r.eligible)).toHaveLength(0);
     const p = predictGoal(m, { activity: 'walk', now: at(2026, 9, 10, 7, 10), tzOffset: TZ, lat: HOME.lat, lon: HOME.lon });
-    expect(p).toMatchObject({ source: 'time', goalM: 4700, name: 'weekend morning walks' });
+    expect(p).toMatchObject({ source: 'time', goalM: 4690, name: 'weekend morning walks' });
   });
 
   it('gives goals in the user’s units', () => {
     const p = predictGoal(model, { activity: 'run', now: at(2026, 9, 11, 8, 40), tzOffset: TZ, lat: PARK.lat, lon: PARK.lon, imperial: true });
-    expect(p.goalM).toBeCloseTo(6.3 * 1609.344, 1); // recent runs of the ~10 km route
+    expect(p.goalM).toBeCloseTo(6.29 * 1609.344, 1); // recent runs of the ~10 km route
   });
 
   it('needs enough history first', () => {

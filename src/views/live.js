@@ -277,7 +277,7 @@ export async function mount(root, params, _query, ctx) {
     }
     const unitM = units === 'imperial' ? 1609.344 : 1000;
     const step = GOAL_STEPS[act.id];
-    const fmt = (m) => String(Math.round((m / unitM) * 10) / 10);
+    const fmt = (m) => String(Math.round((m / unitM) * 100) / 100);
     let label = 'Goal';
     let value = null; // metres
     let sub = '';
@@ -507,7 +507,7 @@ export async function mount(root, params, _query, ctx) {
       // Spoken (and captioned) already unless the confirmation is turned off.
       if (ev.goalM && !ev.offRoute && settings().voice.confirmGoal === false) {
         const unitM = units === 'imperial' ? 1609.344 : 1000;
-        caption(`Goal ${Math.round((ev.goalM / unitM) * 10) / 10} ${distanceUnit(units)}${ev.name ? ` · ${ev.name}` : ''}`);
+        caption(`Goal ${Math.round((ev.goalM / unitM) * 100) / 100} ${distanceUnit(units)}${ev.name ? ` · ${ev.name}` : ''}`);
       }
     })
   );

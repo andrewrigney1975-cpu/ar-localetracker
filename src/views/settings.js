@@ -136,7 +136,7 @@ function routinesHTML(model, s) {
     const auto = s.voice.goalMode[id] === 'auto';
     if (auto && !a?.ready) learning.push(`${ACTIVITIES[id].label}: ${a?.usable ?? 0} of ${model?.need ?? 5}`);
     for (const r of (a?.routines ?? []).filter((x) => (auto && a.ready && (x.eligible || x.suppressed)) || x.user)) {
-      const goal = Math.round((r.goal[imperial ? 'imperial' : 'metric'] / (imperial ? 1609.344 : 1000)) * 10) / 10;
+      const goal = Math.round((r.goal[imperial ? 'imperial' : 'metric'] / (imperial ? 1609.344 : 1000)) * 100) / 100;
       const hit = r.predictions ? ` · goal hit ${r.hits} of ${r.predictions}` : '';
       const custom = s.voice.routines?.[r.id] ? ' · own announcements' : '';
       rows.push(`<div class="setting stack routine" data-activity="${id}"><span class="act-label">${ACTIVITIES[id].icon}<span class="text">${escapeHtml(r.name[0].toUpperCase() + r.name.slice(1))}
