@@ -211,7 +211,7 @@ export async function mount(root, _params, _query, ctx) {
 
   // ---- Actions ----------------------------------------------------------------------------
   root.querySelector('[data-act="allow"]').addEventListener('click', async () => {
-    const perms = await tracker.requestPermissions();
+    const perms = await tracker.requestPermissions(['location', 'notifications']);
     if (perms.location === 'granted') start();
     else if (await confirmDialog({ title: 'Location permission needed', message: 'Allow location for Locale in system settings.', confirmLabel: 'Open settings' })) {
       tracker.openAppSettings();

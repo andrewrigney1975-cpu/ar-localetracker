@@ -30,7 +30,7 @@ sensors.
   <img src="docs/screenshots/summary.png" width="250" alt="Workout summary with distance and the average GPS error, times, speed, pace, climb and altitude">
 </p>
 <p align="center">
-  <img src="docs/screenshots/effort.png" width="250" alt="Effort: average and max heart rate, calories, cardio load and time in heart-rate zones">
+  <img src="docs/screenshots/effort.png" width="250" alt="Workout summary: average step cadence from the watch, then Effort: average and max heart rate, calories, cardio load and time in heart-rate zones">
   &nbsp;
   <img src="docs/screenshots/map.jpeg" width="250" alt="Map view with speed-coloured route, distance marker popover, and elevation profile with heart-rate line">
   &nbsp;
@@ -64,6 +64,9 @@ sensors.
   <img src="docs/screenshots/goals.png" width="250" alt="Goal editor: activity chips, Per day, Per week or Per month, and distance, activity time, cardio load and calorie targets">
   &nbsp;
   <img src="docs/screenshots/insights-goals.png" width="250" alt="Insights: weekly running distance with a dashed 25 km goal line, and a tooltip for a week 7.4 km short of the goal">
+</p>
+<p align="center">
+  <img src="docs/screenshots/profile.png" width="250" alt="Settings, Profile: sex, birth year, height, weight, BMI, resting and max heart rate, and the estimated VO2max: the median of 6 walks in the last 4 weeks">
 </p>
 <p align="center">
   <img src="docs/screenshots/widget-week-chart.png" width="490" alt="4×2 widget: this week's distance, average split and speed, a chart of distance per day with a dashed daily goal line, and You're 3 km ahead of your goal! Well done!!">
@@ -184,6 +187,10 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Live heart rate** from the watch, read through Wear OS Health Services and streamed to
   the phone about every 3 s. It's saved into the workout recording, so every GPS point
   has a heart rate.
+- **Step cadence** (steps per minute) for walks and runs, from the watch with the heart
+  rate, or from the phone's own step counter when the watch has none (needs the "Physical
+  activity" permission, asked once). The workout shows the average cadence and where it
+  came from, and the VO2max estimate uses it to spot heart rate locked onto the step rate.
 - **Watch screen:** elapsed time, distance, pace or speed, and heart rate. The details are
   white on black, whatever the watch's theme; only the heart rate is coloured, by
   zone, matching the phone's zone colours (from your profile's max and resting heart rate).
@@ -212,6 +219,13 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
     without heart rate
   - **cardio load** (Banister TRIMP)
   - time in heart-rate zones
+  - **VO2max estimate** for walks with watch heart rate: the HUNT 3 walking model
+    (Loe et al. 2016) on steady 5-minute stretches after a 10-minute warm-up, from speed,
+    slope, weight, age and heart rate. Stretches with an uneven pace, a steep slope, a
+    jogging pace (over 8.5 km/h) or unreliable heart rate (gaps, sudden jumps, unsteady,
+    too high to be steady walking, or locked onto the step rate) are left out, and the page
+    says why. Runs aren't estimated: the walking model overshoots at running pace. Settings →
+    Profile shows your current estimate: the median of the last 4 weeks.
 - **Heart-rate line** on the elevation profile, with heart rate per split and in the
   marker popovers. GPX, TCX and CSV exports include heart rate.
 - **Splits** per km or mile, with pace, elevation change and fastest/slowest bars.

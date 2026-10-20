@@ -43,7 +43,9 @@ import org.json.JSONException;
     permissions = {
         @Permission(alias = "location", strings = { Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION }),
         @Permission(alias = "notifications", strings = { Manifest.permission.POST_NOTIFICATIONS }),
-        @Permission(alias = "backgroundLocation", strings = { Manifest.permission.ACCESS_BACKGROUND_LOCATION })
+        @Permission(alias = "backgroundLocation", strings = { Manifest.permission.ACCESS_BACKGROUND_LOCATION }),
+        // The phone's step counter (cadence fallback when the watch has none).
+        @Permission(alias = "activity", strings = { Manifest.permission.ACTIVITY_RECOGNITION })
     }
 )
 public class LocaleTrackerPlugin extends Plugin {

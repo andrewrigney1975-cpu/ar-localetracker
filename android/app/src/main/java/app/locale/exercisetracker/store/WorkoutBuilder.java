@@ -79,6 +79,7 @@ public final class WorkoutBuilder {
         final List<Point> points = new ArrayList<>();
         final List<double[]> states = new ArrayList<>(); // [t, active(1/0)]
         final List<double[]> hr = new ArrayList<>(); // [t, bpm]
+        final List<double[]> cad = new ArrayList<>(); // [t, spm, src (1 watch, 2 phone)]
         JSONObject end;
         JSONObject goal;
     }
@@ -137,6 +138,15 @@ public final class WorkoutBuilder {
                     if (t != null && bpm != null && bpm >= 25 && bpm <= 240) j.hr.add(new double[] { t, bpm });
                     break;
                 }
+                case "cad": {
+                    // Step cadence from the watch, or the phone's step counter as a fallback.
+                    Double t = num(o, "t");
+                    Double spm = num(o, "spm");
+                    if (t != null && spm != null && spm >= 0 && spm <= 260) {
+                        j.cad.add(new double[] { t, spm, "phone".equals(o.optString("src")) ? 2 : 1 });
+                    }
+                    break;
+                }
                 case "end":
                     j.end = o;
                     break;
@@ -151,6 +161,7 @@ public final class WorkoutBuilder {
         j.points.sort((a, b) -> Double.compare(a.t, b.t));
         j.states.sort((a, b) -> Double.compare(a[0], b[0]));
         j.hr.sort((a, b) -> Double.compare(a[0], b[0]));
+        j.cad.sort((a, b) -> Double.compare(a[0], b[0]));
         return j;
     }
 
@@ -384,6 +395,9 @@ public final class WorkoutBuilder {
         public final float[] course;
         public final byte[] moving;
         public float[] hr;
+        /** Steps/min (NaN when unknown) and its source per point: 1 watch, 2 phone, 0 none. */
+        public float[] cad;
+        public byte[] cadSrc;
 
         Track(int n) {
             this.n = n;
@@ -415,6 +429,10 @@ public final class WorkoutBuilder {
             c.columns.put("course", course);
             c.columns.put("moving", moving);
             if (hr != null) c.columns.put("hr", hr);
+            if (cad != null) {
+                c.columns.put("cad", cad);
+                c.columns.put("cadSrc", cadSrc);
+            }
             return c;
         }
     }
@@ -523,6 +541,7 @@ public final class WorkoutBuilder {
             track.hr = alignHeartRate(track.t, journal.hr, 10000);
             info.hasHeartRate = true;
         }
+        if (!journal.cad.isEmpty()) alignCadence(track, journal.cad);
 
         // 5. Speed.
         for (int i = 0; i < n; i++) {
@@ -589,6 +608,28 @@ public final class WorkoutBuilder {
             }
         }
         return out;
+    }
+
+    /** The watch's cadence wherever it has a value, the phone's in the gaps (alignCadence in process.js). */
+    static void alignCadence(Track track, List<double[]> samples) {
+        List<double[]> watch = new ArrayList<>();
+        List<double[]> phone = new ArrayList<>();
+        for (double[] s : samples) (s[2] == 2 ? phone : watch).add(new double[] { s[0], s[1] });
+        float[] w = watch.isEmpty() ? null : alignHeartRate(track.t, watch, 10000);
+        float[] p = phone.isEmpty() ? null : alignHeartRate(track.t, phone, 10000);
+        int n = track.n;
+        track.cad = new float[n];
+        track.cadSrc = new byte[n];
+        Arrays.fill(track.cad, Float.NaN);
+        for (int i = 0; i < n; i++) {
+            if (w != null && isFinite(w[i])) {
+                track.cad[i] = w[i];
+                track.cadSrc[i] = 1;
+            } else if (p != null && isFinite(p[i])) {
+                track.cad[i] = p[i];
+                track.cadSrc[i] = 2;
+            }
+        }
     }
 
     private static void smoothSegment(List<Point> kept, int from, int to, Projection proj, double q, Track track) {
@@ -773,6 +814,30 @@ public final class WorkoutBuilder {
         return new double[] { sum / time, max != 0 ? max : Double.NaN };
     }
 
+    /** Moving-time-weighted cadence and its source (cadenceStats in summary.js), or null. */
+    static JSONObject cadenceStats(Track track) throws JSONException {
+        if (track.cad == null) return null;
+        double sum = 0;
+        double time = 0;
+        double watch = 0;
+        double phone = 0;
+        for (int i = 1; i < track.n; i++) {
+            if (track.seg[i] != track.seg[i - 1] || track.moving[i] == 0) continue;
+            double dt = (track.t[i] - track.t[i - 1]) / 1000;
+            double c = track.cad[i];
+            if (!(dt > 0 && dt <= 10) || !isFinite(c) || c <= 0) continue;
+            sum += c * dt;
+            time += dt;
+            if (track.cadSrc[i] == 2) phone += dt;
+            else watch += dt;
+        }
+        if (time == 0) return null;
+        JSONObject o = new JSONObject();
+        o.put("avg", sum / time);
+        o.put("source", phone == 0 ? "watch" : watch == 0 ? "phone" : "mixed");
+        return o;
+    }
+
     static JSONObject analyzeSki(Track track, boolean hasBarometer) throws JSONException {
         int n = track.n;
         double[] t = track.t;
@@ -888,6 +953,8 @@ public final class WorkoutBuilder {
             h.put("max", isFinite(hr[1]) ? hr[1] : JSONObject.NULL);
             s.put("heartRate", h);
         }
+        JSONObject cad = cadenceStats(track);
+        if (cad != null) s.put("cadence", cad);
         if ("ski".equals(info.activity) && n > 2) s.put("ski", analyzeSki(track, info.hasBarometer));
         return s;
     }

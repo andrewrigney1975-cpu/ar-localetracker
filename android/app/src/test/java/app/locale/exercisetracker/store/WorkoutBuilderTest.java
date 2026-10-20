@@ -21,7 +21,7 @@ import org.junit.Test;
  * transcendental functions between V8 and the JVM.
  */
 public class WorkoutBuilderTest {
-    private static final String[] CASES = { "run-hr-pause", "walk-nobaro", "cycle", "ski", "city2surf", "messy-run" };
+    private static final String[] CASES = { "run-hr-pause", "walk-nobaro", "cycle", "ski", "city2surf", "messy-run", "walk-cadence" };
 
     private static String read(String name) throws IOException {
         try (InputStream in = WorkoutBuilderTest.class.getResourceAsStream("/fixtures/" + name)) {
@@ -123,6 +123,14 @@ public class WorkoutBuilderTest {
                     else close(at + ".hr", ((Number) h).doubleValue(), t.hr[i], 1e-3);
                 } else {
                     assertEquals(at + " no hr", null, t.hr);
+                }
+                if (!s.isNull("cad")) {
+                    Object c = s.getJSONArray("cad").get(k);
+                    if (c == JSONObject.NULL) assertTrue(at + ".cad NaN", Float.isNaN(t.cad[i]));
+                    else close(at + ".cad", ((Number) c).doubleValue(), t.cad[i], 1e-3);
+                    close(at + ".cadSrc", s.getJSONArray("cadSrc").getDouble(k), t.cadSrc[i], 0);
+                } else {
+                    assertEquals(at + " no cad", null, t.cad);
                 }
             }
         }

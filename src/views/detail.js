@@ -11,6 +11,7 @@ import { courseLinkURL } from '../course/courseLink.js';
 import { openSms, shareFile, shareText } from '../services/share.js';
 import { settings, updateSettings } from '../settings.js';
 import { estimateCalories, loadLabel, profileComplete, trimp, ZONES, zoneSeconds } from '../stats/physio.js';
+import { rejectedText, VO2_ACTIVITIES, workoutVo2max } from '../stats/vo2max.js';
 import { computeSplits } from '../stats/summary.js';
 import { confirmDialog, openDialog } from '../ui/dialog.js';
 import { Disposer, el, escapeHtml } from '../ui/dom.js';
@@ -406,6 +407,8 @@ function renderSummary(panel, w, track, units) {
     statHTML('Max altitude', alt(sm.maxAlt), au),
     statHTML('Overall avg', speedValue(sm.avgSpeed, units).toFixed(1), speedUnit(units)),
   ];
+  // Steps per minute while moving; the phone's step counter fills in when the watch has none.
+  if (sm.cadence) rows.push(statHTML('Avg cadence', Math.round(sm.cadence.avg), sm.cadence.source === 'phone' ? 'spm · phone' : sm.cadence.source === 'mixed' ? 'spm · watch + phone' : 'spm'));
   if (sm.ski) {
     rows.push(
       statHTML('Ski runs', String(sm.ski.runs)),
@@ -448,6 +451,7 @@ function effortHTML(w, track) {
   const cal = estimateCalories(track, w.activity, profile, w.startedAt);
   const load = hr ? trimp(track, profile, w.startedAt) : null;
   const zones = hr ? zoneSeconds(track, profile, w.startedAt) : null;
+  const vo2 = hr && VO2_ACTIVITIES.includes(w.activity) ? workoutVo2max(track, w.activity, profile, w.startedAt) : null;
   const tiles = [];
   if (hr) {
     tiles.push(statHTML('Avg heart rate', Math.round(hr.avg), 'bpm'));
@@ -455,6 +459,7 @@ function effortHTML(w, track) {
   }
   if (cal) tiles.push(statHTML(cal.method === 'activity' ? 'Calories (est.)' : 'Calories', Math.round(cal.kcal).toLocaleString(), 'kcal'));
   if (load != null) tiles.push(statHTML('Cardio load', Math.round(load), loadLabel(load)));
+  if (vo2?.value != null) tiles.push(statHTML('VO2max (est.)', vo2.value.toFixed(1), 'ml/kg/min'));
   const hint = !complete
     ? `<p class="effort-hint">Add your sex, birth year and weight in <a href="#/settings">Settings → Profile</a> to estimate calories${hr ? ', heart-rate zones and cardio load' : ''}.</p>`
     : '';
@@ -481,7 +486,23 @@ function effortHTML(w, track) {
     ${tiles.length ? `<div class="section-title">Effort</div><div class="stat-grid num">${tiles.join('')}</div>` : ''}
     ${zoneBlock}
     ${hint}
-    ${cal || load != null ? '<p class="about">Calories use the Keytel (2005) heart-rate equation, or activity, speed and slope when heart rate is missing. Cardio load is Banister TRIMP. Both are estimates.</p>' : ''}`;
+    ${cal || load != null ? '<p class="about">Calories use the Keytel (2005) heart-rate equation, or activity, speed and slope when heart rate is missing. Cardio load is Banister TRIMP. Both are estimates.</p>' : ''}
+    ${vo2 ? `<p class="about">${vo2AboutText(vo2)}</p>` : ''}`;
+}
+
+/** How the VO2max estimate was made, or why there isn't one. */
+function vo2AboutText(r) {
+  const why = Object.keys(r.rejected).length ? ` Left out: ${escapeHtml(rejectedText(r.rejected))}.` : '';
+  if (r.value != null) {
+    return `VO2max uses the HUNT walking model (Loe 2016) on ${r.windows} of ${r.checked} steady 5-minute stretches (middle half ${r.low.toFixed(1)}–${r.high.toFixed(1)}), typically within about 14%.${why}`;
+  }
+  if (r.reason === 'profile') return 'Add your sex, birth year and weight in <a href="#/settings">Settings → Profile</a> to estimate VO2max.';
+  if (r.reason === 'no-steady') {
+    return r.checked
+      ? `No VO2max estimate: too few steady 5-minute stretches passed the heart-rate checks.${why}`
+      : 'No VO2max estimate: it needs steady 5-minute stretches after a 10-minute warm-up.';
+  }
+  return '';
 }
 
 function miniProfileSVG(track) {

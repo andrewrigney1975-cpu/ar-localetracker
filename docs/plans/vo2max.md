@@ -1,7 +1,25 @@
 # VO2max estimate from watch heart rate and phone GPS: research
 
-Status: research only (2026-10-20). Nothing built yet. This records the methods found,
-what each needs, how far to trust each, and a first test on the owner's own walks.
+Status: **A1 (HUNT submaximal) and the heart-rate checks are built** (2026-10-20), for
+**walks only**: on the City2Surf sample run (6:18/km) A1 gave 60, against ~35 from race-pace
+tables, because the model is linear in speed and was fitted on walkers. Stretches over
+8.5 km/h are also left out. Runs need A2 (or a running-specific model). Built:
+`src/stats/vo2max.js`, a tile on the workout Summary, and the 4-week median in Settings →
+Profile. The rest of this document is the research it came from; waist, the non-exercise
+models and A2 are still to do.
+
+Built as: 5-min stretches after 10 min of active time, moving, one segment, ≤ 10 s gaps;
+speed ≥ 0.8 m/s with CV ≤ 15%; slope −2%…+8% (downhill counts as flat); heart rate over the
+last 2 min of each stretch: ≥ 80% coverage, no ≥ 15 bpm jump within 2 s, SD ≤ 8, at least
+resting + 15, at most 85% of peak (profile max HR, else the HUNT age formula). At least 2
+stretches; stretches > 3 MAD (MAD ≥ 1) from the median are dropped; the workout's value is
+the median. On the owner's Lake Loop walks: 40.7–44.9 per walk, 4-week median 42.9; the
+18 Oct walk lost 15 of 21 stretches to "heart rate too high".
+
+Cadence lock check (added with step cadence, 2026-10-20): a stretch whose heart rate is within
+3 bpm of the step cadence for ≥ 80% of its readings is suspect; suspects are dropped only when
+they are at most half of the workout's passing stretches (a lock comes and goes; heart rate
+near the step rate all workout is taken as genuine, which is common for brisk walking).
 
 ## 1. Goal
 

@@ -360,6 +360,9 @@ export async function mount(root, params, _query, ctx) {
   async function ensurePermissions() {
     let perms = await tracker.checkPermissions();
     if (perms.location !== 'granted') perms = await tracker.requestPermissions();
+    // Asked once for those who granted location before cadence existed; after a refusal it
+    // isn't asked again (cadence then comes from the watch only).
+    else if (perms.activity === 'prompt') perms = { ...perms, ...(await tracker.requestPermissions(['activity']).catch(() => ({}))) };
     if (perms.location !== 'granted') {
       const go = await confirmDialog({
         title: 'Location permission needed',

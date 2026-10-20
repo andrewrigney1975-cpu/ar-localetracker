@@ -36,6 +36,8 @@ export const CASES = {
   ski: () => generateJournal({ activity: 'ski', seconds: 2400, seed: 5 }).text,
   city2surf: () => generateCalibratedCity2Surf().text,
   'messy-run': messyRun,
+  // Watch cadence with a 2-minute gap that the phone's step counter fills.
+  'walk-cadence': () => generateJournal({ activity: 'walk', seconds: 1500, seed: 14, heartRate: true, cadence: 'both' }).text,
 };
 
 const SAMPLE = (n) => [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor((3 * n) / 4), n - 1];
@@ -64,6 +66,8 @@ function expectedFor(text) {
       course: pick(track.course),
       moving: pick(track.moving),
       hr: pick(track.hr),
+      cad: pick(track.cad),
+      cadSrc: pick(track.cadSrc),
     },
     trackBlob: toBase64(blob),
     trackCrc: crc32(blob),

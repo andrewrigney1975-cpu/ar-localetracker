@@ -20,8 +20,8 @@ function nativeTracker() {
     async checkPermissions() {
       return Native.checkPermissions();
     },
-    async requestPermissions() {
-      return Native.requestPermissions({ permissions: ['location', 'notifications'] });
+    async requestPermissions(permissions = ['location', 'notifications', 'activity']) {
+      return Native.requestPermissions({ permissions });
     },
     getCapabilities: () => Native.getCapabilities(),
     start: (opts) => Native.start(opts),
@@ -201,10 +201,10 @@ function simTracker() {
   return {
     isNative: false,
     async checkPermissions() {
-      return { location: 'granted', notifications: 'granted' };
+      return { location: 'granted', notifications: 'granted', activity: 'granted' };
     },
     async requestPermissions() {
-      return { location: 'granted', notifications: 'granted' };
+      return { location: 'granted', notifications: 'granted', activity: 'granted' };
     },
     async getCapabilities() {
       return { barometer: true, compass: true, gpsEnabled: true, ignoringBatteryOptimizations: true, manufacturer: 'Browser', model: 'Simulator', sdk: 36 };
