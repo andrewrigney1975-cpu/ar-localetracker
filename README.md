@@ -212,6 +212,12 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
     without heart rate
   - **cardio load** (Banister TRIMP)
   - time in heart-rate zones
+  - **VO2max estimate** for walks and runs with watch heart rate: the HUNT 3 walking model
+    (Loe et al. 2016) on steady 5-minute stretches after a 10-minute warm-up, from speed,
+    slope, weight, age and heart rate. Stretches with an uneven pace, a steep slope or
+    unreliable heart rate (gaps, sudden jumps, unsteady, or too high to be steady walking)
+    are left out, and the page says why. Settings → Profile shows your current estimate:
+    the median of the last 4 weeks.
 - **Heart-rate line** on the elevation profile, with heart rate per split and in the
   marker popovers. GPX, TCX and CSV exports include heart rate.
 - **Splits** per km or mile, with pace, elevation change and fastest/slowest bars.

@@ -1,7 +1,17 @@
 # VO2max estimate from watch heart rate and phone GPS: research
 
-Status: research only (2026-10-20). Nothing built yet. This records the methods found,
-what each needs, how far to trust each, and a first test on the owner's own walks.
+Status: **A1 (HUNT submaximal) and the heart-rate checks are built** (2026-10-20):
+`src/stats/vo2max.js`, a tile on the workout Summary, and the 4-week median in Settings →
+Profile. The rest of this document is the research it came from; waist, the non-exercise
+models and A2 are still to do.
+
+Built as: 5-min stretches after 10 min of active time, moving, one segment, ≤ 10 s gaps;
+speed ≥ 0.8 m/s with CV ≤ 15%; slope −2%…+8% (downhill counts as flat); heart rate over the
+last 2 min of each stretch: ≥ 80% coverage, no ≥ 15 bpm jump within 2 s, SD ≤ 8, at least
+resting + 15, at most 85% of peak (profile max HR, else the HUNT age formula). At least 2
+stretches; stretches > 3 MAD (MAD ≥ 1) from the median are dropped; the workout's value is
+the median. On the owner's Lake Loop walks: 40.7–44.9 per walk, 4-week median 42.9; the
+18 Oct walk lost 15 of 21 stretches to "heart rate too high".
 
 ## 1. Goal
 

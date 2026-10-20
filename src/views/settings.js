@@ -12,6 +12,8 @@ import { getRoutineModel, rebuildRoutineModel } from '../insights/model.js';
 import { displayName } from '../insights/routines.js';
 import { GOAL_ACTIVITIES, GOAL_METRICS, GOAL_PERIODS, goalList, goalsFor, withGoals } from '../insights/goals.js';
 import { confirmDialog, openDialog } from '../ui/dialog.js';
+import { effortFor } from '../insights/effort.js';
+import { currentVo2max, VO2_ACTIVITIES, vo2Available } from '../stats/vo2max.js';
 
 const GOAL_MODES = ['auto', 'set', 'off'];
 const GOAL_LABELS = { auto: 'Auto goal', set: 'Set goal', off: 'Goal' };
@@ -24,6 +26,37 @@ function bmiHTML(p) {
   const v = bmi(p);
   return `<div class="text">BMI<small>${v == null ? 'From your height and weight' : bmiCategory(v)}</small></div>
     <span class="input-unit"><output class="bmi-value num" aria-label="Body mass index">${v == null ? '–' : v.toFixed(1)}</output>kg/m²</span>`;
+}
+
+/** Read-only VO2max row; the value is filled in by fillVo2 once the workouts are checked. */
+function vo2HTML(value, hint) {
+  return `<div class="text">VO2max (est.)<small>${hint}</small></div>
+    <span class="input-unit"><output class="bmi-value num" aria-label="Estimated VO2max">${value}</output>ml/kg/min</span>`;
+}
+
+/**
+ * The current estimate: median of the last 4 weeks' walks and runs with heart rate (HUNT
+ * walking model, cached per workout in the effort cache).
+ */
+async function fillVo2(row, workouts, profile) {
+  if (!row) return;
+  if (!vo2Available(profile)) {
+    row.innerHTML = vo2HTML('–', 'Needs your sex, birth year and weight');
+    return;
+  }
+  const now = Date.now();
+  const recent = workouts.filter((w) => VO2_ACTIVITIES.includes(w.activity) && w.summary?.heartRate && w.startedAt >= now - 28 * 86400000);
+  if (!recent.length) {
+    row.innerHTML = vo2HTML('–', 'From walks or runs with watch heart rate in the last 4 weeks');
+    return;
+  }
+  row.innerHTML = vo2HTML('…', 'Working it out from your recent workouts');
+  const effort = await effortFor(recent, profile).catch(() => new Map());
+  if (!row.isConnected) return;
+  const c = currentVo2max(recent.map((w) => ({ at: w.startedAt, value: effort.get(w.id)?.vo2 })), now);
+  row.innerHTML = c
+    ? vo2HTML(c.value.toFixed(1), `Median of ${c.count} workout${c.count === 1 ? '' : 's'} in the last 4 weeks${c.count > 1 ? ` · range ${c.min.toFixed(1)}–${c.max.toFixed(1)}` : ''}`)
+    : vo2HTML('–', 'No steady 5-minute stretches with reliable heart rate in the last 4 weeks');
 }
 
 /** "Sat", "Tue & Thu", "Mon, Wed & Fri": the days a routine is usually done on. */
@@ -217,6 +250,7 @@ export async function mount(root) {
                 <span class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="30" max="120" data-profile="restingHr" value="${p.restingHr ?? ''}" placeholder="60" />bpm</span></label>
               <label class="setting"><span class="text">Max heart rate<small>Optional · ${estMax ? `estimated ${estMax} from age` : 'estimated from age'}</small></span>
                 <span class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="120" max="230" data-profile="maxHr" value="${p.maxHr ?? ''}" placeholder="${estMax ?? '185'}" />bpm</span></label>
+              <div class="setting" data-ref="vo2">${vo2HTML('–', 'From walks and runs with watch heart rate')}</div>
             </div>
 
             <div class="section-title">Watch</div>
@@ -311,6 +345,8 @@ export async function mount(root) {
         </div>
       </div>`;
 
+    fillVo2(root.querySelector('[data-ref="vo2"]'), workouts, p);
+
     root.querySelectorAll('[data-seg]').forEach((group) =>
       group.querySelectorAll('button').forEach((b) =>
         b.addEventListener('click', async () => {
@@ -343,6 +379,7 @@ export async function mount(root) {
         await updateSettings({ profile });
         if (field === 'weight' || field === 'heightCm') root.querySelector('[data-ref="bmi"]').innerHTML = bmiHTML(profile);
         if (field === 'birthYear' || field === 'maxHr') render();
+        else if (field === 'weight' || field === 'restingHr') fillVo2(root.querySelector('[data-ref="vo2"]'), workouts, profile);
       })
     );
     root.querySelectorAll('[data-widget]').forEach((b) =>
