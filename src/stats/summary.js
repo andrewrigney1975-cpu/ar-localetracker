@@ -204,6 +204,31 @@ export function analyzeSki(track, hasBarometer) {
   };
 }
 
+/**
+ * Moving-time-weighted average step cadence (steps/min) and where it came from ('watch',
+ * 'phone', or 'mixed' when the phone filled gaps), or null without cadence. Mirrors
+ * WorkoutBuilder.cadenceStats.
+ */
+export function cadenceStats(track) {
+  if (!track.cad) return null;
+  let sum = 0;
+  let time = 0;
+  let watch = 0;
+  let phone = 0;
+  for (let i = 1; i < track.n; i++) {
+    if (track.seg[i] !== track.seg[i - 1] || !track.moving[i]) continue;
+    const dt = (track.t[i] - track.t[i - 1]) / 1000;
+    const c = track.cad[i];
+    if (!(dt > 0 && dt <= 10) || !Number.isFinite(c) || c <= 0) continue;
+    sum += c * dt;
+    time += dt;
+    if (track.cadSrc?.[i] === 2) phone += dt;
+    else watch += dt;
+  }
+  if (!time) return null;
+  return { avg: sum / time, source: phone === 0 ? 'watch' : watch === 0 ? 'phone' : 'mixed' };
+}
+
 /** Summary stats stored with the workout (unit-independent). */
 export function computeSummary(track, info) {
   const act = activityProfile(info.activity);
@@ -246,6 +271,8 @@ export function computeSummary(track, info) {
   };
   const hr = heartRateStats(track);
   if (hr) summary.heartRate = { avg: hr.avg, max: hr.max };
+  const cad = cadenceStats(track);
+  if (cad) summary.cadence = cad;
   if (act.id === 'ski' && n > 2) {
     const ski = analyzeSki(track, info.hasBarometer);
     summary.ski = {

@@ -22,7 +22,7 @@ import org.json.JSONObject;
  * Receives commands and heart-rate samples from the Locale watch app.
  *
  * Paths (watch → phone): /locale/start {activity}, /locale/pause, /locale/resume,
- * /locale/stop, /locale/hr {s: [[epochMs, bpm], ...]}, /locale/status-request.
+ * /locale/stop, /locale/hr {s: [[epochMs, bpm], ...], c: [[epochMs, stepsPerMin], ...]}, /locale/status-request.
  */
 public class WearListenerService extends WearableListenerService {
     private static final String TAG = "LocaleWear";
@@ -91,11 +91,17 @@ public class WearListenerService extends WearableListenerService {
         TrackingService svc = TrackingService.get();
         if (svc == null) return;
         JSONArray samples = body.optJSONArray("s");
-        if (samples == null) return;
-        for (int i = 0; i < samples.length(); i++) {
+        for (int i = 0; samples != null && i < samples.length(); i++) {
             JSONArray s = samples.optJSONArray(i);
             if (s == null || s.length() < 2) continue;
             svc.onHeartRate(s.optLong(0), s.optInt(1));
+        }
+        // Step cadence, sent with the heart rate by watch apps that have it.
+        JSONArray cad = body.optJSONArray("c");
+        for (int i = 0; cad != null && i < cad.length(); i++) {
+            JSONArray c = cad.optJSONArray(i);
+            if (c == null || c.length() < 2) continue;
+            svc.onCadence(c.optLong(0), c.optInt(1), "watch");
         }
     }
 

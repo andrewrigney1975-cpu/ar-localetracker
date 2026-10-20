@@ -166,10 +166,15 @@ const round = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
  * @param {string} opts.activity
  * @param {number} opts.seconds   active recording length
  * @param {Array<[number, number]>} [opts.pauses]  [atSecond, durationSeconds]
+ * @param {false|'watch'|'phone'|'both'} [opts.cadence]  step cadence lines: the watch every
+ *   2 s, the phone every 5 s; 'both' leaves a 2-minute gap in the watch's (from 5 min) for
+ *   the phone to fill
  */
-export function generateJournal({ activity = 'run', seconds = 1800, pauses = [], startedAt = Date.UTC(2026, 0, 10, 15, 0, 0), seed = 7, noise = 3, stops = true, hasBarometer = true, heartRate = false } = {}) {
+export function generateJournal({ activity = 'run', seconds = 1800, pauses = [], startedAt = Date.UTC(2026, 0, 10, 15, 0, 0), seed = 7, noise = 3, stops = true, hasBarometer = true, heartRate = false, cadence = false } = {}) {
   const route = new SyntheticRoute({ activity, seed, noise, stops });
   const heart = heartRate ? new HeartModel({ seed: seed + 1 }) : null;
+  const stepping = activity === 'walk' || activity === 'run';
+  const cadRand = mulberry32(seed + 2); // its own stream, so other lines don't change
   let prevAlt = null;
   const lines = [];
   const workoutId = `syn-${activity}-${seed}`;
@@ -194,6 +199,12 @@ export function generateJournal({ activity = 'run', seconds = 1800, pauses = [],
     if (heart) {
       const grade = prevAlt == null ? 0 : ((p.af - prevAlt) / Math.max(0.5, p.sp)) * 100;
       lines.push({ type: 'hr', t, bpm: heart.step(1, activity, p.sp, grade) });
+    }
+    if (cadence && stepping) {
+      const spm = p.sp < 0.3 ? 0 : Math.round((activity === 'walk' ? 70 + 32 * p.sp : 150 + 6 * p.sp) + gaussian(cadRand) * 1.5);
+      const watchGap = cadence === 'both' && s >= 300 && s < 420;
+      if ((cadence === 'watch' || cadence === 'both') && s % 2 === 0 && !watchGap) lines.push({ type: 'cad', t, spm, src: 'watch' });
+      if ((cadence === 'phone' || cadence === 'both') && s % 5 === 0) lines.push({ type: 'cad', t, spm, src: 'phone' });
     }
     prevAlt = p.af;
     if (pauseQueue.length && s === pauseQueue[0][0]) {

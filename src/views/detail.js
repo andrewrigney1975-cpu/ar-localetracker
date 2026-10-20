@@ -407,6 +407,8 @@ function renderSummary(panel, w, track, units) {
     statHTML('Max altitude', alt(sm.maxAlt), au),
     statHTML('Overall avg', speedValue(sm.avgSpeed, units).toFixed(1), speedUnit(units)),
   ];
+  // Steps per minute while moving; the phone's step counter fills in when the watch has none.
+  if (sm.cadence) rows.push(statHTML('Avg cadence', Math.round(sm.cadence.avg), sm.cadence.source === 'phone' ? 'spm · phone' : sm.cadence.source === 'mixed' ? 'spm · watch + phone' : 'spm'));
   if (sm.ski) {
     rows.push(
       statHTML('Ski runs', String(sm.ski.runs)),

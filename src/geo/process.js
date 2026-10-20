@@ -20,6 +20,8 @@ import { smoothAxis } from './kalman.js';
  * @property {Float32Array} course direction of travel (deg)
  * @property {Uint8Array}   moving 1 when moving
  * @property {Float32Array} [hr]   heart rate (bpm, NaN when unknown); present only with watch data
+ * @property {Float32Array} [cad]  step cadence (steps/min, NaN when unknown)
+ * @property {Uint8Array}   [cadSrc] where each cadence value came from: 1 watch, 2 phone, 0 none
  */
 
 /**
@@ -93,6 +95,7 @@ export function processJournal(journal, activityId) {
     track.hr = alignHeartRate(track.t, journal.hr);
     info.hasHeartRate = true;
   }
+  if (journal.cad?.length) Object.assign(track, alignCadence(track.t, journal.cad));
 
   // 5. Speed: Doppler where trustworthy, else from smoothed positions.
   for (let i = 0; i < n; i++) {
@@ -166,6 +169,31 @@ export function alignHeartRate(times, samples, maxGapMs = 10000) {
     }
   }
   return out;
+}
+
+/**
+ * Cadence per point: the watch's wherever it has a value, the phone step counter's in the
+ * gaps (watch not worn, or out of range). Mirrors WorkoutBuilder.alignCadence.
+ */
+export function alignCadence(times, samples) {
+  const n = times.length;
+  const of = (src) => samples.filter((s) => s.src === src).map((s) => ({ t: s.t, bpm: s.spm }));
+  const watch = of('watch');
+  const phone = of('phone');
+  const w = watch.length ? alignHeartRate(times, watch) : null;
+  const p = phone.length ? alignHeartRate(times, phone) : null;
+  const cad = new Float32Array(n).fill(NaN);
+  const cadSrc = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    if (w && Number.isFinite(w[i])) {
+      cad[i] = w[i];
+      cadSrc[i] = 1;
+    } else if (p && Number.isFinite(p[i])) {
+      cad[i] = p[i];
+      cadSrc[i] = 2;
+    }
+  }
+  return { cad, cadSrc };
 }
 
 function smoothSegment(kept, from, to, proj, q, track) {

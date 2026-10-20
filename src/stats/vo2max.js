@@ -8,7 +8,9 @@
 // Each workout is cut into steady 5-minute stretches after a 10-minute warm-up (the study
 // warmed up for 10 minutes and read the heart rate once VO2 was steady, after 3 minutes).
 // Every stretch must pass speed, slope and heart-rate checks; the workout's estimate is the
-// median of the stretches that pass, after dropping outliers.
+// median of the stretches that pass, after dropping outliers. With step cadence (watch, or
+// the phone's step counter), stretches whose heart rate sits on the step rate are dropped as
+// a likely optical lock, when that happens in only part of the workout.
 
 import { ageAt } from './physio.js';
 
@@ -30,6 +32,12 @@ const HR_JUMP = 15;
 const MAX_HR_FRACTION = 0.85;
 const MIN_HR_ABOVE_REST = 15;
 const MIN_WINDOWS = 2;
+/**
+ * Cadence lock: optical heart rate can latch onto the step rate. A stretch whose heart rate
+ * is within LOCK_BPM of the cadence for LOCK_SHARE of its readings is suspect.
+ */
+const LOCK_BPM = 3;
+const LOCK_SHARE = 0.8;
 /** Stretches further than this many MADs from the workout's median are dropped. */
 const OUTLIER_MADS = 3;
 /** The MAD is at least this (ml·kg⁻¹·min⁻¹), so tightly agreeing stretches aren't culled. */
@@ -94,7 +102,7 @@ export function steadyWindows(track) {
 
 /**
  * Check one stretch and estimate from it.
- * @returns {{vo2:number, kmh:number, inclinePct:number, hr:number} | {reject:string}}
+ * @returns {{vo2:number, kmh:number, inclinePct:number, hr:number, nearCadence:boolean} | {reject:string}}
  */
 export function checkWindow(track, a, b, { sex, age, weightKg, restingHr, peakHr }) {
   const dur = (track.t[b] - track.t[a]) / 1000;
@@ -122,6 +130,8 @@ export function checkWindow(track, a, b, { sex, age, weightKg, restingHr, peakHr
   let hrSq = 0;
   let total = 0;
   let prev = -1;
+  let withCad = 0;
+  let nearCad = 0;
   for (let i = a; i <= b; i++) {
     if (track.t[i] < from) continue;
     total++;
@@ -129,6 +139,11 @@ export function checkWindow(track, a, b, { sex, age, weightKg, restingHr, peakHr
     if (!Number.isFinite(h)) continue;
     if (prev >= 0 && track.t[i] - track.t[prev] <= 2000 && Math.abs(h - track.hr[prev]) >= HR_JUMP) return { reject: 'hr-jumps' };
     prev = i;
+    const c = track.cad?.[i];
+    if (Number.isFinite(c) && c > 0) {
+      withCad++;
+      if (Math.abs(h - c) <= LOCK_BPM) nearCad++;
+    }
     hrN++;
     hrSum += h;
     hrSq += h * h;
@@ -142,7 +157,8 @@ export function checkWindow(track, a, b, { sex, age, weightKg, restingHr, peakHr
   const kmh = v * 3.6;
   // The model is from treadmill inclines (≥ 0); a slight downhill counts as flat.
   const inclinePct = Math.max(0, grade) * 100;
-  return { vo2: huntSubmaxVo2({ sex, age, weightKg, kmh, inclinePct, hr }), kmh, inclinePct, hr };
+  const nearCadence = withCad >= hrN * 0.5 && nearCad >= withCad * LOCK_SHARE;
+  return { vo2: huntSubmaxVo2({ sex, age, weightKg, kmh, inclinePct, hr }), kmh, inclinePct, hr, nearCadence };
 }
 
 /**
@@ -165,12 +181,17 @@ export function workoutVo2max(track, activity, profile, atMs) {
     peakHr: Number(profile.maxHr) > 0 ? Number(profile.maxHr) : huntPeakHr(sex, age),
   };
   const windows = steadyWindows(track);
-  const ok = [];
+  const passed = [];
   for (const [a, b] of windows) {
     const r = checkWindow(track, a, b, opts);
     if (r.reject) rejected[r.reject] = (rejected[r.reject] ?? 0) + 1;
-    else ok.push(r.vo2);
+    else passed.push(r);
   }
+  // Heart rate matching the step rate is a lock when it comes and goes; when most of the
+  // workout matches, the heart rate genuinely sits near the step rate and is kept.
+  const locked = passed.filter((r) => r.nearCadence).length;
+  const ok = (locked && locked * 2 <= passed.length ? passed.filter((r) => !r.nearCadence) : passed).map((r) => r.vo2);
+  if (ok.length < passed.length) rejected['hr-cadence'] = passed.length - ok.length;
   let kept = ok;
   if (ok.length >= 3) {
     const m = median(ok);
@@ -211,6 +232,7 @@ const REASONS = {
   'hr-unsteady': 'heart rate unsteady',
   'hr-low': 'heart rate too low',
   'hr-high': 'heart rate too high',
+  'hr-cadence': 'heart rate locked to step rate',
   outlier: 'out of line',
 };
 

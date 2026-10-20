@@ -184,6 +184,10 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Live heart rate** from the watch, read through Wear OS Health Services and streamed to
   the phone about every 3 s. It's saved into the workout recording, so every GPS point
   has a heart rate.
+- **Step cadence** (steps per minute) for walks and runs, from the watch with the heart
+  rate, or from the phone's own step counter when the watch has none (needs the "Physical
+  activity" permission, asked once). The workout shows the average cadence and where it
+  came from, and the VO2max estimate uses it to spot heart rate locked onto the step rate.
 - **Watch screen:** elapsed time, distance, pace or speed, and heart rate. The details are
   white on black, whatever the watch's theme; only the heart rate is coloured, by
   zone, matching the phone's zone colours (from your profile's max and resting heart rate).

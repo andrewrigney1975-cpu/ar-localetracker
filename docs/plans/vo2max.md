@@ -13,6 +13,11 @@ stretches; stretches > 3 MAD (MAD ≥ 1) from the median are dropped; the workou
 the median. On the owner's Lake Loop walks: 40.7–44.9 per walk, 4-week median 42.9; the
 18 Oct walk lost 15 of 21 stretches to "heart rate too high".
 
+Cadence lock check (added with step cadence, 2026-10-20): a stretch whose heart rate is within
+3 bpm of the step cadence for ≥ 80% of its readings is suspect; suspects are dropped only when
+they are at most half of the workout's passing stretches (a lock comes and goes; heart rate
+near the step rate all workout is taken as genuine, which is common for brisk walking).
+
 ## 1. Goal
 
 Estimate VO2max (ml·kg⁻¹·min⁻¹) from what Locale already records: Pixel Watch heart rate

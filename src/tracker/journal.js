@@ -2,10 +2,11 @@
 
 /**
  * @param {string} text
- * @returns {{meta: object|null, points: object[], states: {t:number,state:string,reason?:string,seg?:number}[], hr: {t:number,bpm:number}[], end: object|null}}
+ * @returns {{meta: object|null, points: object[], states: {t:number,state:string,reason?:string,seg?:number}[], hr: {t:number,bpm:number}[],
+ *   cad: {t:number,spm:number,src:'watch'|'phone'}[], end: object|null}}
  */
 export function parseJournal(text) {
-  const out = { meta: null, points: [], states: [], hr: [], end: null, goal: null };
+  const out = { meta: null, points: [], states: [], hr: [], cad: [], end: null, goal: null };
   if (!text) return out;
   const lines = text.split('\n');
   for (const line of lines) {
@@ -30,6 +31,10 @@ export function parseJournal(text) {
         // Heart rate from the paired watch (see WearListenerService.java).
         if (Number.isFinite(o.t) && o.bpm >= 25 && o.bpm <= 240) out.hr.push({ t: o.t, bpm: o.bpm });
         break;
+      case 'cad':
+        // Step cadence (steps/min) from the watch, or the phone's step counter as a fallback.
+        if (Number.isFinite(o.t) && o.spm >= 0 && o.spm <= 260) out.cad.push({ t: o.t, spm: o.spm, src: o.src === 'phone' ? 'phone' : 'watch' });
+        break;
       case 'end':
         out.end = o;
         break;
@@ -44,6 +49,7 @@ export function parseJournal(text) {
   out.points.sort((a, b) => a.t - b.t);
   out.states.sort((a, b) => a.t - b.t);
   out.hr.sort((a, b) => a.t - b.t);
+  out.cad.sort((a, b) => a.t - b.t);
   return out;
 }
 

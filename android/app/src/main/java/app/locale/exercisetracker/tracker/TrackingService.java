@@ -1,5 +1,6 @@
 package app.locale.exercisetracker.tracker;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationChannel;
@@ -8,6 +9,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -85,6 +87,9 @@ public class TrackingService extends Service {
     private static final long WEAR_PUSH_INTERVAL_MS = 2000;
     private static final long WIDGET_INTERVAL_MS = 30_000;
     private static final long HR_FRESH_MS = 15000;
+    /** Phone step-counter cadence: one value per ≥ 5 s of steps; a gap over 15 s restarts it. */
+    private static final long STEP_CADENCE_MS = 5000;
+    private static final long STEP_CADENCE_MAX_MS = 15000;
     /** Wake lock is held in short leases, renewed on every fix, so it can never leak. */
     private static final long WAKE_LEASE_MS = 10 * 60 * 1000;
 
@@ -110,6 +115,7 @@ public class TrackingService extends Service {
     private LocationManager locationManager;
     private SensorManager sensorManager;
     private Sensor pressureSensor;
+    private Sensor stepSensor;
     private PowerManager.WakeLock wakeLock;
     private NotificationManager notificationManager;
     private AltitudeConverter altitudeConverter;
@@ -137,6 +143,9 @@ public class TrackingService extends Service {
     private int satsUsed;
     private int lastHr;
     private long lastHrAt;
+    /** Start of the current step-counter cadence interval (epoch ms, -1 none) and the count then. */
+    private long stepBaseT = -1;
+    private float stepBaseCount;
     private long lastWearPushMs;
     private long lastWidgetUpdateMs;
     private int satsVisible;
@@ -180,6 +189,7 @@ public class TrackingService extends Service {
         locationManager = getSystemService(LocationManager.class);
         sensorManager = getSystemService(SensorManager.class);
         pressureSensor = sensorManager != null ? sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) : null;
+        stepSensor = sensorManager != null ? sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) : null;
         notificationManager = getSystemService(NotificationManager.class);
         altitudeConverter = new AltitudeConverter();
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
@@ -801,6 +811,23 @@ public class TrackingService extends Service {
         });
     }
 
+    /**
+     * Step cadence (steps/min) from the watch ("watch") or the phone's step counter ("phone",
+     * the fallback), any thread. Journaled while recording; processing prefers the watch's.
+     */
+    void onCadence(long t, int spm, String src) {
+        if (spm < 0 || spm > 260 || t <= 0) return;
+        handler.post(() -> {
+            if (state == State.IDLE || state == State.PAUSED || journal == null) return;
+            JSONObject line = new JSONObject();
+            put(line, "type", "cad");
+            put(line, "t", t);
+            put(line, "spm", spm);
+            put(line, "src", src);
+            journal.append(line, false);
+        });
+    }
+
     /** Send the current status to the watch, throttled unless forced. */
     void pushWearStatus(boolean force) {
         long now = System.currentTimeMillis();
@@ -917,6 +944,30 @@ public class TrackingService extends Service {
         public void onAccuracyChanged(Sensor sensor, int accuracy) {}
     };
 
+    /** Phone step counter → cadence over ≥ 5 s intervals (the fallback when the watch has none). */
+    private final SensorEventListener stepListener = new SensorEventListener() {
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            long t = System.currentTimeMillis() - (SystemClock.elapsedRealtimeNanos() - event.timestamp) / 1_000_000;
+            float count = event.values[0];
+            if (stepBaseT < 0 || t - stepBaseT > STEP_CADENCE_MAX_MS || count < stepBaseCount) {
+                stepBaseT = t;
+                stepBaseCount = count;
+                return;
+            }
+            long span = t - stepBaseT;
+            if (span < STEP_CADENCE_MS) return;
+            int spm = Math.round((count - stepBaseCount) * 60000f / span);
+            long mid = stepBaseT + span / 2;
+            stepBaseT = t;
+            stepBaseCount = count;
+            onCadence(mid, spm, "phone");
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+    };
+
     private final GnssStatus.Callback gnssCallback = new GnssStatus.Callback() {
         @Override
         public void onSatelliteStatusChanged(@NonNull GnssStatus status) {
@@ -951,6 +1002,11 @@ public class TrackingService extends Service {
         if (pressureSensor != null) {
             sensorManager.registerListener(pressureListener, pressureSensor, 200_000, handler);
         }
+        // Needs the activity-recognition permission; without it, cadence comes from the watch only.
+        if (stepSensor != null && checkSelfPermission(Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED) {
+            stepBaseT = -1;
+            sensorManager.registerListener(stepListener, stepSensor, SensorManager.SENSOR_DELAY_NORMAL, 0, handler);
+        }
         try {
             locationManager.registerGnssStatusCallback(gnssCallback, handler);
         } catch (SecurityException e) {
@@ -959,7 +1015,10 @@ public class TrackingService extends Service {
     }
 
     private void unregisterSensors() {
-        if (sensorManager != null) sensorManager.unregisterListener(pressureListener);
+        if (sensorManager != null) {
+            sensorManager.unregisterListener(pressureListener);
+            sensorManager.unregisterListener(stepListener);
+        }
         if (locationManager != null) locationManager.unregisterGnssStatusCallback(gnssCallback);
     }
 

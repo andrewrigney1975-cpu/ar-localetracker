@@ -32,8 +32,8 @@ import java.time.Instant
 import kotlin.math.roundToInt
 
 /**
- * Foreground service that runs a Health Services exercise (heart rate only; the phone does
- * GPS) and streams heart-rate samples to the phone every few seconds.
+ * Foreground service that runs a Health Services exercise (heart rate, and step cadence for
+ * walks and runs; the phone does GPS) and streams the samples to the phone every few seconds.
  */
 class HeartRateService : LifecycleService() {
     companion object {
@@ -79,6 +79,8 @@ class HeartRateService : LifecycleService() {
 
     private lateinit var exerciseClient: ExerciseClient
     private val pending = mutableListOf<Pair<Long, Int>>()
+    /** Steps per minute, [epochMs, spm]; guarded by `pending`. */
+    private val pendingCadence = mutableListOf<Pair<Long, Int>>()
     private var started = false
 
     /** Health Services timestamps are relative to boot. */
@@ -88,15 +90,20 @@ class HeartRateService : LifecycleService() {
     private val callback = object : ExerciseUpdateCallback {
         override fun onExerciseUpdateReceived(update: ExerciseUpdate) {
             val samples = update.latestMetrics.getData(DataType.HEART_RATE_BPM)
-            if (samples.isEmpty()) return
+            val cadence = update.latestMetrics.getData(DataType.STEPS_PER_MINUTE)
+            if (samples.isEmpty() && cadence.isEmpty()) return
             val boot = bootInstant
             synchronized(pending) {
                 for (p in samples) {
                     val bpm = p.value.roundToInt()
                     if (bpm in 25..240) pending += p.getTimeInstant(boot).toEpochMilli() to bpm
                 }
+                for (c in cadence) {
+                    val spm = c.value.toInt()
+                    if (spm in 0..260) pendingCadence += c.getTimeInstant(boot).toEpochMilli() to spm
+                }
             }
-            PhoneLink.heartRate.value = samples.last().value.roundToInt()
+            if (samples.isNotEmpty()) PhoneLink.heartRate.value = samples.last().value.roundToInt()
         }
 
         override fun onLapSummaryReceived(lapSummary: ExerciseLapSummary) {}
@@ -135,8 +142,14 @@ class HeartRateService : LifecycleService() {
                 stopSelf()
                 return
             }
-            val dataTypes = setOf<DataType<*, *>>(DataType.HEART_RATE_BPM)
-                .intersect(caps.getExerciseTypeCapabilities(type).supportedDataTypes)
+            // Cadence for walks and runs, when the watch offers it and steps are allowed; the
+            // phone's step counter fills in otherwise.
+            val wanted = mutableSetOf<DataType<*, *>>(DataType.HEART_RATE_BPM)
+            val stepping = type == ExerciseType.WALKING || type == ExerciseType.RUNNING
+            val stepsAllowed = checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (stepping && stepsAllowed) wanted += DataType.STEPS_PER_MINUTE
+            val dataTypes = wanted.intersect(caps.getExerciseTypeCapabilities(type).supportedDataTypes)
+            Log.i(TAG, "Exercise $type with $dataTypes")
             exerciseClient.setUpdateCallback(callback)
             val config = ExerciseConfig.builder(type)
                 .setDataTypes(dataTypes)
@@ -158,13 +171,27 @@ class HeartRateService : LifecycleService() {
     }
 
     private suspend fun flush() {
-        val batch = synchronized(pending) { pending.toList().also { pending.clear() } }
-        if (batch.isEmpty()) return
+        val (batch, cadence) = synchronized(pending) {
+            (pending.toList() to pendingCadence.toList()).also {
+                pending.clear()
+                pendingCadence.clear()
+            }
+        }
+        if (batch.isEmpty() && cadence.isEmpty()) return
         val arr = JSONArray()
         for ((t, bpm) in batch) arr.put(JSONArray().put(t).put(bpm))
-        if (!PhoneLink.send(this, "/locale/hr", JSONObject().put("s", arr))) {
+        val body = JSONObject().put("s", arr)
+        if (cadence.isNotEmpty()) {
+            val c = JSONArray()
+            for ((t, spm) in cadence) c.put(JSONArray().put(t).put(spm))
+            body.put("c", c)
+        }
+        if (!PhoneLink.send(this, "/locale/hr", body)) {
             // Phone briefly unreachable: keep the most recent samples for the next attempt.
-            synchronized(pending) { pending.addAll(0, batch.takeLast(120)) }
+            synchronized(pending) {
+                pending.addAll(0, batch.takeLast(120))
+                pendingCadence.addAll(0, cadence.takeLast(120))
+            }
         }
     }
 

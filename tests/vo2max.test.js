@@ -112,6 +112,23 @@ describe('workout estimate', () => {
     expect(r.value).toBeCloseTo(huntSubmaxVo2({ sex: 'male', age: 51, weightKg: 93, kmh: 2.03 * 3.6, inclinePct: 0, hr: 125 }), 3);
   });
 
+  it('drops stretches where the heart rate locks onto the step rate, when only some do', () => {
+    // Steps at 128/min; heart rate 128 (locked) during two of the nine stretches, else 120.
+    const lockedAt = (s) => (s >= 901 && s <= 1201) || (s >= 1803 && s <= 2103);
+    const t = makeTrack({ hr: (s) => (lockedAt(s) ? 128 : 120) });
+    t.cad = new Float32Array(t.n).fill(128);
+    t.cadSrc = new Uint8Array(t.n).fill(1);
+    const r = workoutVo2max(t, 'walk', MAN, AT);
+    expect(r.rejected['hr-cadence']).toBe(2);
+    expect(r.windows).toBe(7);
+    expect(rejectedText({ 'hr-cadence': 2 })).toBe('heart rate locked to step rate 2');
+    // Heart rate near the step rate all walk is taken as genuine.
+    const all = makeTrack({ hr: () => 127 });
+    all.cad = new Float32Array(all.n).fill(128);
+    all.cadSrc = new Uint8Array(all.n).fill(2);
+    expect(workoutVo2max(all, 'walk', MAN, AT)).toMatchObject({ windows: 9, rejected: {} });
+  });
+
   it('needs walking or running, a profile, heart rate and two stretches', () => {
     expect(workoutVo2max(makeTrack(), 'cycle', MAN, AT)).toMatchObject({ value: null, reason: 'activity' });
     expect(workoutVo2max(makeTrack(), 'walk', { ...MAN, weightKg: null }, AT)).toMatchObject({ value: null, reason: 'profile' });
