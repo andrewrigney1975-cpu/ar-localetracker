@@ -1,6 +1,9 @@
 # VO2max estimate from watch heart rate and phone GPS: research
 
-Status: **A1 (HUNT submaximal) and the heart-rate checks are built** (2026-10-20):
+Status: **A1 (HUNT submaximal) and the heart-rate checks are built** (2026-10-20), for
+**walks only**: on the City2Surf sample run (6:18/km) A1 gave 60, against ~35 from race-pace
+tables, because the model is linear in speed and was fitted on walkers. Stretches over
+8.5 km/h are also left out. Runs need A2 (or a running-specific model). Built:
 `src/stats/vo2max.js`, a tile on the workout Summary, and the 4-week median in Settings →
 Profile. The rest of this document is the research it came from; waist, the non-exercise
 models and A2 are still to do.

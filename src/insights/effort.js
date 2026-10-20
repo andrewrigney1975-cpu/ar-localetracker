@@ -6,14 +6,16 @@ import { getTrack } from '../db/workouts.js';
 import { estimateCalories, maxHeartRate, profileComplete, trimp } from '../stats/physio.js';
 import { VO2_ACTIVITIES, vo2Available, workoutVo2max } from '../stats/vo2max.js';
 
-const KEY = 'insights.effort.v2';
+const KEY = 'insights.effort.v3';
 
 let cache = null;
 
 function load() {
   if (cache) return cache;
   try {
-    localStorage.removeItem('insights.effort.v1'); // before VO2max was cached
+    // v1: before VO2max was cached; v2: VO2max for runs too.
+    localStorage.removeItem('insights.effort.v1');
+    localStorage.removeItem('insights.effort.v2');
     cache = JSON.parse(localStorage.getItem(KEY) ?? '{}') ?? {};
   } catch {
     cache = {};

@@ -107,6 +107,8 @@ export function generateCity2SurfJournal({ seed = 2026, startedAt = CITY2SURF_ST
   let seq = 0;
   let phase = rand() * 10;
   const heart = new HeartModel({ rest: 56, max: 184, seed: seed + 7 });
+  // Watch step cadence on its own stream, so adding it left the other lines unchanged.
+  const cadRand = mulberry32(seed + 13);
   while (s < total) {
     t += 1000;
     const k = Math.min(paces.length - 1, Math.floor(s / 1000));
@@ -150,6 +152,7 @@ export function generateCity2SurfJournal({ seed = 2026, startedAt = CITY2SURF_ST
       seg: 0,
     });
     lines.push({ type: 'hr', t, bpm });
+    if (seq % 2 === 0) lines.push({ type: 'cad', t, spm: Math.round(150 + 6 * v + gaussian(cadRand) * 1.5), src: 'watch' });
   }
   lines.push({ type: 'state', t, state: 'idle', reason: 'stop', seg: 0 });
   lines.push({ type: 'end', t });

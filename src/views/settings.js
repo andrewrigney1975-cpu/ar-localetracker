@@ -35,7 +35,7 @@ function vo2HTML(value, hint) {
 }
 
 /**
- * The current estimate: median of the last 4 weeks' walks and runs with heart rate (HUNT
+ * The current estimate: median of the last 4 weeks' walks with heart rate (HUNT
  * walking model, cached per workout in the effort cache).
  */
 async function fillVo2(row, workouts, profile) {
@@ -47,7 +47,7 @@ async function fillVo2(row, workouts, profile) {
   const now = Date.now();
   const recent = workouts.filter((w) => VO2_ACTIVITIES.includes(w.activity) && w.summary?.heartRate && w.startedAt >= now - 28 * 86400000);
   if (!recent.length) {
-    row.innerHTML = vo2HTML('–', 'From walks or runs with watch heart rate in the last 4 weeks');
+    row.innerHTML = vo2HTML('–', 'From walks with watch heart rate in the last 4 weeks');
     return;
   }
   row.innerHTML = vo2HTML('…', 'Working it out from your recent workouts');
@@ -55,7 +55,7 @@ async function fillVo2(row, workouts, profile) {
   if (!row.isConnected) return;
   const c = currentVo2max(recent.map((w) => ({ at: w.startedAt, value: effort.get(w.id)?.vo2 })), now);
   row.innerHTML = c
-    ? vo2HTML(c.value.toFixed(1), `Median of ${c.count} workout${c.count === 1 ? '' : 's'} in the last 4 weeks${c.count > 1 ? ` · range ${c.min.toFixed(1)}–${c.max.toFixed(1)}` : ''}`)
+    ? vo2HTML(c.value.toFixed(1), `Median of ${c.count} walk${c.count === 1 ? '' : 's'} in the last 4 weeks${c.count > 1 ? ` · range ${c.min.toFixed(1)}–${c.max.toFixed(1)}` : ''}`)
     : vo2HTML('–', 'No steady 5-minute stretches with reliable heart rate in the last 4 weeks');
 }
 
@@ -237,7 +237,7 @@ export async function mount(root) {
             <div class="card settings-group">
               <label class="setting"><span class="text">Your name<small>${p.name ? `Shared courses are labelled ${escapeHtml(initialsOf(p.name))}` : 'Your initials label the courses you share'}</small></span>
                 <input class="text-input" type="text" maxlength="60" autocomplete="name" data-name value="${escapeHtml(p.name ?? '')}" placeholder="First Last" /></label>
-              <div class="setting"><div class="text">Sex<small>Used for calories and cardio load</small></div>
+              <div class="setting"><div class="text">Sex<small>Used for calories, cardio load and VO2max</small></div>
                 ${segmented('profile.sex', [['male', 'Male'], ['female', 'Female']], p.sex)}</div>
               <label class="setting"><span class="text">Birth year</span>
                 <input class="num-input" type="number" inputmode="numeric" min="1900" max="2025" data-profile="birthYear" value="${p.birthYear ?? ''}" placeholder="1985" /></label>
@@ -250,7 +250,7 @@ export async function mount(root) {
                 <span class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="30" max="120" data-profile="restingHr" value="${p.restingHr ?? ''}" placeholder="60" />bpm</span></label>
               <label class="setting"><span class="text">Max heart rate<small>Optional · ${estMax ? `estimated ${estMax} from age` : 'estimated from age'}</small></span>
                 <span class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="120" max="230" data-profile="maxHr" value="${p.maxHr ?? ''}" placeholder="${estMax ?? '185'}" />bpm</span></label>
-              <div class="setting" data-ref="vo2">${vo2HTML('–', 'From walks and runs with watch heart rate')}</div>
+              <div class="setting" data-ref="vo2">${vo2HTML('–', 'From walks with watch heart rate')}</div>
             </div>
 
             <div class="section-title">Watch</div>

@@ -1,9 +1,13 @@
-// VO2max estimate from steady walking or running with watch heart rate (docs/plans/vo2max.md).
+// VO2max estimate from steady walking with watch heart rate (docs/plans/vo2max.md).
 //
 // HUNT 3 submaximal model (Loe et al. 2016, PLoS ONE 11:e0144873; ~4,600 adults, 92% walked
 // at the submaximal stage): VO2peak from speed, incline, weight, age and the heart rate at a
 // steady submaximal stage, as a fraction of the study's age-predicted peak heart rate.
 // SEE 6.24 (men) / 5.17 (women) ml·kg⁻¹·min⁻¹, about 14%.
+//
+// Walks only: the model is linear in speed (+6.4 per km/h) and was fitted on mostly walking
+// subjects, so at running pace it runs away (the City2Surf sample at 6:18/km came out at 60,
+// where race-pace tables put that pace near 35). Stretches above 8.5 km/h are left out too.
 //
 // Each workout is cut into steady 5-minute stretches after a 10-minute warm-up (the study
 // warmed up for 10 minutes and read the heart rate once VO2 was steady, after 3 minutes).
@@ -14,13 +18,14 @@
 
 import { ageAt } from './physio.js';
 
-export const VO2_ACTIVITIES = ['walk', 'run'];
+export const VO2_ACTIVITIES = ['walk'];
 const WARMUP_S = 600;
 const WINDOW_S = 300;
 /** Heart rate is read over the end of each stretch, once it has settled. */
 const HR_SETTLE_S = 120;
 const MAX_GAP_S = 10;
 const MIN_SPEED = 0.8; // m/s, about 3 km/h
+const MAX_SPEED = 8.5 / 3.6; // m/s: faster is jogging, beyond the walking model
 const MAX_SPEED_CV = 0.15;
 const MIN_GRADE = -0.02;
 const MAX_GRADE = 0.08;
@@ -109,6 +114,7 @@ export function checkWindow(track, a, b, { sex, age, weightKg, restingHr, peakHr
   const dist = track.dist[b] - track.dist[a];
   const v = dist / dur;
   if (!(v >= MIN_SPEED)) return { reject: 'slow' };
+  if (v > MAX_SPEED) return { reject: 'fast' };
   let sum = 0;
   let sq = 0;
   for (let i = a; i <= b; i++) {
@@ -225,6 +231,7 @@ export function currentVo2max(entries, now, days = 28) {
 
 const REASONS = {
   slow: 'too slow',
+  fast: 'too fast for walking',
   speed: 'uneven pace',
   slope: 'too steep',
   'hr-missing': 'heart rate missing',

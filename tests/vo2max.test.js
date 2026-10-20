@@ -69,7 +69,7 @@ describe('workout estimate', () => {
     expect(r.windows).toBe(r.checked);
     expect(r.checked).toBe(9);
     expect(rejectedText(r.rejected)).toBe('');
-    const f = workoutVo2max(makeTrack({ speed: () => 1.7, hr: () => 125 }), 'run', WOMAN, AT);
+    const f = workoutVo2max(makeTrack({ speed: () => 1.7, hr: () => 125 }), 'walk', WOMAN, AT);
     expect(f.value).toBeGreaterThan(20);
   });
 
@@ -131,6 +131,9 @@ describe('workout estimate', () => {
 
   it('needs walking or running, a profile, heart rate and two stretches', () => {
     expect(workoutVo2max(makeTrack(), 'cycle', MAN, AT)).toMatchObject({ value: null, reason: 'activity' });
+    // Runs are beyond the walking model, and so are jogged stretches of a walk.
+    expect(workoutVo2max(makeTrack({ speed: () => 2.65, hr: () => 149 }), 'run', MAN, AT)).toMatchObject({ value: null, reason: 'activity' });
+    expect(workoutVo2max(makeTrack({ speed: () => 2.5 }), 'walk', MAN, AT)).toMatchObject({ value: null, rejected: { fast: 9 } });
     expect(workoutVo2max(makeTrack(), 'walk', { ...MAN, weightKg: null }, AT)).toMatchObject({ value: null, reason: 'profile' });
     expect(workoutVo2max({ ...makeTrack(), hr: undefined }, 'walk', MAN, AT)).toMatchObject({ value: null, reason: 'no-hr' });
     expect(workoutVo2max(makeTrack({ seconds: 1100 }), 'walk', MAN, AT)).toMatchObject({ value: null, reason: 'no-steady', checked: 1 });
