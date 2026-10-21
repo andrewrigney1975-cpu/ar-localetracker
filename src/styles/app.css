@@ -714,6 +714,12 @@ main#view {
   animation: rise 0.2s ease-out;
 }
 
+/* Screenshots (services/screenshot.js): controls and toasts stay out of the image. */
+.capturing [data-shot-hide],
+.capturing .toast-host {
+  visibility: hidden !important;
+}
+
 /* Popover (shared by map + 3D markers) */
 .popover {
   position: absolute;
