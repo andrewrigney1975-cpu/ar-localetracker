@@ -3,6 +3,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { captureElement } from './screenshot.js';
 
 /** Base64 for binary content (Capacitor's Filesystem takes base64 when no encoding is given). */
 function toBase64(bytes) {
@@ -12,10 +13,10 @@ function toBase64(bytes) {
 }
 
 /** Share plain text through the Android share sheet (Messages, WhatsApp, email, …). */
-export async function shareText({ text, title }) {
+export async function shareText({ text, title, dialogTitle = 'Share workout' }) {
   try {
     if (Capacitor.isNativePlatform()) {
-      await Share.share({ title, text, dialogTitle: 'Share workout' });
+      await Share.share({ title, text, dialogTitle });
     } else if (navigator.share) {
       await navigator.share({ title, text });
     } else {
@@ -26,6 +27,27 @@ export async function shareText({ text, title }) {
     if (!/cancel|abort/i.test(String(e?.message ?? e?.name ?? e))) throw e;
   }
   return 'shared';
+}
+
+/**
+ * Share a screenshot of `element` with `text` alongside (apps that take only one use the
+ * image). Where no screenshot can be taken (the browser) or capture fails, shares the text.
+ * @returns {Promise<'image'|'shared'|'copied'>}
+ */
+export async function shareScreenshot({ element, text, title, filename = 'screenshot.png', dialogTitle = 'Share' }) {
+  let shot = null;
+  try {
+    shot = await captureElement(element, { filename });
+  } catch (e) {
+    console.warn('Screenshot failed; sharing text', e);
+  }
+  if (!shot) return shareText({ text, title, dialogTitle });
+  try {
+    await Share.share({ title, text, files: [shot.uri], dialogTitle });
+  } catch (e) {
+    if (!/cancel|abort/i.test(String(e?.message ?? e?.name ?? e))) throw e;
+  }
+  return 'image';
 }
 
 /** Open the default SMS app with the message pre-filled (sms: URIs open externally). */

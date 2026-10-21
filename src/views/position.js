@@ -4,7 +4,8 @@
 import { App } from '@capacitor/app';
 import { locationShareText } from '../export/text.js';
 import { navigate } from '../router.js';
-import { shareText } from '../services/share.js';
+import { screenshotName } from '../services/screenshot.js';
+import { shareScreenshot } from '../services/share.js';
 import { settings, updateSettings } from '../settings.js';
 import { tracker } from '../tracker/client.js';
 import { confirmDialog } from '../ui/dialog.js';
@@ -46,7 +47,7 @@ export async function mount(root, _params, _query, ctx) {
             <span class="gps-quality"><span class="gps-bars" data-ref="bars"><i></i><i></i><i></i><i></i></span><span data-ref="gpsText">Searching for GPS…</span></span>
             <span class="gps-quality" data-ref="sats"></span>
           </div>
-          <div class="banner warn" data-ref="perm" hidden>
+          <div class="banner warn" data-ref="perm" data-shot-hide hidden>
             ${icons.warning}<span class="grow"><strong>Location is off</strong><span class="dim">Allow location to see where you are.</span></span>
             <button class="btn ghost" data-act="allow">Allow</button>
           </div>
@@ -66,7 +67,7 @@ export async function mount(root, _params, _query, ctx) {
 
           <div class="card pos-map-card" data-ref="map"></div>
 
-          <div class="pos-actions">
+          <div class="pos-actions" data-shot-hide>
             <button class="btn ghost" data-act="copy">${icons.copy}Copy</button>
             <button class="btn ghost" data-act="share">${icons.share}Share</button>
             <button class="btn primary" data-act="hold" aria-pressed="false">${icons.pause}<span>Hold</span></button>
@@ -242,7 +243,13 @@ export async function mount(root, _params, _query, ctx) {
   root.querySelector('[data-act="share"]').addEventListener('click', async () => {
     if (!fix) return toast('No position yet');
     try {
-      const res = await shareText({ text: locationShareText(fix, { units }), title: 'My location' });
+      const res = await shareScreenshot({
+        element: root.querySelector('.live-pos'),
+        text: locationShareText(fix, { units }),
+        title: 'My location',
+        filename: screenshotName('location'),
+        dialogTitle: 'Share location',
+      });
       if (res === 'copied') toast('Location copied');
     } catch (e) {
       toast(`Sharing failed: ${e?.message ?? e}`);

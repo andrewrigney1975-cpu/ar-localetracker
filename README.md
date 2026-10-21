@@ -115,7 +115,8 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - barometric altitude with vertical accuracy and air pressure
   - speed, and heading from the compass or GPS
   - a live map with an accuracy circle
-  - **Copy**, **Share** and **Hold**
+  - **Copy**, **Share** and **Hold**: Share sends a screenshot of the screen (map included)
+    with your coordinates and a Google Maps link
 
   Sensors stop as soon as you leave the screen.
 - **Home-screen widgets:**
