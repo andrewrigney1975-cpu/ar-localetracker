@@ -225,7 +225,9 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
     jogging pace (over 8.5 km/h) or unreliable heart rate (gaps, sudden jumps, unsteady,
     too high to be steady walking, or locked onto the step rate) are left out, and the page
     says why. Runs aren't estimated: the walking model overshoots at running pace. Settings →
-    Profile shows your current estimate: the median of the last 4 weeks.
+    Profile shows your current estimate (the median of the last 4 weeks) and a chart rating it
+    against Cooper Institute norms for your age and sex, from Very Poor to Excellent, with
+    your percentile and the range of your recent walks.
 - **Heart-rate line** on the elevation profile, with heart rate per split and in the
   marker popovers. GPX, TCX and CSV exports include heart rate.
 - **Splits** per km or mile, with pace, elevation change and fastest/slowest bars.
