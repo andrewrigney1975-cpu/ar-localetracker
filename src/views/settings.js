@@ -3,7 +3,7 @@ import { initialsOf } from '../course/courseFile.js';
 import { listWorkouts } from '../db/workouts.js';
 import { settings, updateSettings } from '../settings.js';
 import { tracker } from '../tracker/client.js';
-import { bmi, bmiCategory, maxHeartRate } from '../stats/physio.js';
+import { ageAt, bmi, bmiCategory, maxHeartRate } from '../stats/physio.js';
 import { Disposer, escapeHtml } from '../ui/dom.js';
 import { toast } from '../ui/toast.js';
 import { App } from '@capacitor/app';
@@ -14,6 +14,7 @@ import { GOAL_ACTIVITIES, GOAL_METRICS, GOAL_PERIODS, goalList, goalsFor, withGo
 import { confirmDialog, openDialog } from '../ui/dialog.js';
 import { effortFor } from '../insights/effort.js';
 import { currentVo2max, VO2_ACTIVITIES, vo2Available } from '../stats/vo2max.js';
+import { ordinal, rateVo2max, VO2_CATEGORIES } from '../stats/vo2norms.js';
 
 const GOAL_MODES = ['auto', 'set', 'off'];
 const GOAL_LABELS = { auto: 'Auto goal', set: 'Set goal', off: 'Goal' };
@@ -35,11 +36,76 @@ function vo2HTML(value, hint) {
 }
 
 /**
+ * Norms chart under the VO2max row: one horizontal bar per category on a shared ml/kg/min
+ * scale, the estimate's category highlighted, the 4-week range shaded and the estimate
+ * marked. `current` is from currentVo2max, or null for the norms alone.
+ */
+function vo2ChartHTML(profile, current) {
+  const rating = rateVo2max(current?.value ?? null, profile.sex, ageAt(profile));
+  if (!rating) return '';
+  const { ranges } = rating;
+  const first = ranges[0].max;
+  const last = ranges[ranges.length - 1].min;
+  // Room either side of the open-ended categories, and for the estimates.
+  let lo = Math.floor(first - (ranges[1].max - first) * 1.5);
+  let hi = Math.ceil(last + (last - ranges[ranges.length - 2].min) * 0.6);
+  if (current) {
+    lo = Math.min(lo, Math.floor(current.min - 1));
+    hi = Math.max(hi, Math.ceil(current.max + 1));
+  }
+  const x = (v) => `${(((v - lo) / (hi - lo)) * 100).toFixed(2)}%`;
+  const fmt = (v) => v.toFixed(1);
+  const rows = ranges
+    .map((r, i) => {
+      const from = r.min ?? lo;
+      const to = r.max ?? hi;
+      const text = r.min == null ? `< ${fmt(r.max)}` : r.max == null ? `≥ ${fmt(r.min)}` : `${fmt(r.min)}–${fmt(r.max)}`;
+      const cur = i === rating.category ? ' current' : '';
+      // Cells are placed explicitly so the overlay can share the bars column.
+      const row = `grid-row:${i + 1}`;
+      return `<span class="vo2-label${cur}" style="${row}">${r.label}</span>
+        <span class="vo2-track" style="${row}"><i class="vo2-bar c${i}${cur}" style="left:${x(from)};width:calc(${x(to)} - ${x(from)})"></i></span>
+        <span class="vo2-range num${cur}" style="${row}">${text}</span>`;
+    })
+    .join('');
+  const who = `${profile.sex === 'female' ? 'women' : 'men'} aged ${rating.band}${rating.clamped ? ' (nearest age group)' : ''}`;
+  let head = `Norms for ${who}`;
+  if (current) {
+    const pct = rating.below ? 'below the 5th percentile' : rating.above ? 'above the 95th percentile' : `${ordinal(rating.percentile)} percentile`;
+    head = `<strong>${VO2_CATEGORIES[rating.category].label}</strong> · ${pct} for ${who}`;
+  }
+  const overlay = current
+    ? `<span class="vo2-overlay" aria-hidden="true">
+        ${current.count > 1 ? `<i class="vo2-span" style="left:${x(current.min)};width:calc(${x(current.max)} - ${x(current.min)})"></i>` : ''}
+        <i class="vo2-mark" style="left:${x(current.value)}"><b class="num">${fmt(current.value)}</b></i>
+      </span>`
+    : '';
+  const note = current
+    ? `Line: your estimate${current.count > 1 ? '. Shaded: the range of your walks in the last 4 weeks' : ''}. `
+    : '';
+  return `<div class="vo2-head">${head}</div>
+    <div class="vo2-chart${current ? ' has-mark' : ''}" role="img" aria-label="VO2max categories for ${who}${current ? `; your estimate ${fmt(current.value)} is ${VO2_CATEGORIES[rating.category].label}` : ''}">
+      ${rows}${overlay}
+    </div>
+    <small class="vo2-note">${note}Values in ml/kg/min. Norms: Cooper Institute (ACSM Guidelines, 11th ed.), via vo2maxcalculators.com.</small>`;
+}
+
+/** Show or hide the chart row below the VO2max row. */
+function setVo2Chart(row, profile, current) {
+  const chart = row.parentElement?.querySelector('[data-ref="vo2chart"]');
+  if (!chart) return;
+  const html = vo2Available(profile) ? vo2ChartHTML(profile, current) : '';
+  chart.innerHTML = html;
+  chart.hidden = !html;
+}
+
+/**
  * The current estimate: median of the last 4 weeks' walks with heart rate (HUNT
  * walking model, cached per workout in the effort cache).
  */
 async function fillVo2(row, workouts, profile) {
   if (!row) return;
+  setVo2Chart(row, profile, null);
   if (!vo2Available(profile)) {
     row.innerHTML = vo2HTML('–', 'Needs your sex, birth year and weight');
     return;
@@ -57,6 +123,7 @@ async function fillVo2(row, workouts, profile) {
   row.innerHTML = c
     ? vo2HTML(c.value.toFixed(1), `Median of ${c.count} walk${c.count === 1 ? '' : 's'} in the last 4 weeks${c.count > 1 ? ` · range ${c.min.toFixed(1)}–${c.max.toFixed(1)}` : ''}`)
     : vo2HTML('–', 'No steady 5-minute stretches with reliable heart rate in the last 4 weeks');
+  setVo2Chart(row, profile, c);
 }
 
 /** "Sat", "Tue & Thu", "Mon, Wed & Fri": the days a routine is usually done on. */
@@ -251,6 +318,7 @@ export async function mount(root) {
               <label class="setting"><span class="text">Max heart rate<small>Optional · ${estMax ? `estimated ${estMax} from age` : 'estimated from age'}</small></span>
                 <span class="input-unit"><input class="num-input" type="number" inputmode="numeric" min="120" max="230" data-profile="maxHr" value="${p.maxHr ?? ''}" placeholder="${estMax ?? '185'}" />bpm</span></label>
               <div class="setting" data-ref="vo2">${vo2HTML('–', 'From walks with watch heart rate')}</div>
+              <div class="setting stack vo2-chart-row" data-ref="vo2chart" hidden></div>
             </div>
 
             <div class="section-title">Watch</div>

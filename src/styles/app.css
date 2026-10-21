@@ -2034,6 +2034,127 @@ main#view {
   width: 100%;
 }
 
+/* VO2max norms chart (Settings → Profile): one bar per category on a shared scale. */
+.vo2-chart-row[hidden] {
+  display: none;
+}
+
+.vo2-chart-row {
+  gap: 8px;
+}
+
+.vo2-head {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+.vo2-head strong {
+  color: var(--text);
+}
+
+.vo2-chart {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.vo2-chart.has-mark {
+  padding-top: 20px;
+}
+
+.vo2-label.current,
+.vo2-range.current {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.vo2-label {
+  grid-column: 1;
+}
+
+.vo2-range {
+  grid-column: 3;
+  text-align: right;
+}
+
+.vo2-track {
+  grid-column: 2;
+  position: relative;
+  height: 14px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.vo2-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 4px;
+  opacity: 0.4;
+}
+
+.vo2-bar.current {
+  opacity: 1;
+}
+
+.vo2-bar.c0 { background: #c0392b; }
+.vo2-bar.c1 { background: #e0663a; }
+.vo2-bar.c2 { background: #e8a33a; }
+.vo2-bar.c3 { background: #c9b53a; }
+.vo2-bar.c4 { background: #7fb24a; }
+.vo2-bar.c5 { background: #3b9d5d; }
+.vo2-bar.c6 { background: #1f7a6d; }
+
+/* Over the bars column, all rows: the 4-week range and the estimate. */
+.vo2-overlay {
+  grid-column: 2;
+  grid-row: 1 / span 7;
+  position: relative;
+  align-self: stretch;
+  margin-top: -20px;
+  pointer-events: none;
+}
+
+.vo2-span {
+  position: absolute;
+  top: 20px;
+  bottom: 0;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+  border-radius: 3px;
+}
+
+.vo2-mark {
+  position: absolute;
+  top: 16px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+
+.vo2-mark b {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.8rem;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.vo2-note {
+  color: var(--text-faint);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
 /* Learned routines: the Rename / Customise / Forget chips go under the name. */
 .setting.routine .voice-kinds {
   padding-left: 32px;
