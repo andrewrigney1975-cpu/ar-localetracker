@@ -265,7 +265,7 @@ main#view {
 
 .tabbar {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr)); /* set per fit by fitTabbar in main.js */
   padding: 4px calc(var(--safe-right) + 8px) calc(var(--safe-bottom) + 4px) calc(var(--safe-left) + 8px);
   background: var(--surface);
   border-top: 1px solid var(--border);
@@ -275,7 +275,8 @@ main#view {
   display: none;
 }
 
-.tabbar a {
+.tabbar a,
+.tabbar .tab-more {
   display: grid;
   justify-items: center;
   gap: 2px;
@@ -287,9 +288,54 @@ main#view {
   border-radius: 12px;
 }
 
-.tabbar a svg {
+.tabbar a svg,
+.tabbar .tab-more svg {
   width: 24px;
   height: 24px;
+}
+
+/* Labels stay on one line; a tab that can't fit its label moves into the ⋮ menu instead. */
+.tabbar span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.tabbar a[hidden],
+.tabbar .tab-more[hidden] {
+  display: none;
+}
+
+.tabbar .tab-more {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 550;
+}
+
+/* The current page is one of the tabs in the menu. */
+.tabbar .tab-more.has-current {
+  color: var(--text);
+}
+
+.tabbar .tab-more.has-current svg {
+  color: var(--accent);
+}
+
+.tab-menu .tag svg {
+  width: 22px;
+  height: 22px;
+}
+
+.option-list.tab-menu button {
+  grid-template-columns: 48px 1fr;
+  font-weight: 550;
+}
+
+.tab-menu button[aria-current='page'] .tag {
+  color: var(--accent);
 }
 
 .tabbar a[aria-current='page'] {
@@ -2034,7 +2080,7 @@ main#view {
   width: 100%;
 }
 
-/* VO2max norms chart (Settings → Profile): one bar per category on a shared scale. */
+/* VO2max norms chart (You → Profile): the categories in one row on a shared scale, then a table. */
 .vo2-chart-row[hidden] {
   display: none;
 }
@@ -2054,92 +2100,66 @@ main#view {
 
 .vo2-chart {
   position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 10px;
-  row-gap: 6px;
-  font-size: 0.8rem;
-  color: var(--text-dim);
+  height: 14px;
+  margin: 2px 0 4px;
 }
 
 .vo2-chart.has-mark {
-  padding-top: 20px;
+  margin: 26px 0 10px;
 }
 
-.vo2-label.current,
-.vo2-range.current {
-  color: var(--text);
-  font-weight: 650;
+.vo2-scale {
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  overflow: hidden;
 }
 
-.vo2-label {
-  grid-column: 1;
-}
-
-.vo2-range {
-  grid-column: 3;
-  text-align: right;
-}
-
-.vo2-track {
-  grid-column: 2;
-  position: relative;
-  height: 14px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--text) 6%, transparent);
-}
-
-.vo2-bar {
+.vo2-seg {
   position: absolute;
   top: 0;
   bottom: 0;
-  border-radius: 4px;
-  opacity: 0.4;
+  opacity: 0.45;
 }
 
-.vo2-bar.current {
+.vo2-seg.current {
   opacity: 1;
 }
 
-.vo2-bar.c0 { background: #c0392b; }
-.vo2-bar.c1 { background: #e0663a; }
-.vo2-bar.c2 { background: #e8a33a; }
-.vo2-bar.c3 { background: #c9b53a; }
-.vo2-bar.c4 { background: #7fb24a; }
-.vo2-bar.c5 { background: #3b9d5d; }
-.vo2-bar.c6 { background: #1f7a6d; }
+.c0:is(.vo2-seg, .vo2-swatch) { background: #c0392b; }
+.c1:is(.vo2-seg, .vo2-swatch) { background: #e0663a; }
+.c2:is(.vo2-seg, .vo2-swatch) { background: #e8a33a; }
+.c3:is(.vo2-seg, .vo2-swatch) { background: #c9b53a; }
+.c4:is(.vo2-seg, .vo2-swatch) { background: #7fb24a; }
+.c5:is(.vo2-seg, .vo2-swatch) { background: #3b9d5d; }
+.c6:is(.vo2-seg, .vo2-swatch) { background: #1f7a6d; }
 
-/* Over the bars column, all rows: the 4-week range and the estimate. */
-.vo2-overlay {
-  grid-column: 2;
-  grid-row: 1 / span 7;
-  position: relative;
-  align-self: stretch;
-  margin-top: -20px;
-  pointer-events: none;
-}
-
+/* The 4-week range: a shaded band taller than the scale, so it shows above and below the dot
+   even when the range is narrower than the dot. */
 .vo2-span {
   position: absolute;
-  top: 20px;
-  bottom: 0;
-  background: color-mix(in srgb, var(--text) 18%, transparent);
-  border-radius: 3px;
+  top: -5px;
+  bottom: -5px;
+  min-width: 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text) 30%, transparent);
 }
 
+/* The estimate: a white dot with a fine dark outline, its value above. */
 .vo2-mark {
   position: absolute;
-  top: 16px;
-  bottom: -2px;
-  width: 2px;
-  margin-left: -1px;
-  background: var(--text);
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55), 0 1px 3px rgb(0 0 0 / 0.25);
 }
 
 .vo2-mark b {
   position: absolute;
-  top: -18px;
+  bottom: 19px;
   left: 50%;
   transform: translateX(-50%);
   font-size: 0.8rem;
@@ -2147,6 +2167,38 @@ main#view {
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
+}
+
+.vo2-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.vo2-table th,
+.vo2-table td {
+  padding: 3px 0;
+  font-weight: inherit;
+  text-align: left;
+}
+
+.vo2-table td {
+  text-align: right;
+}
+
+.vo2-table tr.current {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.vo2-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 3px;
+  vertical-align: -1px;
 }
 
 .vo2-note {
@@ -2782,7 +2834,7 @@ a.stat.pb:active {
   color: var(--accent);
 }
 
-/* Settings → Goals: each row opens the goal editor. */
+/* You → Goals: each row opens the goal editor. */
 .setting.goal-row {
   width: 100%;
   border: 0;
@@ -2845,7 +2897,7 @@ a.stat.pb:active {
   display: none;
 }
 
-/* Insights: the goal for the chart's activity, period and metric (Settings → Goals). */
+/* Insights: the goal for the chart's activity, period and metric (You → Goals). */
 .chart-scroll .goal-line {
   fill: none;
   pointer-events: none;

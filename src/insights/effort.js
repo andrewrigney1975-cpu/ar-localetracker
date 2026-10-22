@@ -1,4 +1,4 @@
-// Calories, cardio load and the VO2max estimate per workout (Insights, Settings). All need
+// Calories, cardio load and the VO2max estimate per workout (Insights, You). All need
 // the full track and the user's profile, so values are cached in localStorage by workout
 // version and profile; a cold cache loads each track once.
 
