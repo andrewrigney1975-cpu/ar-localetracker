@@ -318,7 +318,10 @@ cloudy, rain, fog, windy, etc.). Show it on the workout and make it usable in In
 
 ---
 
-## 11. Insights: CSV of raw vs smoothed distance statistics
+## 11. Insights: CSV of raw vs smoothed distance statistics: ✅ done (October 2026)
+
+> Implemented in `src/stats/gpsDistance.js` (pure: `rawDistance` from a journal, `describe`, `groupStats`, `gpsStatsCSV`) and `src/insights/gpsCache.js` (per-workout cache `insights.rawdist.v1`, keyed by id + start time since raw journals don't change). Insights → Export → **GPS distance** covers the workouts in the window and filters. Grouping decision: one group per routine (the selected routine only, when one is chosen; unmatched workouts as "Walk (no routine)" etc.), each with Raw, Raw ≤ ±20 m, Smoothed and **Raw over smoothed %**; with several groups, an "All workouts" row of the % only, since that compares across routes and the distances don't. Per-workout rows also carry the weather at the start. Reproduces the hand analysis of 2026-10-23 exactly (raw 15,008.2 ± 352.6 m, gated 14,905.4 ± 155.0, smoothed 14,672.7 ± 94.2; sample SD).
+
 
 **Request:** in Insights, an export option that writes a CSV with the **min, max, mean and
 standard deviation** of the **raw GPS** and **smoothed** distance, for a single routine

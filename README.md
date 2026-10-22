@@ -349,6 +349,14 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   dashed line, with how much each period had left to go.
 - **Export** the report as **CSV** (one row per period, or per period and activity) or
   **JSON** (with totals) through the Android share sheet. Values are SI units.
+- **GPS distance export** (CSV): for the workouts in the window and filters, the distance
+  from the raw GPS fixes (all of them, and only those the phone rated ±20 m or better)
+  against the saved, smoothed distance. A first block gives n, min, max, mean, standard
+  deviation and coefficient of variation per routine (or for the selected routine), plus how
+  much longer raw GPS reads than smoothed, also over all workouts. A second block has one
+  row per workout with those distances, the average reported accuracy and satellites used,
+  and the weather at the start. Useful for seeing how consistent the GPS is on a route you
+  repeat, and what affects it. Journals are read once per workout and cached.
 - **Personal bests**, per activity over all time (following the activity and routine
   filters): best average pace or speed, best km or mile split, fastest speed (held for
   at least 5 seconds, so a GPS glitch doesn't count) and longest workout. Tap one to open
