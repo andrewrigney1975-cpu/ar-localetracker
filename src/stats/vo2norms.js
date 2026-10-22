@@ -1,4 +1,4 @@
-// VO2max norms by age and sex, for rating an estimate (Settings → Profile chart).
+// VO2max norms by age and sex, for rating an estimate (You → Profile chart).
 //
 // Percentiles from The Cooper Institute's Aerobics Center Longitudinal Study (maximal
 // treadmill tests with gas analysis), as published in ACSM's Guidelines for Exercise Testing

@@ -9,14 +9,16 @@ import { syncWorkouts } from './services/sync.js';
 import { getRoutineModel, scheduleRoutineRebuild } from './insights/model.js';
 import { loadSettings } from './settings.js';
 import { tracker } from './tracker/client.js';
-import { closeTopDialog } from './ui/dialog.js';
+import { closeTopDialog, openDialog } from './ui/dialog.js';
 import { $, el } from './ui/dom.js';
 import { icons } from './ui/icons.js';
+import { fitTabs } from './ui/tabFit.js';
 import { toast } from './ui/toast.js';
 
 route('/', () => import('./views/home.js'), { tabs: true });
 route('/history', () => import('./views/history.js'), { tabs: true });
 route('/insights', () => import('./views/insights.js'), { tabs: true });
+route('/you', () => import('./views/you.js'), { tabs: true });
 route('/settings', () => import('./views/settings.js'), { tabs: true });
 route('/live', () => import('./views/live.js'));
 route('/live/:activity', () => import('./views/live.js'));
@@ -29,15 +31,68 @@ const TABS = [
   { path: '/', label: 'Track', icon: icons.home },
   { path: '/history', label: 'History', icon: icons.history },
   { path: '/insights', label: 'Insights', icon: icons.insights },
+  { path: '/you', label: 'You', icon: icons.person },
   { path: '/settings', label: 'Settings', icon: icons.settings },
 ];
+
+// Narrowest a tab may get before the ones on the right move into the ⋮ menu.
+const MIN_TAB_PX = 64;
 
 function renderTabbar(path, opts) {
   const bar = $('.tabbar');
   bar.hidden = !opts.tabs;
-  bar.innerHTML = TABS.map(
-    (t) => `<a href="#${t.path}" ${t.path === path ? 'aria-current="page"' : ''}>${t.icon}<span>${t.label}</span></a>`
-  ).join('');
+  bar.innerHTML =
+    TABS.map((t) => `<a href="#${t.path}" ${t.path === path ? 'aria-current="page"' : ''}>${t.icon}<span>${t.label}</span></a>`).join('') +
+    `<button class="tab-more" aria-label="More tabs" aria-haspopup="dialog" aria-expanded="false" hidden>${icons.more}<span>More</span></button>`;
+  bar.querySelector('.tab-more').addEventListener('click', () => openTabMenu(bar));
+  if (!opts.tabs) return;
+  fitTabbar(bar);
+  if (!bar.dataset.observed) {
+    bar.dataset.observed = '1';
+    new ResizeObserver(() => fitTabbar(bar)).observe(bar);
+  }
+}
+
+/**
+ * Keep the tabs on one row: when they don't fit at MIN_TAB_PX (or a label would be cut off),
+ * move tabs from the right into a ⋮ menu (fitTabs). Re-run when the bar resizes.
+ */
+function fitTabbar(bar) {
+  if (bar.hidden) return;
+  const links = [...bar.querySelectorAll('a')];
+  const more = bar.querySelector('.tab-more');
+  links.forEach((a) => (a.hidden = false));
+  more.hidden = true;
+  bar.style.gridTemplateColumns = `repeat(${links.length}, minmax(0, 1fr))`;
+  const css = getComputedStyle(bar);
+  const width = bar.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight);
+  const label = (a) => a.querySelector('span');
+  const need = Math.max(MIN_TAB_PX, ...links.map((a) => label(a).scrollWidth + 8));
+  const current = links.findIndex((a) => a.hasAttribute('aria-current'));
+  const { shown, more: overflow } = fitTabs(links.length, width, need, current);
+  if (!overflow) return;
+  links.forEach((a, i) => (a.hidden = !shown.includes(i)));
+  more.hidden = false;
+  more.classList.toggle('has-current', current >= 0 && !shown.includes(current));
+  bar.style.gridTemplateColumns = `repeat(${shown.length + 1}, minmax(0, 1fr))`;
+}
+
+/** The tabs that didn't fit on the bar, as a bottom sheet. */
+async function openTabMenu(bar) {
+  const more = bar.querySelector('.tab-more');
+  const hidden = TABS.filter((t, i) => bar.querySelectorAll('a')[i].hidden);
+  more.setAttribute('aria-expanded', 'true');
+  const path = await openDialog((dlg, close) => {
+    dlg.innerHTML = '<h2>More</h2><div class="option-list tab-menu"></div>';
+    const list = dlg.querySelector('.option-list');
+    for (const t of hidden) {
+      const b = el(`<button ${t.path === currentPath() ? 'aria-current="page"' : ''}><span class="tag">${t.icon}</span><span>${t.label}</span></button>`);
+      b.addEventListener('click', () => close(t.path));
+      list.appendChild(b);
+    }
+  });
+  more.setAttribute('aria-expanded', 'false');
+  if (path) navigate(path);
 }
 
 /**

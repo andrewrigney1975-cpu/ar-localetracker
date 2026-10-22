@@ -265,7 +265,7 @@ main#view {
 
 .tabbar {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr)); /* set per fit by fitTabbar in main.js */
   padding: 4px calc(var(--safe-right) + 8px) calc(var(--safe-bottom) + 4px) calc(var(--safe-left) + 8px);
   background: var(--surface);
   border-top: 1px solid var(--border);
@@ -275,7 +275,8 @@ main#view {
   display: none;
 }
 
-.tabbar a {
+.tabbar a,
+.tabbar .tab-more {
   display: grid;
   justify-items: center;
   gap: 2px;
@@ -287,9 +288,54 @@ main#view {
   border-radius: 12px;
 }
 
-.tabbar a svg {
+.tabbar a svg,
+.tabbar .tab-more svg {
   width: 24px;
   height: 24px;
+}
+
+/* Labels stay on one line; a tab that can't fit its label moves into the ⋮ menu instead. */
+.tabbar span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.tabbar a[hidden],
+.tabbar .tab-more[hidden] {
+  display: none;
+}
+
+.tabbar .tab-more {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 550;
+}
+
+/* The current page is one of the tabs in the menu. */
+.tabbar .tab-more.has-current {
+  color: var(--text);
+}
+
+.tabbar .tab-more.has-current svg {
+  color: var(--accent);
+}
+
+.tab-menu .tag svg {
+  width: 22px;
+  height: 22px;
+}
+
+.option-list.tab-menu button {
+  grid-template-columns: 48px 1fr;
+  font-weight: 550;
+}
+
+.tab-menu button[aria-current='page'] .tag {
+  color: var(--accent);
 }
 
 .tabbar a[aria-current='page'] {
@@ -2034,7 +2080,7 @@ main#view {
   width: 100%;
 }
 
-/* VO2max norms chart (Settings → Profile): one bar per category on a shared scale. */
+/* VO2max norms chart (You → Profile): one bar per category on a shared scale. */
 .vo2-chart-row[hidden] {
   display: none;
 }
@@ -2782,7 +2828,7 @@ a.stat.pb:active {
   color: var(--accent);
 }
 
-/* Settings → Goals: each row opens the goal editor. */
+/* You → Goals: each row opens the goal editor. */
 .setting.goal-row {
   width: 100%;
   border: 0;
@@ -2845,7 +2891,7 @@ a.stat.pb:active {
   display: none;
 }
 
-/* Insights: the goal for the chart's activity, period and metric (Settings → Goals). */
+/* Insights: the goal for the chart's activity, period and metric (You → Goals). */
 .chart-scroll .goal-line {
   fill: none;
   pointer-events: none;

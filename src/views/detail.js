@@ -461,7 +461,7 @@ function effortHTML(w, track) {
   if (load != null) tiles.push(statHTML('Cardio load', Math.round(load), loadLabel(load)));
   if (vo2?.value != null) tiles.push(statHTML('VO2max (est.)', vo2.value.toFixed(1), 'ml/kg/min'));
   const hint = !complete
-    ? `<p class="effort-hint">Add your sex, birth year and weight in <a href="#/settings">Settings → Profile</a> to estimate calories${hr ? ', heart-rate zones and cardio load' : ''}.</p>`
+    ? `<p class="effort-hint">Add your sex, birth year and weight in <a href="#/you">You → Profile</a> to estimate calories${hr ? ', heart-rate zones and cardio load' : ''}.</p>`
     : '';
   if (!tiles.length && !hint) return '';
   let zoneBlock = '';
@@ -496,7 +496,7 @@ function vo2AboutText(r) {
   if (r.value != null) {
     return `VO2max uses the HUNT walking model (Loe 2016) on ${r.windows} of ${r.checked} steady 5-minute stretches (middle half ${r.low.toFixed(1)}–${r.high.toFixed(1)}), typically within about 14%.${why}`;
   }
-  if (r.reason === 'profile') return 'Add your sex, birth year and weight in <a href="#/settings">Settings → Profile</a> to estimate VO2max.';
+  if (r.reason === 'profile') return 'Add your sex, birth year and weight in <a href="#/you">You → Profile</a> to estimate VO2max.';
   if (r.reason === 'no-steady') {
     return r.checked
       ? `No VO2max estimate: too few steady 5-minute stretches passed the heart-rate checks.${why}`

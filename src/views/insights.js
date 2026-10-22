@@ -324,7 +324,7 @@ export async function mount(root, params, query) {
     ];
     const hint =
       !can.calories || !can.cardioLoad
-        ? `<p class="effort-hint">Add your sex, birth year and weight in <a href="#/settings">Settings → Profile</a> to include calories and cardio load.</p>`
+        ? `<p class="effort-hint">Add your sex, birth year and weight in <a href="#/you">You → Profile</a> to include calories and cardio load.</p>`
         : '';
     content.innerHTML = `
       <div class="stat-grid num insights-totals">${tiles
@@ -403,7 +403,7 @@ export async function mount(root, params, query) {
       host.innerHTML = `<div class="chart-title">${title}</div><div class="chart-empty">No ${def.label.toLowerCase()} data in this range.</div>`;
       return;
     }
-    // The goal for this activity and metric (Settings → Goals) per chart period, scaled from
+    // The goal for this activity and metric (You → Goals) per chart period, scaled from
     // another period when none is set for this one. All activities in one bar adds up the
     // activities' goals when there's no All-activities goal. Not for a routine: the goal covers
     // all of the activity's workouts.

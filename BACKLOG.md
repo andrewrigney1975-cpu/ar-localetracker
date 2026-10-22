@@ -239,7 +239,9 @@ distance, in the same font as the workout count.
 
 ---
 
-## 8. "You" tab for personal settings and data
+## 8. "You" tab for personal settings and data: ✅ done (October 2026)
+
+> Implemented in `src/views/you.js` (Profile with BMI and VO2max chart, Goals, Learned routines with Rename/Customise/Forget), moved out of `settings.js`; the shared `segmented()` helper is now `src/ui/segmented.js`. Tab order: Track, History, Insights, You, Settings. "Add your profile" links in the workout detail and Insights point at `#/you`. Settings → Voice announcements says where the routines went.
 
 **Request:** move personal settings and data out of Settings into a new **You** tab, with a
 person icon.
@@ -263,7 +265,9 @@ person icon.
 
 ---
 
-## 9. Tab bar overflow into a ⋮ menu
+## 9. Tab bar overflow into a ⋮ menu: ✅ done (October 2026)
+
+> Implemented in `main.js` (`fitTabbar`, run on render and from a `ResizeObserver`) with the choice of tabs in the pure `src/ui/tabFit.js` (`fitTabs`, unit-tested). A tab needs 64 px or its label width, whichever is more; labels never wrap. The ⋮ More button opens a bottom sheet (`openDialog`, `.option-list.tab-menu`) and is highlighted when the current page is in it.
 
 **Request:** if the tabs would wrap onto two rows, keep one row and move the tabs that don't
 fit into a three-dot (⋮) menu at the right-hand end.

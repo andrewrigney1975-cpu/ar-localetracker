@@ -59,14 +59,14 @@ sensors.
   <img src="docs/screenshots/insights-bests.png" width="250" alt="Insights: personal bests per activity, with best average pace, best kilometre split, fastest speed and longest workout, each with its date">
 </p>
 <p align="center">
-  <img src="docs/screenshots/settings.png" width="250" alt="Settings: Units and display, then Goals listing all activities per week, walk per day, run per week and cycle per month, with an Add button">
+  <img src="docs/screenshots/you.png" width="250" alt="You tab: Goals listing all activities per week, walk per day, run per week and cycle per month, with an Add button, then Learned routines">
   &nbsp;
   <img src="docs/screenshots/goals.png" width="250" alt="Goal editor: activity chips, Per day, Per week or Per month, and distance, activity time, cardio load and calorie targets">
   &nbsp;
   <img src="docs/screenshots/insights-goals.png" width="250" alt="Insights: weekly running distance with a dashed 25 km goal line, and a tooltip for a week 7.4 km short of the goal">
 </p>
 <p align="center">
-  <img src="docs/screenshots/profile.png" width="250" alt="Settings, Profile: resting and max heart rate, the estimated VO2max (the median of 6 walks in the last 4 weeks) and a chart rating it from Very Poor to Excellent for men aged 40–49, with the estimate marked in Fair at the 30th percentile">
+  <img src="docs/screenshots/profile.png" width="250" alt="You, Profile: resting and max heart rate, the estimated VO2max (the median of 6 walks in the last 4 weeks) and a chart rating it from Very Poor to Excellent for men aged 40–49, with the estimate marked in Fair at the 30th percentile">
 </p>
 <p align="center">
   <img src="docs/screenshots/widget-week-chart.png" width="490" alt="4×2 widget: this week's distance, average split and speed, a chart of distance per day with a dashed daily goal line, and You're 3 km ahead of your goal! Well done!!">
@@ -162,7 +162,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   the media volume up to full while Locale speaks, then back to where it was.
   The distance spoken (and shown live) only counts movement of 10 m or more, so GPS
   jitter while you walk doesn't run it ahead of the saved workout's distance. A routine can have its
-  own (Settings → Learned routines → **Customise**): splits, time, goal and the time
+  own (You → Learned routines → **Customise**): splits, time, goal and the time
   interval, used instead of the activity's once Locale recognises the routine at the start.
 - **Watch vibration** with each announcement, so you can feel it without listening:
   - split: two taps
@@ -225,7 +225,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
     slope, weight, age and heart rate. Stretches with an uneven pace, a steep slope, a
     jogging pace (over 8.5 km/h) or unreliable heart rate (gaps, sudden jumps, unsteady,
     too high to be steady walking, or locked onto the step rate) are left out, and the page
-    says why. Runs aren't estimated: the walking model overshoots at running pace. Settings →
+    says why. Runs aren't estimated: the walking model overshoots at running pace. You →
     Profile shows your current estimate (the median of the last 4 weeks) and a chart rating it
     against Cooper Institute norms for your age and sex, from Very Poor to Excellent, with
     your percentile and the range of your recent walks.
@@ -262,7 +262,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   leaves out every time and date, speed, pace, pause, heart rate, calorie, note and
   device detail, so a share can never give away how fast you went or when.
   - The file is named with your initials and the workout's label, like
-    `AR Bondi loop.gpx`. Your name is in **Settings → Profile**, and only the initials
+    `AR Bondi loop.gpx`. Your name is in **You → Profile**, and only the initials
     are sent.
   - **Hide start and finish** (off by default) leaves out the first and last 200 m, so a
     course that starts at home doesn't show where you live.
@@ -297,7 +297,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
     any static host.
 
 ### Goals
-- **Set in Settings → Goals:** pick all activities or one, and per day, week or month, then
+- **Set in You → Goals:** pick all activities or one, and per day, week or month, then
   set any of distance, activity time, cardio load and calories. Leave a box empty for no
   target.
 - **Insights** draws the goal as a dashed line on the chart for the same activity and
@@ -340,10 +340,14 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   filters): best average pace or speed, best km or mile split, fastest speed (held for
   at least 5 seconds, so a GPS glitch doesn't count) and longest workout. Tap one to open
   the workout. Ski days show only fastest speed and longest workout.
-- Calories and cardio load need the profile in Settings. They are worked out from each
+- Calories and cardio load need the profile (You tab). They are worked out from each
   workout's full recording and cached on the device until the workout or profile changes.
 
 ### General
+- **Tabs:** Track, History, Insights, **You** (your profile, VO2max, goals and learned
+  routines) and Settings (units, watch, widgets, voice, maps, tracking). When the tabs don't
+  fit on one row (a narrow screen or a large font size), the ones on the right move into a
+  **⋮ More** menu; the current tab always stays on the bar.
 - **Units:** metric by default, imperial in Settings.
 - **Theme:** light, dark and auto.
 - **Font:** Google Sans, bundled for offline use.
@@ -430,14 +434,14 @@ workouts started from the watch or a widget get their routine too.
   own announcements (Customise) include the goal.
 - **Start screen:** shows the auto goal and the routine it came from, or "learning · 3
   of 5 runs". Use − or + to set a different goal for this workout only.
-- **Settings → Learned routines:** each routine's distance, how often you do it, the
+- **You → Learned routines:** each routine's distance, how often you do it, the
   usual day and time, and how often its goal was hit. You can **Rename** it (Locale then
   says "your usual lake loop") or **Forget** it, which leaves its workouts out of
   learning. **Restore** undoes forgetting.
 - **History → Select:** pick two or more workouts of one activity and **Mark as
   routine** with a name. A routine you mark counts from those two workouts, with no
   need for 5 workouts of history, 3 repeats or a recent one. Later workouts on the same
-  route join it. In Settings it shows as "Marked by you", where **Remove** turns it
+  route join it. On the You tab it shows as "Marked by you", where **Remove** turns it
   back into ordinary learning.
 - **Workout names:** a workout that belongs to a routine is named after it ("Lake loop"
   instead of "Morning Run"), and follows the routine if you rename it. Only automatic
@@ -531,7 +535,7 @@ src/
   seed/      City2Surf sample workout (course data + generator)
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, insights,
-             settings, courses + course (View)
+             you (profile, goals, routines), settings, courses + course (View)
   course/    shared course files (write, name, parse), course links, and the View
              course store
   viewer/    Locale Viewer, the standalone web page (entry: viewer/index.html)

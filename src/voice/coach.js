@@ -48,7 +48,7 @@ export function voiceConfig(s, activity) {
 }
 
 /**
- * A routine's own announcement settings ({splits, time, goal, intervalMin}, from Settings →
+ * A routine's own announcement settings ({splits, time, goal, intervalMin}, from You →
  * Learned routines → Customise), or null to keep the activity's.
  */
 export function routineVoice(s, routineId) {
