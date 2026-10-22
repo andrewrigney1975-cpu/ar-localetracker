@@ -66,7 +66,7 @@ sensors.
   <img src="docs/screenshots/insights-goals.png" width="250" alt="Insights: weekly running distance with a dashed 25 km goal line, and a tooltip for a week 7.4 km short of the goal">
 </p>
 <p align="center">
-  <img src="docs/screenshots/profile.png" width="250" alt="You, Profile: resting and max heart rate, the estimated VO2max (the median of 6 walks in the last 4 weeks) and a chart rating it from Very Poor to Excellent for men aged 40–49, with the estimate marked in Fair at the 30th percentile">
+  <img src="docs/screenshots/profile.png" width="250" alt="You, Profile: resting and max heart rate, the estimated VO2max (the median of 6 walks in the last 4 weeks) and a one-row chart rating it from Very Poor to Excellent for men aged 40–49, with the estimate as a white dot in Fair at the 30th percentile, and a table of the categories and their ranges below">
 </p>
 <p align="center">
   <img src="docs/screenshots/widget-week-chart.png" width="490" alt="4×2 widget: this week's distance, average split and speed, a chart of distance per day with a dashed daily goal line, and You're 3 km ahead of your goal! Well done!!">

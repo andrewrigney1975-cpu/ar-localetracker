@@ -37,9 +37,9 @@ function vo2HTML(value, hint) {
 }
 
 /**
- * Norms chart under the VO2max row: one horizontal bar per category on a shared ml/kg/min
- * scale, the estimate's category highlighted, the 4-week range shaded and the estimate
- * marked. `current` is from currentVo2max, or null for the norms alone.
+ * Norms chart under the VO2max row: the categories as one row of coloured segments on an
+ * ml/kg/min scale, the 4-week range shaded and the estimate as a white dot, then a table of
+ * the categories and their ranges. `current` is from currentVo2max, or null for the norms alone.
  */
 function vo2ChartHTML(profile, current) {
   const rating = rateVo2max(current?.value ?? null, profile.sex, ageAt(profile));
@@ -56,17 +56,17 @@ function vo2ChartHTML(profile, current) {
   }
   const x = (v) => `${(((v - lo) / (hi - lo)) * 100).toFixed(2)}%`;
   const fmt = (v) => v.toFixed(1);
-  const rows = ranges
+  const segments = ranges
     .map((r, i) => {
       const from = r.min ?? lo;
       const to = r.max ?? hi;
+      return `<i class="vo2-seg c${i}${i === rating.category ? ' current' : ''}" style="left:${x(from)};width:calc(${x(to)} - ${x(from)})"></i>`;
+    })
+    .join('');
+  const rows = ranges
+    .map((r, i) => {
       const text = r.min == null ? `< ${fmt(r.max)}` : r.max == null ? `≥ ${fmt(r.min)}` : `${fmt(r.min)}–${fmt(r.max)}`;
-      const cur = i === rating.category ? ' current' : '';
-      // Cells are placed explicitly so the overlay can share the bars column.
-      const row = `grid-row:${i + 1}`;
-      return `<span class="vo2-label${cur}" style="${row}">${r.label}</span>
-        <span class="vo2-track" style="${row}"><i class="vo2-bar c${i}${cur}" style="left:${x(from)};width:calc(${x(to)} - ${x(from)})"></i></span>
-        <span class="vo2-range num${cur}" style="${row}">${text}</span>`;
+      return `<tr${i === rating.category ? ' class="current"' : ''}><th scope="row"><i class="vo2-swatch c${i}"></i>${r.label}</th><td class="num">${text}</td></tr>`;
     })
     .join('');
   const who = `${profile.sex === 'female' ? 'women' : 'men'} aged ${rating.band}${rating.clamped ? ' (nearest age group)' : ''}`;
@@ -75,19 +75,18 @@ function vo2ChartHTML(profile, current) {
     const pct = rating.below ? 'below the 5th percentile' : rating.above ? 'above the 95th percentile' : `${ordinal(rating.percentile)} percentile`;
     head = `<strong>${VO2_CATEGORIES[rating.category].label}</strong> · ${pct} for ${who}`;
   }
-  const overlay = current
-    ? `<span class="vo2-overlay" aria-hidden="true">
-        ${current.count > 1 ? `<i class="vo2-span" style="left:${x(current.min)};width:calc(${x(current.max)} - ${x(current.min)})"></i>` : ''}
-        <i class="vo2-mark" style="left:${x(current.value)}"><b class="num">${fmt(current.value)}</b></i>
-      </span>`
+  const marks = current
+    ? `${current.count > 1 ? `<i class="vo2-span" style="left:${x(current.min)};width:calc(${x(current.max)} - ${x(current.min)})"></i>` : ''}
+        <i class="vo2-mark" style="left:${x(current.value)}"><b class="num">${fmt(current.value)}</b></i>`
     : '';
   const note = current
-    ? `Line: your estimate${current.count > 1 ? '. Shaded: the range of your walks in the last 4 weeks' : ''}. `
+    ? `Dot: your estimate${current.count > 1 ? '. Shaded: the range of your walks in the last 4 weeks' : ''}. `
     : '';
   return `<div class="vo2-head">${head}</div>
     <div class="vo2-chart${current ? ' has-mark' : ''}" role="img" aria-label="VO2max categories for ${who}${current ? `; your estimate ${fmt(current.value)} is ${VO2_CATEGORIES[rating.category].label}` : ''}">
-      ${rows}${overlay}
+      <span class="vo2-scale">${segments}</span>${marks}
     </div>
+    <table class="vo2-table"><caption class="visually-hidden">VO2max categories for ${who}, ml/kg/min</caption><tbody>${rows}</tbody></table>
     <small class="vo2-note">${note}Values in ml/kg/min. Norms: Cooper Institute (ACSM Guidelines, 11th ed.), via vo2maxcalculators.com.</small>`;
 }
 
