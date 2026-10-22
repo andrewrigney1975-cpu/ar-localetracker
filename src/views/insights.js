@@ -2,6 +2,8 @@ import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
 import { personalBests, pruneSplitCache, splitTimesFor } from '../insights/bests.js';
 import { effortAvailability, effortFor, pruneEffortCache } from '../insights/effort.js';
+import { pruneRawDistanceCache, rawDistancesFor } from '../insights/gpsCache.js';
+import { gpsStatsCSV } from '../stats/gpsDistance.js';
 import { combinedGoalForPeriod, GOAL_PERIODS, goalForPeriod, goalForWindow, goalValue } from '../insights/goals.js';
 import { getRoutineModel } from '../insights/model.js';
 import {
@@ -599,16 +601,21 @@ export async function mount(root, params, query) {
         <div class="actions"><button class="btn ghost" data-v="cancel">Cancel</button></div>`;
       dlg.querySelector('[data-v="cancel"]').addEventListener('click', () => close(null));
       const list = dlg.querySelector('.option-list');
-      for (const [id, label, desc] of [
-        ['csv', 'CSV', 'Spreadsheet: one row per period' + (report.split ? ' and activity' : '')],
-        ['json', 'JSON', 'Structured data with totals'],
+      for (const [id, tag, label, desc] of [
+        ['csv', 'CSV', 'CSV', 'Spreadsheet: one row per period' + (report.split ? ' and activity' : '')],
+        ['json', 'JSON', 'JSON', 'Structured data with totals'],
+        ['gps', 'CSV', 'GPS distance', `Raw GPS against smoothed distance: min, max, mean and SD ${selectedRoutine() ? 'for this routine' : 'per routine'}, then each workout`],
       ]) {
-        const b = el(`<button><span class="tag">${label}</span><span>${label}<small>${desc}</small></span></button>`);
+        const b = el(`<button><span class="tag">${tag}</span><span>${label}<small>${desc}</small></span></button>`);
         b.addEventListener('click', () => close(id));
         list.appendChild(b);
       }
     });
     if (!fmt) return;
+    if (fmt === 'gps') {
+      await exportGpsStats();
+      return;
+    }
     try {
       const csv = fmt === 'csv';
       await shareFile({
@@ -623,6 +630,59 @@ export async function mount(root, params, query) {
     }
   });
 
+  /**
+   * Insights → Export → GPS: raw GPS distance (from each workout's journal) against the saved,
+   * smoothed distance for the workouts in the window and filters, grouped by routine.
+   */
+  async function exportGpsStats() {
+    const [from, to] = bounds();
+    const r = selectedRoutine();
+    const list = scoped().filter((w) => w.startedAt >= from && w.startedAt < nextPeriod(to, 'day'));
+    if (!list.length) {
+      toast('No workouts to export');
+      return;
+    }
+    const overlay = el('<div class="saving-overlay"><div class="spinner"></div><div data-ref="msg">Reading GPS recordings…</div></div>');
+    document.body.appendChild(overlay);
+    try {
+      const raw = await rawDistancesFor(list, {
+        onProgress: (done, total) => (overlay.querySelector('[data-ref="msg"]').textContent = `Reading GPS recordings… ${done + 1} of ${total}`),
+      });
+      const groupOf = (w) => {
+        if (r) return r.name;
+        const mine = routines.find((x) => x.workoutIds.includes(w.id));
+        return mine ? mine.name : `${ACTIVITIES[w.activity]?.label ?? w.activity} (no routine)`;
+      };
+      const rows = list
+        .filter((w) => raw.get(w.id))
+        .map((w) => ({ ...raw.get(w.id), startedAt: w.startedAt, name: w.name, activity: w.activity, group: groupOf(w), smoothed: w.summary?.distance ?? 0, weather: w.weather }));
+      if (!rows.length) {
+        toast('No GPS recordings for these workouts');
+        return;
+      }
+      const pad = (n) => String(n).padStart(2, '0');
+      const localTime = (ms) => {
+        const t = new Date(ms);
+        return [isoDate(ms), `${pad(t.getHours())}:${pad(t.getMinutes())}`];
+      };
+      const scope = r ? r.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : state.activity;
+      overlay.remove();
+      await shareFile({
+        filename: `locale-gps-distance-${scope}-${isoDate(from)}-to-${isoDate(to)}.csv`,
+        content: gpsStatsCSV(rows, { localTime }),
+        mime: 'text/csv',
+        title: 'Locale GPS distance',
+      });
+      const missing = list.length - rows.length;
+      if (missing) toast(`${missing} workout${missing === 1 ? '' : 's'} left out: no GPS recording kept`);
+    } catch (e) {
+      console.error(e);
+      toast(`Export failed: ${e?.message ?? e}`);
+    } finally {
+      overlay.remove();
+    }
+  }
+
   async function loadRoutines() {
     routines = routineList(await getRoutineModel().catch(() => null));
     // The remembered routine may have been forgotten since.
@@ -633,6 +693,7 @@ export async function mount(root, params, query) {
     workouts = (await listWorkouts()).filter((w) => !String(w.id).startsWith('sample-'));
     pruneEffortCache(workouts.map((w) => w.id));
     pruneSplitCache(workouts.map((w) => w.id));
+    pruneRawDistanceCache(workouts.map((w) => w.id));
     await loadRoutines();
     syncControls();
     renderBests();
