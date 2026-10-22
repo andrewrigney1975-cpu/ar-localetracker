@@ -434,9 +434,9 @@ function renderSummary(panel, w, track, units) {
   panel.innerHTML = `
     <div class="page">
       <div class="stat-grid num" style="margin-top:12px">${rows.join('')}</div>
-      ${weatherHTML(w, units)}
       ${goalHTML(w, units)}
       ${effortHTML(w, track)}
+      ${weatherHTML(w, units)}
       <div class="card mini-profile">${miniProfileSVG(track)}</div>
       ${w.notes ? `<div class="card notes">${escapeHtml(w.notes)}</div>` : ''}
       <p class="about">Altitude source: ${sm.hasBarometer ? 'barometer anchored to GPS' : 'GPS only'} · ${sm.pointCount.toLocaleString()} points${sm.segments > 1 ? ` · ${sm.segments} segments` : ''}${w.device ? ` · ${escapeHtml(w.device)}` : ''}</p>
