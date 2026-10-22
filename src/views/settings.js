@@ -1,6 +1,7 @@
 import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
 import { settings, updateSettings } from '../settings.js';
+import { fillWeather } from '../services/weather.js';
 import { tracker } from '../tracker/client.js';
 import { Disposer, escapeHtml } from '../ui/dom.js';
 import { segmented } from '../ui/segmented.js';
@@ -114,6 +115,12 @@ export async function mount(root) {
                 <input type="checkbox" class="switch" data-toggle="smooth3d" ${s.smooth3d ? 'checked' : ''} /></label>
             </div>
 
+            <div class="section-title">Weather</div>
+            <div class="card settings-group">
+              <label class="setting"><span class="text">Weather at the start<small>Temperature, wind and conditions for each workout, from Open-Meteo. Sends the start time and the start position rounded to about 1 km; nothing else leaves the phone.</small></span>
+                <input type="checkbox" class="switch" data-toggle="weather" ${s.weather ? 'checked' : ''} /></label>
+            </div>
+
             <div class="section-title">Tracking reliability</div>
             <div class="card settings-group">
               <div class="setting"><div class="text">Location permission<small>${perms?.location === 'granted' ? 'Precise location while using the app' : 'Not granted'}</small></div>
@@ -128,7 +135,7 @@ export async function mount(root) {
 
             <div class="about">
               <p><strong>Locale Exercise Tracker</strong> <span data-ref="version"></span><br>${workouts.length} workout${workouts.length === 1 ? '' : 's'} stored on this device.</p>
-              <p>Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors. Tiles by <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA). 3D satellite imagery © Esri, Maxar, Earthstar Geographics.</p>
+              <p>Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors. Tiles by <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA). 3D satellite imagery © Esri, Maxar, Earthstar Geographics. <a href="https://open-meteo.com" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a> (CC BY 4.0).</p>
               ${tracker.isNative ? '' : '<p>Running in the browser with simulated GPS. Add <code>?sim=10</code> to the URL to speed it up.</p>'}
             </div>
           </div>
@@ -164,6 +171,11 @@ export async function mount(root) {
     root.querySelector('[data-toggle="keepScreenOn"]').addEventListener('change', (e) => updateSettings({ keepScreenOn: e.target.checked }));
     root.querySelector('[data-toggle="satellite3d"]').addEventListener('change', (e) => updateSettings({ satellite3d: e.target.checked }));
     root.querySelector('[data-toggle="smooth3d"]').addEventListener('change', (e) => updateSettings({ smooth3d: e.target.checked }));
+    root.querySelector('[data-toggle="weather"]').addEventListener('change', async (e) => {
+      await updateSettings({ weather: e.target.checked });
+      // Turning it on fills in the workouts recorded while it was off.
+      if (e.target.checked) fillWeather().catch((err) => console.error(err));
+    });
     root.querySelectorAll('[data-autopause]').forEach((c) =>
       c.addEventListener('change', () => updateSettings({ autoPause: { ...settings().autoPause, [c.dataset.autopause]: c.checked } }))
     );

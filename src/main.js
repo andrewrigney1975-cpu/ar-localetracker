@@ -6,6 +6,7 @@ import { requestPersistence } from './db/idb.js';
 import { useBackend } from './db/workouts.js';
 import { currentPath, currentView, navigate, route, startRouter } from './router.js';
 import { syncWorkouts } from './services/sync.js';
+import { fillWeather } from './services/weather.js';
 import { getRoutineModel, scheduleRoutineRebuild } from './insights/model.js';
 import { loadSettings } from './settings.js';
 import { tracker } from './tracker/client.js';
@@ -160,6 +161,8 @@ async function openIncomingCourse(url) {
   }
 }
 
+let weatherTimer = null;
+
 async function boot() {
   // Canvas text (profile, 3D markers) needs the bundled font before first draw.
   await Promise.race([document.fonts.load('400 16px "Google Sans Variable"'), new Promise((r) => setTimeout(r, 1500))]).catch(() => {});
@@ -186,7 +189,12 @@ async function boot() {
   // Saved natively (e.g. stopped from the watch or notification): refresh lists.
   tracker.on('saved', () => window.dispatchEvent(new CustomEvent('workouts-changed')));
   // Keep the learned routines (goal prediction) in step with the workout list.
-  window.addEventListener('workouts-changed', () => scheduleRoutineRebuild());
+  window.addEventListener('workouts-changed', () => {
+    scheduleRoutineRebuild();
+    // New workouts get the weather at their start. The run this ends with finds nothing left to do, so it settles.
+    clearTimeout(weatherTimer);
+    weatherTimer = setTimeout(() => fillWeather().catch((e) => console.error(e)), 2000);
+  });
   // A workout started outside the app (widget, watch, notification) while it's open: show it.
   tracker.on('state', (ev) => {
     if (ev.reason === 'start' && !currentPath().startsWith('/live')) navigate('/live');
@@ -202,6 +210,7 @@ async function boot() {
   }
   await syncWorkouts();
   getRoutineModel().catch((e) => console.error(e));
+  fillWeather().catch((e) => console.error(e));
 }
 
 boot();

@@ -9,6 +9,7 @@ import {
   formatPace,
   formatSpeed,
 } from '../units.js';
+import { weatherLine } from '../weather/weather.js';
 
 /**
  * Build a short message such as:
@@ -16,6 +17,7 @@ import {
  *   City2Surf 2026 — Run, Sun 9 Aug 2026
  *   14.37 km in 1:30:29 · 6:18 /km avg
  *   Climb +242 m · Avg HR 149 bpm · 1,373 kcal
+ *   Partly cloudy, 14 °C (feels 12 °C), wind SW 18 km/h
  *   Recorded with Locale
  *
  * Lines and fields without data are left out.
@@ -49,6 +51,8 @@ export function workoutShareText(workout, { units = 'metric', calories = null, f
   if (sm.heartRate?.avg) extra.push(`Avg HR ${Math.round(sm.heartRate.avg)} bpm`);
   if (Number.isFinite(calories) && calories > 0) extra.push(`${Math.round(calories).toLocaleString()} kcal`);
   if (extra.length) lines.push(extra.join(' · '));
+  const weather = weatherLine(workout.weather, units);
+  if (weather) lines.push(weather);
 
   lines.push('Recorded with Locale');
   return lines.join('\n');

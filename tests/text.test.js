@@ -16,6 +16,14 @@ const run = {
   },
 };
 
+describe('workout share text with weather', () => {
+  it('adds a weather line when the workout has it', () => {
+    const weather = { tempC: 14.4, feelsC: 12.2, windMs: 5, windDeg: 225, gustMs: 9, condition: 'Partly cloudy' };
+    expect(workoutShareText({ ...run, weather }, { formatDay: day }).split('\n')).toContain('Partly cloudy, 14 °C (feels 12 °C), wind SW 18 km/h');
+    expect(workoutShareText({ ...run, weather: { unavailable: true } }, { formatDay: day })).not.toContain('wind');
+  });
+});
+
 describe('workout share text', () => {
   it('matches the backlog example for a run with heart rate and calories', () => {
     expect(workoutShareText(run, { calories: 1373.2, formatDay: day })).toBe(

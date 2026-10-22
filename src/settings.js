@@ -15,6 +15,8 @@ export const DEFAULT_SETTINGS = {
   satellite3d: true,
   smooth3d: true,
   coordFormat: 'decimal',
+  /** Look up the weather at each workout's start from Open-Meteo (services/weather.js). */
+  weather: true,
   /**
    * Learned routines: user names by routine id, workouts left out of learning, routines
    * the user marked in History or a workout's Distance tile ({id, name, activity,

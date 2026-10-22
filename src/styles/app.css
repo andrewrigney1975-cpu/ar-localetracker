@@ -1467,6 +1467,19 @@ main#view {
   letter-spacing: -0.02em;
 }
 
+/* Weather at the start (workout Summary): a condition can be a few words, so a smaller value. */
+.weather .stat .value {
+  font-size: 1.2rem;
+  line-height: 1.25;
+}
+
+.stat .stat-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
 .stat .value small {
   font-size: 0.6em;
   font-weight: 600;
@@ -1587,14 +1600,60 @@ main#view {
 }
 
 .mini-profile {
-  height: 90px;
   margin-top: 12px;
-  padding: 8px;
+  padding: 24px 8px 22px;
 }
 
-.mini-profile svg {
+/* The plot area; labels are placed over it in % of its size. */
+.ele-plot {
+  position: relative;
+  height: 84px;
+}
+
+.ele-plot svg {
+  display: block;
   width: 100%;
   height: 100%;
+}
+
+/* A dot on a significant high or low, with its altitude above (high) or below (low). */
+.ele-mark {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.ele-mark b {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.ele-mark.high b {
+  bottom: 8px;
+}
+
+.ele-mark.low b {
+  top: 8px;
+}
+
+.ele-mark.start b {
+  left: -2px;
+  transform: none;
+}
+
+.ele-mark.end b {
+  left: auto;
+  right: -2px;
+  transform: none;
 }
 
 .notes {
