@@ -347,3 +347,55 @@ tracked the average reported accuracy (r = 0.93) and the satellite count (r = �
   report the per-workout raw ÷ smoothed ratio instead. Decide before building.
 - Add to the existing export sheet in `insights.js` (`reportToCSV` lives in
   `insights/report.js`) as a third option, e.g. "GPS distance statistics".
+
+---
+
+## 12. High-intensity interval (HII) workouts
+
+**Request:** a new **High Intensity Interval** workout type, with randomised intervals of
+walking, jogging, running and sprinting, and spoken warnings before each change.
+
+- **Workout type:** its own tile on the home screen, and also an option on a routine (a
+  routine can be set to run as HII).
+- **Starting from the home screen:** the usual routine matching applies (weekday, time,
+  then place at the first good fix), so a matched routine still sets the goal and name.
+- **HII settings:** the share of the workout spent in each mode: **% walk, % jog, % run,
+  % sprint** (adding up to 100).
+- **Mode durations:** each mode's total time is its percentage of the workout's duration.
+- **Order:** when each mode starts is randomised, with two rules:
+  - a sprint never follows a run;
+  - a sprint or a run is always followed by a walk.
+- **Announcements:** 10 seconds before each change, *"Get ready to X in 10 seconds, for Y
+  minutes"*, where X is walk, jog, run or sprint.
+
+*Notes:*
+- **Questions to settle before building:**
+  - **Total duration:** percentages need a length to apply to. Options: a duration picked
+    on the start screen, or a matched routine's usual duration. What if the workout runs
+    on past it: keep cycling the plan, or stay in walk?
+  - **Interval lengths:** each mode's time is split into several bouts. Choose a minimum
+    and maximum bout length (e.g. sprint 20–60 s, run 1–3 min, jog and walk 1–4 min) and
+    whether "Y minutes" is spoken as seconds for short bouts ("for 30 seconds").
+  - **Routine option:** do the percentages live per routine, with the HII settings as
+    the default? Does a routine set to HII make every workout matched to it an HII, even
+    one started as a plain walk or run?
+  - **Activity:** is HII a fifth activity (its own colour, icon, auto-pause off, speed
+    cap like run, its own goals and Insights filter, FIT sport *training* / sub-sport
+    *HIIT*), or a mode on top of walk/run? The request reads as its own type.
+- **Plan generator:** a pure function `planIntervals({durationS, shares, bout limits,
+  seed})` → `[{mode, startS, durationS}]`. Randomise with a seeded generator and store
+  the seed in the journal (`meta` or a `plan` line), so a restarted service, the browser
+  simulator and the saved workout all see the same plan. Enforce the order rules while
+  placing bouts (e.g. build the sequence first, then shuffle only the walk/jog blocks);
+  unit-test the rules and that each mode's total matches its share to the second.
+- **Announcements must run natively** (`VoiceCoach.java`), since the WebView is suspended
+  with the screen off. Mirror the plan generator and the phrases in JS
+  (`voice/coach.js`) with a shared fixture, like the existing coach and routine matcher.
+  Time the warnings on active time so pauses don't shift them. Merge with other
+  announcements that fall in the same few seconds (splits, goal milestones).
+- **Watch:** a new buzz kind per change (e.g. a distinct pattern for "sprint"), and show
+  the current mode and time left on the workout screen. Unknown kinds fall back to one
+  tap on an older watch app.
+- **Live screen and summary:** show the current mode and a countdown to the next change;
+  after the workout, the plan on the Summary (time in each mode) and mode bands on the
+  elevation/speed charts. Speed per mode tells you whether the sprints were sprints.
