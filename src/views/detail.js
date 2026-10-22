@@ -102,7 +102,9 @@ export async function mount(root, params, query, ctx) {
             if (!updated) return;
             w = updated;
             const slot = panel.querySelector('[data-ref="weather"]');
+            const note = panel.querySelector('[data-ref="weather-note"]');
             if (tab === 'summary' && slot) slot.outerHTML = weatherHTML(w, units);
+            if (tab === 'summary' && note) note.outerHTML = weatherNoteHTML(w);
           })
           .catch((e) => console.warn('Weather lookup failed', e));
       }
@@ -431,12 +433,15 @@ function renderSummary(panel, w, track, units) {
       statHTML('Max run speed', speedValue(sm.ski.maxRunSpeed, units).toFixed(1), speedUnit(units))
     );
   }
+  const effort = effortHTML(w, track);
   panel.innerHTML = `
     <div class="page">
       <div class="stat-grid num" style="margin-top:12px">${rows.join('')}</div>
       ${goalHTML(w, units)}
-      ${effortHTML(w, track)}
+      ${effort.html}
       ${weatherHTML(w, units)}
+      ${effort.notes}
+      ${weatherNoteHTML(w)}
       <div class="card mini-profile">${miniProfileSVG(track)}</div>
       ${w.notes ? `<div class="card notes">${escapeHtml(w.notes)}</div>` : ''}
       <p class="about">Altitude source: ${sm.hasBarometer ? 'barometer anchored to GPS' : 'GPS only'} · ${sm.pointCount.toLocaleString()} points${sm.segments > 1 ? ` · ${sm.segments} segments` : ''}${w.device ? ` · ${escapeHtml(w.device)}` : ''}</p>
@@ -459,6 +464,23 @@ function weatherHTML(w, units) {
     </div>`;
 }
 
+const WEATHER_SOURCES = {
+  forecast: 'the weather models Open-Meteo gathers from national weather services',
+  historical: "Open-Meteo's archive of those weather services' model runs",
+  archive: 'the ERA5 reanalysis (ECMWF), a reconstruction of past weather from observations',
+};
+
+/** Why the weather is recorded and where it comes from, under the notes on effort. */
+function weatherNoteHTML(w) {
+  const wx = w.weather;
+  if (!wx || wx.unavailable) return '<p data-ref="weather-note" hidden></p>';
+  return `<p class="about" data-ref="weather-note">Weather is recorded because heat, cold, wind and rain all change pace and heart rate, so a slow day can be put in context.
+    It's the hourly data for the start time and place, worked out for the minute you started, from ${WEATHER_SOURCES[wx.source] ?? 'Open-Meteo'}.
+    That describes the area on a grid of a few kilometres, not a reading where you stood: shade, shelter and breezes off water can differ.
+    Windy means wind of 30 km/h or more, or gusts of 50 km/h or more.
+    <a href="https://open-meteo.com" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a> (CC BY 4.0).</p>`;
+}
+
 /** "Goal 4.7 km (auto, usual Saturday morning loop) · finished 4.72 km ✓" */
 function goalHTML(w, units) {
   const p = w.prediction;
@@ -473,6 +495,7 @@ function goalHTML(w, units) {
 }
 
 /** Heart rate, calories, cardio load and time in zones. */
+/** The Effort tiles and zones, and its notes on how calories, load and VO2max are worked out (shown under Weather). */
 function effortHTML(w, track) {
   const profile = settings().profile;
   const sm = w.summary;
@@ -493,7 +516,7 @@ function effortHTML(w, track) {
   const hint = !complete
     ? `<p class="effort-hint">Add your sex, birth year and weight in <a href="#/you">You → Profile</a> to estimate calories${hr ? ', heart-rate zones and cardio load' : ''}.</p>`
     : '';
-  if (!tiles.length && !hint) return '';
+  if (!tiles.length && !hint) return { html: '', notes: '' };
   let zoneBlock = '';
   const total = zones ? zones.slice(1).reduce((a, b) => a + b, 0) : 0;
   if (zones && total > 0) {
@@ -512,12 +535,15 @@ function effortHTML(w, track) {
           .join('')}
       </div>`;
   }
-  return `
+  return {
+    html: `
     ${tiles.length ? `<div class="section-title">Effort</div><div class="stat-grid num">${tiles.join('')}</div>` : ''}
     ${zoneBlock}
-    ${hint}
+    ${hint}`,
+    notes: `
     ${cal || load != null ? '<p class="about">Calories use the Keytel (2005) heart-rate equation, or activity, speed and slope when heart rate is missing. Cardio load is Banister TRIMP. Both are estimates.</p>' : ''}
-    ${vo2 ? `<p class="about">${vo2AboutText(vo2)}</p>` : ''}`;
+    ${vo2 ? `<p class="about">${vo2AboutText(vo2)}</p>` : ''}`,
+  };
 }
 
 /** How the VO2max estimate was made, or why there isn't one. */
