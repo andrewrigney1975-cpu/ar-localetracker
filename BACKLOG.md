@@ -236,3 +236,107 @@ distance, in the same font as the workout count.
   building.
 - Update the widget's content description so TalkBack reads the new values, and add a
   unit test for the averaging, beside the existing widget tests if any.
+
+---
+
+## 8. "You" tab for personal settings and data
+
+**Request:** move personal settings and data out of Settings into a new **You** tab, with a
+person icon.
+
+- Candidates to move: Profile (sex, birth year, height, weight, resting/max HR), the VO2max
+  estimate and norms chart, Goals, and Learned routines.
+- Settings keeps the app and device options: Units & display, Watch, Home-screen widgets,
+  Auto-pause, Voice announcements, Maps, Tracking reliability.
+
+*Notes:*
+- Tabs are `TABS` in `src/main.js`; add `{ path: '/you', label: 'You', icon: icons.person }`
+  and a person glyph in the icon set, matching the stroke style of the others.
+- New view `src/views/you.js` with the usual `mount(root, params, query)` → dispose shape.
+  Move the section builders out of `settings.js` (`vo2ChartHTML`, `fillVo2`, goals and
+  routines sections) into it rather than duplicating them; both views share
+  `settings()`/`updateSettings()`.
+- Links into the moved sections (e.g. "Cardio load and calories need your profile", the
+  Insights goal captions, the routine picker) must point at `#/you`.
+- `.tabbar` is `grid-template-columns: repeat(4, 1fr)`: make it follow the tab count.
+- Update the README screenshots that show Settings → Profile.
+
+---
+
+## 9. Tab bar overflow into a ⋮ menu
+
+**Request:** if the tabs would wrap onto two rows, keep one row and move the tabs that don't
+fit into a three-dot (⋮) menu at the right-hand end.
+
+*Notes:*
+- At 390 px with 5 tabs (after #8) each tab is about 75 px, so nothing overflows yet; this
+  matters for more tabs, larger font scaling (Android font size / display size) or narrow
+  widths.
+- Measure rather than guess: render all tabs, then with a `ResizeObserver` on `.tabbar`
+  move tabs from the right into the menu until the rest fit at a minimum width
+  (≈ 64 px, or when a label would wrap). Keep the **current** tab visible, swapping it with
+  the last visible one if needed.
+- The ⋮ button opens a `ui/dialog.js`-style sheet or a small popover listing the
+  overflowing tabs with their icons; highlight it when the current page is one of them.
+- Never `alert`/`confirm`. Keep `aria-current` on the right link and give the button
+  `aria-haspopup` / `aria-expanded`.
+
+---
+
+## 10. Weather at the start of a workout
+
+**Request:** record the weather when a workout (routine) starts: temperature, apparent
+("feels like") temperature, wind speed and direction, and the prevailing condition (clear,
+cloudy, rain, fog, windy, etc.). Show it on the workout and make it usable in Insights.
+
+*Notes:*
+- Source: **Open-Meteo** (free, no API key). `current=temperature_2m,apparent_temperature,
+  wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,is_day`. Condition from
+  the WMO `weather_code` (0 clear, 1–3 cloud, 45/48 fog, 51–67 drizzle/rain, 71–77 snow,
+  80–82 showers, 95–99 thunderstorm); "Windy" is not a WMO code, so add it when the
+  sustained wind ≥ ~30 km/h or gusts ≥ ~50 km/h (decide thresholds).
+- When to fetch: at the first good fix, natively in `TrackingService` (works for watch and
+  widget starts), written as a `wx` journal line so it survives with the journal. If
+  offline, fill it in later from Open-Meteo's archive/forecast `hourly` data for the start
+  time and place (`services/sync.js` or the finaliser), so a dead network never loses it.
+- Store on the record as `weather: {tempC, feelsC, windMs, windDeg, gustMs, code,
+  condition, source: 'live'|'later', at}` in SI units; convert for display (°F, mph) via
+  `units.js`. WorkoutBuilder must carry it through (fixture update).
+- Privacy: round the coordinates sent to ~2 decimals (≈ 1 km); nothing else leaves the
+  phone. Mention in the README.
+- Display: a line on the Summary tab ("14 °C, feels 12 °C · SW 18 km/h · Cloudy") and in
+  the shared text; later, weather as an Insights filter/column (e.g. pace vs temperature).
+- Not in the exports unless a format has a field for it (TCX/GPX don't; FIT has a
+  `weather_conditions` message).
+
+---
+
+## 11. Insights: CSV of raw vs smoothed distance statistics
+
+**Request:** in Insights, an export option that writes a CSV with the **min, max, mean and
+standard deviation** of the **raw GPS** and **smoothed** distance, for a single routine
+(routine filter) or for all workouts in the chosen period.
+
+Done by hand on 2026-10-23 for Lake Loop 2 Laps (14 walks): raw 15,008 ± 353 m (CV 2.4%),
+raw with fixes ≤ ±20 m 14,905 ± 155 m, smoothed 14,673 ± 94 m (CV 0.6%). The raw excess
+tracked the average reported accuracy (r = 0.93) and the satellite count (r = −0.79).
+
+- Rows: one per series (Raw, Raw ≤ ±20 m, Smoothed), columns n, min, max, mean, SD, CV%.
+- A second block (or a second file) with one row per workout: date, name, raw, raw gated,
+  smoothed, raw − smoothed, average reported accuracy (m), average satellites used,
+  point count. That made the hand analysis readable.
+
+*Notes:*
+- **Raw distance** = sum of haversine distances between consecutive journal `pt` fixes in
+  the same segment, unfiltered; **gated** keeps only fixes with `ha ≤ 20`. Smoothed =
+  `summary.distance`. Accuracy = mean `ha`, satellites = mean `sv`.
+- Raw journals are gzip blobs (SQLite `raw_journals`, IDB in the browser): decompressing
+  ~30k lines per workout is slow for a year of data, so compute once per workout in a pure
+  `stats/` function and cache it by workout version in localStorage (e.g.
+  `insights.rawdist.v1`), like the effort cache. Workouts without a raw journal are
+  skipped and counted in a note.
+- "All workouts" across different routes and activities gives a meaningless SD of
+  distance; for that case also group rows by routine (and activity for unmatched ones), or
+  report the per-workout raw ÷ smoothed ratio instead. Decide before building.
+- Add to the existing export sheet in `insights.js` (`reportToCSV` lives in
+  `insights/report.js`) as a third option, e.g. "GPS distance statistics".
