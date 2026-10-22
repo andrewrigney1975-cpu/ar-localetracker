@@ -287,7 +287,10 @@ fit into a three-dot (⋮) menu at the right-hand end.
 
 ---
 
-## 10. Weather at the start of a workout
+## 10. Weather at the start of a workout: ✅ done (October 2026)
+
+> Implemented in JS only, not natively as the notes below suggested: `src/weather/weather.js` (pure: Open-Meteo URLs, hourly parsing with interpolation to the start minute, WMO code → condition, Windy at ≥ 30 km/h wind or ≥ 50 km/h gusts, formatting) and `src/services/weather.js` (lookup and back-fill). One path covers new and old workouts: after a workout is saved (`workouts-changed`), on app start and when the setting is turned on, every workout without `weather` is looked up from the hourly data for its start time and place (forecast API for the last ~80 days, then the historical forecast archive, then ERA5 back to 1940). Workouts stopped from the watch or a widget get it when the app next opens, and offline lookups retry 10 minutes later. Stored on the record as `weather: {tempC, feelsC, windMs, windDeg, gustMs, code, isDay, condition, windy, source, lat, lon, fetchedAt}`, or `{unavailable: true}` when no service has data. Shown on the Summary tab ("Weather at the start") and in the shared text; Settings → Weather turns it off. Not yet in Insights or the exports.
+
 
 **Request:** record the weather when a workout (routine) starts: temperature, apparent
 ("feels like") temperature, wind speed and direction, and the prevailing condition (clear,

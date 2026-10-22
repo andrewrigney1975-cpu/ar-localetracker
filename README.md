@@ -214,6 +214,13 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - climb, descent and net vertical
   - min and max altitude
 - **Ski extras:** runs, lifts, ski vertical, lift time and max run speed.
+- **Weather at the start:** conditions (clear, cloudy, fog, drizzle, rain, showers, snow,
+  thunderstorm, or **windy** when the wind is 30 km/h or more or gusts reach 50 km/h),
+  temperature and feels-like temperature, and wind direction, speed and gusts. Looked up
+  from [Open-Meteo](https://open-meteo.com)'s hourly model data for the start time and
+  place once the workout is saved, so it works for workouts recorded offline or stopped
+  from the watch. Older workouts are filled in from Open-Meteo's archives (back to 1940).
+  It's in the shared text too. Turn it off in Settings → Weather.
 - **Effort**, when you've filled in the profile (sex, birth year, weight):
   - average and max heart rate
   - **calories**: Keytel 2005 heart-rate equation, or ACSM/MET from speed and slope
@@ -353,7 +360,8 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Theme:** light, dark and auto.
 - **Font:** Google Sans, bundled for offline use.
 - **Privacy:** workouts are stored only on the device. The network is used for map tiles
-  and nothing else.
+  and the weather lookup, which sends Open-Meteo each workout's start time and start
+  position rounded to about 1 km (Settings → Weather turns it off). Nothing else is sent.
 - **Storage:** on Android, workouts live in an app-private **SQLite** database. Existing
   IndexedDB data migrates automatically on first launch, verified per track by CRC-32.
   A workout stopped from the watch, a widget or the notification is processed and saved
@@ -541,6 +549,8 @@ src/
              course store
   viewer/    Locale Viewer, the standalone web page (entry: viewer/index.html)
   voice/     announcement triggers and phrases (mirrored natively in VoiceCoach)
+  weather/   weather at the start: Open-Meteo requests, parsing, conditions (lookups
+             and back-fill in services/weather.js)
   insights/  learned routines and goal prediction (matcher mirrored in RoutineMatcher);
              date-based reports with CSV/JSON export, calorie and load cache
 android/app/src/main/java/app/locale/exercisetracker/tracker/
@@ -567,6 +577,8 @@ the feature requests.
   [OpenTopoMap](https://opentopomap.org) (CC-BY-SA).
 - **Satellite imagery:** © Esri, Maxar, Earthstar Geographics.
 - **Sample course elevation:** Copernicus GLO-90 DEM via [Open-Meteo](https://open-meteo.com).
+- **Weather:** [Open-Meteo](https://open-meteo.com) (CC BY 4.0), from national weather
+  services' models and ERA5 reanalysis.
 - **FIT protocol:** files are validated in tests with Garmin's
   [FIT SDK](https://developer.garmin.com/fit/) (a dev dependency only; it isn't shipped
   in the app).

@@ -1467,6 +1467,19 @@ main#view {
   letter-spacing: -0.02em;
 }
 
+/* Weather at the start (workout Summary): a condition can be a few words, so a smaller value. */
+.weather .stat .value {
+  font-size: 1.2rem;
+  line-height: 1.25;
+}
+
+.stat .stat-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
 .stat .value small {
   font-size: 0.6em;
   font-weight: 600;

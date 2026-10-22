@@ -6,6 +6,8 @@ import { assignWorkout, displayName, isUsable, routineChoices, routineOf } from 
 import { navigate } from '../router.js';
 import { workoutShareText, smsUri } from '../export/text.js';
 import { changeActivity } from '../services/workoutService.js';
+import { lookupWeather, needsWeather } from '../services/weather.js';
+import { weatherText } from '../weather/weather.js';
 import { COURSE_MIME, courseFilename, initialsOf, parseCourse, toCourseGPX } from '../course/courseFile.js';
 import { courseLinkURL } from '../course/courseLink.js';
 import { openSms, shareFile, shareText } from '../services/share.js';
@@ -93,6 +95,17 @@ export async function mount(root, params, query, ctx) {
     if (id === 'summary') {
       renderSummary(panel, w, track, units);
       fillRoutinePicker();
+      // Not looked up yet (recorded offline, or just saved): fetch it now and show it.
+      if (s.weather && needsWeather(w)) {
+        lookupWeather(w)
+          .then((updated) => {
+            if (!updated) return;
+            w = updated;
+            const slot = panel.querySelector('[data-ref="weather"]');
+            if (tab === 'summary' && slot) slot.outerHTML = weatherHTML(w, units);
+          })
+          .catch((e) => console.warn('Weather lookup failed', e));
+      }
     }
     else if (id === 'splits') renderSplits(panel, w, track, units, preferSpeed);
     else {
@@ -421,11 +434,28 @@ function renderSummary(panel, w, track, units) {
   panel.innerHTML = `
     <div class="page">
       <div class="stat-grid num" style="margin-top:12px">${rows.join('')}</div>
+      ${weatherHTML(w, units)}
       ${goalHTML(w, units)}
       ${effortHTML(w, track)}
       <div class="card mini-profile">${miniProfileSVG(track)}</div>
       ${w.notes ? `<div class="card notes">${escapeHtml(w.notes)}</div>` : ''}
       <p class="about">Altitude source: ${sm.hasBarometer ? 'barometer anchored to GPS' : 'GPS only'} · ${sm.pointCount.toLocaleString()} points${sm.segments > 1 ? ` · ${sm.segments} segments` : ''}${w.device ? ` · ${escapeHtml(w.device)}` : ''}</p>
+    </div>`;
+}
+
+/** Weather at the start (services/weather.js): conditions, temperature, feels like and wind. */
+function weatherHTML(w, units) {
+  const t = weatherText(w.weather, units);
+  if (!t) return '<div data-ref="weather" hidden></div>';
+  const tile = (label, value, side = '') =>
+    `<div class="stat"><label>${label}</label><div class="value">${escapeHtml(value)}</div>${side ? `<small class="stat-note">${side}</small>` : ''}</div>`;
+  return `<div data-ref="weather" class="weather">
+      <div class="section-title">Weather at the start</div>
+      <div class="stat-grid num">
+        ${tile('Conditions', t.condition)}
+        ${tile('Temperature', t.temp, t.feels ? `Feels like ${t.feels}` : '')}
+        ${tile('Wind', t.wind, t.gusts ? `Gusts ${t.gusts}` : '')}
+      </div>
     </div>`;
 }
 
