@@ -14,6 +14,7 @@ import { openSms, shareFile, shareText } from '../services/share.js';
 import { settings, updateSettings } from '../settings.js';
 import { estimateCalories, loadLabel, profileComplete, trimp, ZONES, zoneSeconds } from '../stats/physio.js';
 import { rejectedText, VO2_ACTIVITIES, workoutVo2max } from '../stats/vo2max.js';
+import { significantExtremes } from '../stats/extremes.js';
 import { computeSplits } from '../stats/summary.js';
 import { confirmDialog, openDialog } from '../ui/dialog.js';
 import { Disposer, el, escapeHtml } from '../ui/dom.js';
@@ -440,9 +441,9 @@ function renderSummary(panel, w, track, units) {
       ${goalHTML(w, units)}
       ${effort.html}
       ${weatherHTML(w, units)}
+      <div class="card mini-profile">${miniProfileHTML(track, units)}</div>
       ${effort.notes}
       ${weatherNoteHTML(w)}
-      <div class="card mini-profile">${miniProfileSVG(track)}</div>
       ${w.notes ? `<div class="card notes">${escapeHtml(w.notes)}</div>` : ''}
       <p class="about">Altitude source: ${sm.hasBarometer ? 'barometer anchored to GPS' : 'GPS only'} · ${sm.pointCount.toLocaleString()} points${sm.segments > 1 ? ` · ${sm.segments} segments` : ''}${w.device ? ` · ${escapeHtml(w.device)}` : ''}</p>
     </div>`;
@@ -561,9 +562,14 @@ function vo2AboutText(r) {
   return '';
 }
 
-function miniProfileSVG(track) {
+/**
+ * Elevation chart for the Summary: the profile as a stretched SVG, with HTML labels (so the
+ * text isn't stretched) on the significant highs and lows (stats/extremes.js). Labels of the
+ * same kind that would overlap keep the one with the bigger swing.
+ */
+function miniProfileHTML(track, units) {
   const W = 300;
-  const H = 74;
+  const H = 100;
   if (track.n < 2) return '';
   const total = track.dist[track.n - 1] || 1;
   let lo = Infinity;
@@ -577,13 +583,31 @@ function miniProfileSVG(track) {
   }
   if (!Number.isFinite(lo)) return '';
   const span = Math.max(10, hi - lo);
+  const x = (i) => (track.dist[i] / total) * W;
+  const y = (a) => 4 + (1 - (a - lo) / span) * (H - 8);
   const step = Math.max(1, Math.floor(track.n / 300));
   const pts = [];
-  for (let i = 0; i < track.n; i += step) pts.push(`${((track.dist[i] / total) * W).toFixed(1)},${(H - 4 - ((track.alt[i] - lo) / span) * (H - 10)).toFixed(1)}`);
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Elevation profile">
-    <polygon points="0,${H} ${pts.join(' ')} ${W},${H}" fill="var(--accent)" opacity="0.18"/>
-    <polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/>
-  </svg>`;
+  for (let i = 0; i < track.n; i += step) if (Number.isFinite(track.alt[i])) pts.push(`${x(i).toFixed(1)},${y(track.alt[i]).toFixed(1)}`);
+  const placed = [];
+  for (const e of significantExtremes(track.dist, track.alt, track.n).sort((a, b) => b.swing - a.swing)) {
+    const px = (x(e.i) / W) * 100;
+    if (placed.some((p) => p.type === e.type && Math.abs(p.px - px) < 16)) continue;
+    placed.push({ ...e, px, py: (y(e.alt) / H) * 100 });
+  }
+  const labels = placed
+    .map((p) => {
+      // Keep the text inside the card at either end.
+      const align = p.px < 8 ? 'start' : p.px > 92 ? 'end' : 'mid';
+      return `<span class="ele-mark ${p.type} ${align}" style="left:${p.px.toFixed(2)}%;top:${p.py.toFixed(2)}%"><b class="num">${Math.round(altitudeValue(p.alt, units)).toLocaleString().replace('-', '−')} ${altitudeUnit(units)}</b></span>`;
+    })
+    .join('');
+  return `<div class="ele-plot">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Elevation profile">
+        <polygon points="0,${H} ${pts.join(' ')} ${W},${H}" fill="var(--accent)" opacity="0.18"/>
+        <polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+      </svg>
+      ${labels}
+    </div>`;
 }
 
 // ---- Splits -------------------------------------------------------------------------------
