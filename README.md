@@ -30,20 +30,22 @@ sensors.
   <img src="docs/screenshots/summary.png" width="250" alt="Workout summary with distance and the average GPS error, times, speed, pace, climb and altitude">
 </p>
 <p align="center">
-  <img src="docs/screenshots/effort.png" width="250" alt="Workout summary: average step cadence from the watch, then Effort: average and max heart rate, calories, cardio load and time in heart-rate zones">
+  <img src="docs/screenshots/effort.png" width="250" alt="Workout summary, Effort: average and max heart rate, calories, cardio load and time in heart-rate zones, then the weather at the start">
+  &nbsp;
+  <img src="docs/screenshots/weather.png" width="250" alt="Workout summary: weather at the start (fog, 11 °C feeling like 10 °C, wind NW 4 km/h gusting 15), the elevation chart with its highs and lows labelled, and notes on how calories and the weather are worked out">
   &nbsp;
   <img src="docs/screenshots/map.jpeg" width="250" alt="Map view with speed-coloured route, distance marker popover, and elevation profile with heart-rate line">
-  &nbsp;
-  <img src="docs/screenshots/3d.jpeg" width="250" alt="3D route over satellite imagery with exaggerated altitude">
 </p>
 <p align="center">
+  <img src="docs/screenshots/3d.jpeg" width="250" alt="3D route over satellite imagery with exaggerated altitude">
+  &nbsp;
   <img src="docs/screenshots/splits.png" width="250" alt="Per-kilometre splits with pace, elevation change, heart rate and time">
   &nbsp;
   <img src="docs/screenshots/share.png" width="250" alt="Share sheet: text summary with Text message and Other apps buttons, and file export formats">
-  &nbsp;
-  <img src="docs/screenshots/live-position.png" width="250" alt="Live position screen: coordinates, barometric altitude, speed, compass heading and a map, with nothing recorded">
 </p>
 <p align="center">
+  <img src="docs/screenshots/live-position.png" width="250" alt="Live position screen: coordinates, barometric altitude, speed, compass heading and a map, with nothing recorded">
+  &nbsp;
   <img src="docs/screenshots/voice-settings.png" width="250" alt="Voice announcement settings: Splits, Time and Goal per activity, time interval, lower or pause other audio, always loud, and watch vibration">
   &nbsp;
   <img src="docs/screenshots/voice-live.png" width="250" alt="Live workout screen showing the last spoken announcement as a caption under the controls">
@@ -214,6 +216,9 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - climb, descent and net vertical
   - min and max altitude
 - **Ski extras:** runs, lifts, ski vertical, lift time and max run speed.
+- **Elevation chart** on the summary, with the significant highs and lows labelled with
+  their altitude: the highest and lowest points always, plus hills and dips that stand out
+  by at least 5 m or a fifth of the route's height range, whichever is more.
 - **Weather at the start:** conditions (clear, cloudy, fog, drizzle, rain, showers, snow,
   thunderstorm, or **windy** when the wind is 30 km/h or more or gusts reach 50 km/h),
   temperature and feels-like temperature, and wind direction, speed and gusts. Looked up
