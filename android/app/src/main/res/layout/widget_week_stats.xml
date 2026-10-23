@@ -8,13 +8,14 @@
         android:id="@+id/week_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:fontFamily="sans-serif-medium"
+        android:fontFamily="@font/google_sans_medium"
         android:maxLines="1"
         android:text="@string/widget_week_title"
         android:textColor="@color/widget_accent"
         android:textSize="14sp" />
     <TextView
         android:id="@+id/week_range"
+        android:fontFamily="@font/google_sans_regular"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:maxLines="1"
@@ -23,6 +24,7 @@
     <!-- Average split and speed: styled like week_count. -->
     <TextView
         android:id="@+id/week_split"
+        android:fontFamily="@font/google_sans_regular"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
@@ -32,6 +34,7 @@
         android:visibility="gone" />
     <TextView
         android:id="@+id/week_speed"
+        android:fontFamily="@font/google_sans_regular"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:maxLines="1"
@@ -52,7 +55,7 @@
             android:id="@+id/week_distance"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/google_sans_medium"
             android:includeFontPadding="false"
             android:letterSpacing="-0.05"
             android:maxLines="1"
@@ -64,7 +67,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/google_sans_medium"
             android:maxLines="1"
             android:text="@string/widget_week_unit_km"
             android:textColor="@color/widget_text_secondary"
@@ -72,6 +75,7 @@
     </LinearLayout>
     <TextView
         android:id="@+id/week_count"
+        android:fontFamily="@font/google_sans_regular"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:maxLines="1"

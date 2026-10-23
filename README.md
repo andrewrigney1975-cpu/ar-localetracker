@@ -640,7 +640,8 @@ the feature requests.
   [FIT SDK](https://developer.garmin.com/fit/) (a dev dependency only; it isn't shipped
   in the app).
 - **Font:** [Google Sans](https://fonts.google.com/specimen/Google+Sans) (SIL Open Font
-  License).
+  License), in the app and on the home-screen widgets. The widgets use Latin subsets made by
+  `scripts/make-widget-fonts.py`; the licence is in `android/app/src/main/google-sans-OFL.txt`.
 
 ## License
 
