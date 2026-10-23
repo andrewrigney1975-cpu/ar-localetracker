@@ -62,7 +62,7 @@ final class WearSync {
     private static void sendTo(Context app, Node node, String path, byte[] bytes) {
         Wearable.getMessageClient(app)
             .sendMessage(node.getId(), path, bytes)
-            .addOnFailureListener(e -> Log.d(TAG, "send " + path + " to " + node.getDisplayName() + " failed: " + e.getMessage()));
+            .addOnFailureListener(e -> Log.d(TAG, "send " + path + " to node " + node.getId() + " failed: " + e.getMessage()));
     }
 
     /** Forget cached nodes, e.g. after a capability change. */

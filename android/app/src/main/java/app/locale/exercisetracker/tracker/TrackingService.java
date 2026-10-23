@@ -645,7 +645,8 @@ public class TrackingService extends Service {
     private void decideGoal(double lat, double lon) {
         RoutineMatcher.Prediction p = predictRoutine(lat, lon);
         if (p.routineId != null) {
-            Log.i(TAG, "Routine " + p.name + " (" + p.confidence + (Double.isNaN(lat) ? ", no fix yet)" : ")"));
+            // The routine's id, not its name: names are the user's words for places they go.
+            Log.i(TAG, "Routine " + p.routineId + " (" + p.confidence + (Double.isNaN(lat) ? ", no fix yet)" : ")"));
             if (manualGoalM > 0) applyGoal(manualGoalM, "manual", p.routineId, p.name, p.confidence, null);
             else applyGoal(p.goalM, p.source, p.routineId, p.name, p.confidence, p.signature);
         } else if (manualGoalM > 0) {
@@ -761,7 +762,7 @@ public class TrackingService extends Service {
         if (elapsedMs() <= GOAL_REFINE_WINDOW_MS) {
             RoutineMatcher.Prediction p = predictRoutine(lat, lon);
             if (p.routineId != null && !p.routineId.equals(goalRoutineId)) {
-                Log.i(TAG, "Routine changed at the first fix: " + goalName + " -> " + p.name);
+                Log.i(TAG, "Routine changed at the first fix: " + goalRoutineId + " -> " + p.routineId);
                 decideGoal(lat, lon);
                 return;
             }

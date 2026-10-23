@@ -4,5 +4,8 @@
   "webDir": "dist",
   "android": {
     "backgroundColor": "#0f1419"
+  },
+  "cordova": {
+    "accessOrigins": []
   }
 }

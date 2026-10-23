@@ -126,7 +126,8 @@ object PhoneLink {
                 Wearable.getMessageClient(app).sendMessage(node.id, path, bytes).await()
                 sent = true
             } catch (e: Exception) {
-                Log.w(TAG, "Send $path to ${node.displayName} failed", e)
+                // The node id, not its display name, which is often the owner's name ("Andrew's Pixel").
+                Log.w(TAG, "Send $path to node ${node.id} failed", e)
             }
         }
         return sent
