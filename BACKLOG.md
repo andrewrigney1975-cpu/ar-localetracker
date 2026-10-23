@@ -424,3 +424,34 @@ walking, jogging, running and sprinting, and spoken warnings before each change.
 - **Live screen and summary:** show the current mode and a countdown to the next change;
   after the workout, the plan on the Summary (time in each mode) and mode bands on the
   elevation/speed charts. Speed per mode tells you whether the sprints were sprints.
+
+---
+
+## 13. Google Sans on the home-screen widgets
+
+**Request:** check the font on the widgets and use Google Sans, as the app does.
+
+*Notes:*
+- **Now:** the app uses Google Sans everywhere (`--font` in `app.css`, bundled from
+  `@fontsource-variable/google-sans`), but the widgets use the system sans-serif. The XML
+  layouts (`widget_1x1`, `widget_2x1`, `widget_2x2`, `widget_active`, `widget_week_stats`) set
+  `android:fontFamily="sans-serif-medium"` (12 places), and the 4×2 week chart draws its labels
+  into a bitmap with `Typeface.DEFAULT` / `DEFAULT_BOLD` (`LocaleWidgets.java`, the chart's
+  `Paint`s).
+- **Layouts:** add the font under `res/font/` and use `android:fontFamily="@font/…"`. The
+  launcher inflates widget layouts with the app's resources, so font resources work in
+  `RemoteViews` layouts. Android can't read the npm package's `.woff2` files, so take the TTF from
+  Google Fonts (SIL Open Font License; keep the licence text with it).
+- **Weights:** the layouts use medium, and the chart uses regular and bold (today's day). Either
+  ship static instances or one variable font with `<font-family>` entries setting
+  `android:fontVariationSettings` (`'wght' 500`, `'wght' 700`).
+- **Chart bitmap:** load the font with `ctx.getResources().getFont(R.font.…)` and set it on the
+  `Paint`s instead of `Typeface.DEFAULT`.
+- **Size:** a full variable TTF can add a megabyte or more to a 3.6 MB APK; a Latin subset is
+  much smaller. Check the release APK size before and after.
+- **Release builds:** resource shrinking keeps fonts referenced from layouts, but check that
+  the font is still in the release APK (`aapt2 dump resources … | grep font/`), as the Wear
+  capability arrays were removed when nothing referenced them in code.
+- **Check on the phone:** screenshots of all five widget sizes in light and dark, and the
+  active (recording) state. The watch tile and watch app use the watch's system font; decide
+  separately whether they should follow.
