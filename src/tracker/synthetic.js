@@ -19,7 +19,9 @@ function gaussian(rand) {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-const BASE_SPEED = { walk: 1.4, run: 3.1, cycle: 7.5, ski: 11 };
+const BASE_SPEED = { walk: 1.4, run: 3.1, hii: 2.2, cycle: 7.5, ski: 11 };
+/** Simulated speed (m/s) in each high-intensity interval mode. */
+export const HII_SPEED = { walk: 1.5, jog: 2.5, run: 3.4, sprint: 5.2 };
 
 /**
  * Simple heart-rate response: target from speed and grade per activity, first-order lag
@@ -46,6 +48,9 @@ export class HeartModel {
       case 'ski':
         x = speed > 0.5 ? 0.55 + 0.012 * speed : 0.3;
         break;
+      case 'hii':
+        x = speed < 2 ? 0.3 + 0.13 * (speed - 1.0) : 0.62 + 0.11 * (speed - 2.0);
+        break;
       default:
         x = 0.62 + 0.11 * (speed - 2.0);
     }
@@ -69,8 +74,10 @@ export class HeartModel {
  * Ski alternates 6-minute lifts (straight climbs) with zig-zag descents.
  */
 export class SyntheticRoute {
-  constructor({ activity = 'run', lat = 50.1163, lon = -122.9574, alt = 680, seed = 7, noise = 3, stops = true } = {}) {
+  /** speedAt(elapsedS): the speed to move at instead of the activity's (e.g. an interval plan's). */
+  constructor({ activity = 'run', lat = 50.1163, lon = -122.9574, alt = 680, seed = 7, noise = 3, stops = true, speedAt = null } = {}) {
     this.activity = activity;
+    this.speedAt = speedAt;
     this.lat = lat;
     this.lon = lon;
     this.alt = alt;
@@ -90,7 +97,7 @@ export class SyntheticRoute {
   /** Advance by dt seconds; returns a journal-style point (without seq/seg). */
   step(dt, t) {
     this.elapsed += dt;
-    let speed = BASE_SPEED[this.activity] ?? 3;
+    let speed = this.speedAt?.(this.elapsed) ?? BASE_SPEED[this.activity] ?? 3;
     let climbRate = 0;
 
     if (this.activity === 'ski') {
@@ -169,11 +176,13 @@ const round = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
  * @param {false|'watch'|'phone'|'both'} [opts.cadence]  step cadence lines: the watch every
  *   2 s, the phone every 5 s; 'both' leaves a 2-minute gap in the watch's (from 5 min) for
  *   the phone to fill
+ * @param {object[]} [opts.hii]  interval journal lines ({type:'hii', at (s), plan | stopS}), written
+ *   at their second; with `speedAt` the route follows the plan
  */
-export function generateJournal({ activity = 'run', seconds = 1800, pauses = [], startedAt = Date.UTC(2026, 0, 10, 15, 0, 0), seed = 7, noise = 3, stops = true, hasBarometer = true, heartRate = false, cadence = false } = {}) {
-  const route = new SyntheticRoute({ activity, seed, noise, stops });
+export function generateJournal({ activity = 'run', seconds = 1800, pauses = [], startedAt = Date.UTC(2026, 0, 10, 15, 0, 0), seed = 7, noise = 3, stops = true, hasBarometer = true, heartRate = false, cadence = false, hii = [], speedAt = null } = {}) {
+  const route = new SyntheticRoute({ activity, seed, noise, stops, speedAt });
   const heart = heartRate ? new HeartModel({ seed: seed + 1 }) : null;
-  const stepping = activity === 'walk' || activity === 'run';
+  const stepping = activity === 'walk' || activity === 'run' || activity === 'hii';
   const cadRand = mulberry32(seed + 2); // its own stream, so other lines don't change
   let prevAlt = null;
   const lines = [];
@@ -186,6 +195,7 @@ export function generateJournal({ activity = 'run', seconds = 1800, pauses = [],
   let trueDist = 0;
   const pauseQueue = [...pauses].sort((a, b) => a[0] - b[0]);
   for (let s = 1; s <= seconds; s++) {
+    for (const { at, ...line } of hii) if (at === s - 1) lines.push({ ...line, t });
     t += 1000;
     const p = route.step(1, t);
     trueDist = p._trueDist;

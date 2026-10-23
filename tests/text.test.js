@@ -24,6 +24,13 @@ describe('workout share text with weather', () => {
   });
 });
 
+describe('workout share text with intervals', () => {
+  it('adds the time in each mode, up to a stop', () => {
+    const hii = [{ atS: 0, durationS: 600, stopS: 500, items: [['walk', 0, 180], ['run', 180, 120], ['walk', 300, 120], ['sprint', 420, 180]], shares: {} }];
+    expect(workoutShareText({ ...run, hii }, { formatDay: day }).split('\n')).toContain('Intervals: walk 5:00 · run 2:00 · sprint 1:20');
+  });
+});
+
 describe('workout share text', () => {
   it('matches the backlog example for a run with heart rate and calories', () => {
     expect(workoutShareText(run, { calories: 1373.2, formatDay: day })).toBe(

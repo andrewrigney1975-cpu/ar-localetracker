@@ -63,6 +63,8 @@ public class TrackingService extends Service {
     static final String EXTRA_FIX_LON = "fixLon";
     static final String EXTRA_FIX_T = "fixT";
     static final String EXTRA_FIX_ACC = "fixAcc";
+    /** HII: the plan's length in seconds chosen on the start screen (else the routine's or the setting's). */
+    static final String EXTRA_HII_S = "hiiS";
 
     /**
      * Routine: picked at the start, with the warm-up fix if it is this accurate and recent;
@@ -175,6 +177,21 @@ public class TrackingService extends Service {
     private double goalConfidence;
     private boolean goalOffRoute;
     private RouteGuard routeGuard;
+    /** HII length chosen on the start screen for this workout (s), or 0. */
+    private int hiiStartS;
+
+    /** Interval announcements fall on time, not on fixes: check every second while recording. */
+    private final Runnable hiiTick = new Runnable() {
+        @Override
+        public void run() {
+            if (state == State.IDLE) return;
+            if (state == State.RECORDING && coach != null && coach.plan != null) {
+                announce();
+                pushWearStatus(false);
+            }
+            handler.postDelayed(this, 1000);
+        }
+    };
 
     // ---- Lifecycle --------------------------------------------------------------------------
 
@@ -251,6 +268,7 @@ public class TrackingService extends Service {
                 gs.fixT = intent.getLongExtra(EXTRA_FIX_T, 0);
                 gs.fixAcc = intent.getDoubleExtra(EXTRA_FIX_ACC, 999);
             }
+            gs.hiiS = intent.getIntExtra(EXTRA_HII_S, 0);
             handler.post(() -> startWorkout(id, act, ap, u, resume, gs));
         } else if (ACTION_PAUSE.equals(action)) {
             handler.post(this::pauseWorkout);
@@ -269,6 +287,7 @@ public class TrackingService extends Service {
         double fixLon = Double.NaN;
         long fixT;
         double fixAcc = 999;
+        int hiiS;
     }
 
     /** Same format as the web app's newWorkoutId(). */
@@ -330,6 +349,7 @@ public class TrackingService extends Service {
                     coach.syncTo(distanceM, elapsedBaseMs);
                 }
                 restoreGoal();
+                restoreHii();
             } else {
                 startedAt = System.currentTimeMillis();
                 elapsedBaseMs = 0;
@@ -375,6 +395,8 @@ public class TrackingService extends Service {
         setState(State.RECORDING, resume ? "restored" : "start");
         if (!resume) startGoal(gs);
         requestLocationUpdates(Priority.PRIORITY_HIGH_ACCURACY);
+        handler.removeCallbacks(hiiTick);
+        handler.postDelayed(hiiTick, 1000);
     }
 
     private void restoreAfterRestart() {
@@ -414,6 +436,7 @@ public class TrackingService extends Service {
             return;
         }
         setState(State.IDLE, "stop");
+        handler.removeCallbacks(hiiTick);
         goalPending = false;
         routeGuard = null;
         synchronized (this) {
@@ -601,6 +624,7 @@ public class TrackingService extends Service {
         synchronized (this) {
             clearGoal();
         }
+        hiiStartS = gs != null ? gs.hiiS : 0;
         manualGoalM = gs != null && gs.goalM > 0 ? gs.goalM : coach.cfg.goal && coach.cfg.goalM > 0 ? coach.cfg.goalM : 0;
         boolean freshFix = gs != null && !Double.isNaN(gs.fixLat) && gs.fixAcc <= GOAL_FIX_ACCURACY_M
             && System.currentTimeMillis() - gs.fixT <= GOAL_FIX_MAX_AGE_MS;
@@ -634,6 +658,100 @@ public class TrackingService extends Service {
             ev.put("reason", p.reason != null ? p.reason : "unsure");
             TrackerHub.emit("goal", ev);
             saveSnapshot();
+        }
+        considerHii();
+    }
+
+    // ---- High-intensity intervals (src/hii/plan.js, HiiPlan) ----------------------------------
+
+    /**
+     * An HII workout, or one recognised as a routine set to run as intervals, follows a plan:
+     * as long as chosen on the start screen, else the routine's usual duration (what is left of
+     * it when the routine is recognised late), else the HII setting. Once only per workout; the
+     * live screen can stop and restart it (requestHii).
+     */
+    private void considerHii() {
+        if (coach == null || coach.plan != null) return;
+        if (!"hii".equals(profile.id) && !PhoneSettings.hiiRoutine(this, goalRoutineId)) return;
+        long elapsedS = elapsedMs() / 1000;
+        int usual = goalRoutineId != null ? RoutineMatcher.medianSOf(PhoneSettings.routineModel(this), profile.id, goalRoutineId) : 0;
+        int durationS = hiiStartS > 0 ? hiiStartS
+            : usual > 0 ? (int) Math.max(HiiPlan.MIN_PLAN_S, usual - elapsedS)
+            : PhoneSettings.hii(this).optInt("durationMin", HiiPlan.DEFAULT_DURATION_MIN) * 60;
+        startHii(durationS, elapsedS);
+    }
+
+    private void startHii(int durationS, long atS) {
+        JSONObject h = PhoneSettings.hii(this);
+        HiiPlan plan = HiiPlan.make(Math.max(HiiPlan.MIN_PLAN_S, durationS), HiiPlan.sharesOf(h.optJSONObject("shares")),
+            HiiPlan.boutsOf(h.optJSONObject("bouts")), (int) (System.currentTimeMillis() & 0x7fffffff), atS);
+        synchronized (this) {
+            // From exactly atS, so the start is said straight away.
+            coach.setPlan(plan, atS * 1000);
+        }
+        Log.i(TAG, "Intervals for " + plan.durationS + " s, " + plan.items.size() + " bouts");
+        if (journal != null) {
+            JSONObject line = new JSONObject();
+            put(line, "type", "hii");
+            put(line, "t", System.currentTimeMillis());
+            put(line, "plan", plan.toJson());
+            journal.append(line, true);
+        }
+        if (speaker == null) speaker = new Speaker(this, coach.cfg.duck, coach.cfg.loud);
+        announce();
+        saveSnapshot();
+        TrackerHub.emit("hii", hiiJs());
+        pushWearStatus(true);
+    }
+
+    private void stopHii() {
+        if (coach == null || coach.plan == null || coach.plan.stopS >= 0) return;
+        long stopS = elapsedMs() / 1000;
+        synchronized (this) {
+            coach.stopPlan(stopS);
+        }
+        if (journal != null) {
+            JSONObject line = new JSONObject();
+            put(line, "type", "hii");
+            put(line, "t", System.currentTimeMillis());
+            put(line, "stopS", stopS);
+            journal.append(line, true);
+        }
+        saveSnapshot();
+        TrackerHub.emit("hii", hiiJs());
+        pushWearStatus(true);
+    }
+
+    /** From the live screen: intervals on (a new plan of `durationS` from now) or off. */
+    void requestHii(boolean on, int durationS) {
+        handler.post(() -> {
+            if (state == State.IDLE || coach == null) return;
+            if (!on) stopHii();
+            else if (coach.plan == null || coach.plan.stopS >= 0 || coach.plan.indexAt(elapsedMs() / 1000.0) >= coach.plan.items.size()) {
+                startHii(durationS, elapsedMs() / 1000);
+            }
+        });
+    }
+
+    /** After a service restart: the plan comes back from the snapshot; passed changes aren't repeated. */
+    private void restoreHii() {
+        String s = prefs.getString("hPlan", null);
+        if (s == null) return;
+        try {
+            HiiPlan plan = HiiPlan.fromJson(new JSONObject(s));
+            if (plan != null) coach.setPlan(plan, elapsedBaseMs);
+        } catch (org.json.JSONException e) {
+            Log.w(TAG, "Interval plan not restored", e);
+        }
+    }
+
+    /** The plan for the live screen (snapshot and the "hii" event). */
+    private synchronized JSObject hiiJs() {
+        if (coach == null || coach.plan == null) return new JSObject();
+        try {
+            return new JSObject(coach.plan.toJson().toString());
+        } catch (org.json.JSONException e) {
+            return new JSObject();
         }
     }
 
@@ -730,6 +848,7 @@ public class TrackingService extends Service {
         JSObject o = new JSObject();
         o.put("goalM", goalM);
         o.put("source", goalSource);
+        if (goalRoutineId != null) o.put("routineId", goalRoutineId);
         if (goalName != null) o.put("name", goalName);
         if (goalOffRoute) o.put("offRoute", true);
         return o;
@@ -846,6 +965,16 @@ public class TrackingService extends Service {
             if (lastLocation != null && lastLocation.hasSpeed()) put(o, "speed", (double) lastLocation.getSpeed());
             if (now - lastHrAt < HR_FRESH_MS) put(o, "hr", lastHr);
             if (goalM > 0 && !goalOffRoute) put(o, "goalM", goalM);
+            HiiPlan plan = coach != null ? coach.plan : null;
+            if (plan != null) {
+                double es = elapsedMs() / 1000.0;
+                int i = plan.indexAt(es);
+                if (i >= 0 && i < plan.items.size()) {
+                    put(o, "hiiMode", HiiPlan.MODES[plan.items.get(i)[0]]);
+                    put(o, "hiiLeftS", plan.leftAt(es, i));
+                    if (i + 1 < plan.items.size()) put(o, "hiiNext", HiiPlan.MODES[plan.items.get(i + 1)[0]]);
+                }
+            }
         }
         PhoneSettings.putHeartRange(this, o);
         WearSync.send(this, WearSync.PATH_STATUS, o);
@@ -1054,6 +1183,7 @@ public class TrackingService extends Service {
         if (System.currentTimeMillis() - lastHrAt < HR_FRESH_MS) o.put("hr", lastHr);
         if (lastLocation != null) o.put("last", LocaleTrackerPlugin.locationToJs(lastLocation, lastFusedAlt));
         if (goalM > 0) o.put("goal", goalJs());
+        if (coach != null && coach.plan != null) o.put("hii", hiiJs());
         return o;
     }
 
@@ -1084,6 +1214,7 @@ public class TrackingService extends Service {
                 .putString("gName", goalName)
                 .putLong("gConfBits", Double.doubleToLongBits(goalConfidence))
                 .putBoolean("gOffRoute", goalOffRoute)
+                .putString("hPlan", coach != null && coach.plan != null ? coach.plan.toJson().toString() : null)
                 .apply();
         }
         if (journal != null) journal.flush();

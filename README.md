@@ -1,7 +1,7 @@
 # Locale Exercise Tracker
 
-Locale is a GPS workout tracker for Android 16+ covering **walking, running, cycling and
-snow skiing**. It records reliably in the background with the screen off. A **Wear OS
+Locale is a GPS workout tracker for Android 16+ covering **walking, running,
+high-intensity intervals (HII), cycling and snow skiing**. It records reliably in the background with the screen off. A **Wear OS
 companion** lets you start and stop workouts from your watch and adds live heart rate.
 Home-screen widgets start a workout in one tap, and **voice announcements** call out
 your splits, time and goal progress as you go. Locale **learns your routines**, and
@@ -23,7 +23,7 @@ The app is written in HTML5, vanilla JavaScript and CSS3, and packaged with
 sensors.
 
 <p align="center">
-  <img src="docs/screenshots/home.png" width="250" alt="Home screen with activity tiles, the Live and View tiles, and the City2Surf sample workout">
+  <img src="docs/screenshots/home.png" width="250" alt="Home screen with activity tiles, the full-width HII button, the Live and View buttons, and the City2Surf sample workout">
   &nbsp;
   <img src="docs/screenshots/live.png" width="250" alt="Live workout screen with elapsed time, heart rate, distance, pace, heading, altitude and location">
   &nbsp;
@@ -49,6 +49,13 @@ sensors.
   <img src="docs/screenshots/voice-settings.png" width="250" alt="Voice announcement settings: Splits, Time and Goal per activity, time interval, lower or pause other audio, always loud, and watch vibration">
   &nbsp;
   <img src="docs/screenshots/voice-live.png" width="250" alt="Live workout screen showing the last spoken announcement as a caption under the controls">
+</p>
+<p align="center">
+  <img src="docs/screenshots/hii-live.png" width="250" alt="HII workout on the live screen: a Walk pill with 8 seconds left and a sprint next, a Stop intervals button, and the caption Get ready to sprint in 10 seconds, for 45 seconds">
+  &nbsp;
+  <img src="docs/screenshots/hii-summary.png" width="250" alt="HII workout summary: Intervals tiles with the pace, time and bouts for walk, jog, run and sprint, a note on the plan, then Effort">
+  &nbsp;
+  <img src="docs/screenshots/hii-settings.png" width="250" alt="Settings, High-intensity intervals: the share of time for walk, jog, run and sprint, the shortest and longest bout of each in seconds, and the length without a routine">
 </p>
 <p align="center">
   <img src="docs/screenshots/insights.png" width="250" alt="Insights: date range, grouping, activity and routine filters, with totals for workouts, distance against its goal, activity time, speed and pace with their ± variation, heart rate, cardio load and calories">
@@ -94,8 +101,9 @@ sensors.
 
 <sub>The phone screenshots show the built-in sample workout, a simulated run of the Sydney
 City2Surf (Hyde Park to Bondi via Heartbreak Hill at 6:18/km, with simulated heart rate).
-It is generated from the course map and is not a real recording. The voice screenshots
-come from the browser simulator. The Insights screenshots use a year of generated
+It is generated from the course map and is not a real recording. The voice and HII
+screenshots come from the browser simulator (the HII summary is a generated workout whose
+route follows its interval plan). The Insights screenshots use a year of generated
 workouts in the browser build, and the Goals screenshots 16 weeks of them. The 4×2
 widget is on a Pixel 10a. The View screenshots show the sample shared as a course,
 and a generated walk shared with its start and finish hidden; the Locale Viewer screenshot
@@ -105,12 +113,33 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 ## Features
 
 ### Record
-- **Four activities:** walk, run, cycle and ski, each with tuned accuracy filters and
+- **Five activities:** walk, run, HII, cycle and ski, each with tuned accuracy filters and
   stationary thresholds.
+- **High-intensity intervals (HII):** the full-width yellow **HII** button starts a workout
+  of random bouts of walking, jogging, running and sprinting:
+  - **Length:** a recognised routine's usual duration. Without a routine, Locale asks how
+    long the workout will be, and remembers your answer for starts from the watch or a
+    widget. The start screen shows the length and lets you change it for one workout.
+  - **Mix:** each mode's share of the time (default walk 40%, jog 30%, run 20%,
+    sprint 10%), split into bouts between a shortest and longest length per mode
+    (Settings → High-intensity intervals).
+  - **Order:** random, but every run or sprint is followed by a walk, so a sprint never
+    follows a run, and a plan prefers not to start hard.
+  - **Announcements:** *"Intervals for 30 minutes. Jog for 3 minutes."* at the start,
+    then ten seconds before each change *"Get ready to sprint in 10 seconds, for 30
+    seconds"*, timed on active time so pauses don't shift them, and *"Intervals complete."*
+    The watch buzzes four quick taps and shows the mode and time left.
+  - **Any routine as intervals:** turn on **Intervals** for a walk or run routine under
+    You → Learned routines, or tap **Start intervals** on the live screen during a
+    recognised routine. That workout and every later one of the routine run as intervals
+    until you turn it off (**Stop intervals**, or the same chip). Past workouts don't change.
+  - **Afterwards:** the Summary shows each mode's pace, time and number of bouts, with the
+    bouts as coloured bands on the elevation chart. The plan is saved in the workout's
+    journal and on the workout, and FIT exports use sport *training*, sub-sport *HIIT*.
 - **Controls:** start, pause, resume and **hold-to-stop**, so a gloved hand can't end a
   workout by accident.
 - **Auto-pause:** optional, set separately for each activity.
-- **Live position mode:** the yellow **Live** tile shows where you are without recording
+- **Live position mode:** the **Live** button shows where you are without recording
   anything:
   - coordinates, as decimal or degrees-minutes-seconds
   - GPS accuracy and satellites
@@ -124,7 +153,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 - **Home-screen widgets:**
   - **1×1:** your last-used activity
   - **2×1:** run and walk
-  - **2×2:** all four activities
+  - **2×2:** walk, run, cycle and ski
 
   One tap starts recording, even with the app closed. While recording, the widget shows
   the activity, a running timer and distance. Add one from Settings → Home-screen widgets.
@@ -174,6 +203,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - countdown: one quick tap
   - goal set: one short tap
   - off route: two long taps
+  - interval change coming up: four quick taps
 
   The watch also shows the announcement's text for a few seconds. Settings → Voice
   announcements → Vibrate the watch turns it off, and **Test** buzzes the watch too.
@@ -287,7 +317,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - **Share a link to view in a browser** sends the same course as a
     [Locale Viewer](https://andrewrigney1975-cpu.github.io/ar-localetracker/) link, which
     anyone can open in a browser without installing anything (see below).
-- **View**, the tile under Live on the Track screen, opens a course file someone shared
+- **View**, the button next to Live on the Track screen, opens a course file someone shared
   with you. Tap a `.gpx` attachment in Messages, Gmail or Files and choose **Open with
   Locale**, or use **Open a course file** in View.
   - **Map**: the course in one colour (there's no speed to colour it by), distance
@@ -564,13 +594,14 @@ src/
   voice/     announcement triggers and phrases (mirrored natively in VoiceCoach)
   weather/   weather at the start: Open-Meteo requests, parsing, conditions (lookups
              and back-fill in services/weather.js)
+  hii/       high-intensity interval plans (seeded; mirrored in HiiPlan)
   insights/  learned routines and goal prediction (matcher mirrored in RoutineMatcher);
              date-based reports with CSV/JSON export, calorie and load cache
 android/app/src/main/java/app/locale/exercisetracker/tracker/
   LocaleTrackerPlugin  TrackingService  Journal  AltitudeFusion
   WearListenerService  WearSync          (watch link)
   LocaleWidgets  Widget1x1/2x1/2x2/Week/WeekChartProvider  (home-screen widgets)
-  VoiceCoach  Speaker                        (voice announcements, text-to-speech)
+  VoiceCoach  Speaker  HiiPlan               (voice announcements, text-to-speech, intervals)
   RoutineMatcher  RouteGuard                 (auto goals from learned routines)
 android/app/src/main/java/app/locale/exercisetracker/store/
   WorkoutStore (SQLite)  LocaleStorePlugin  TrackCodec  WorkoutBuilder (JS processing port)

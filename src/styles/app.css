@@ -20,8 +20,9 @@
   --run: #f2672e;
   --cycle: #2f7df6;
   --ski: #8a63f0;
-  --live: #f5c518;
+  --hii: #f5c518;
   --view: #4b6584;
+  --live: var(--view);
   --accent: var(--run);
   --on-accent: #ffffff;
 
@@ -72,9 +73,10 @@
 [data-activity='walk'] { --accent: var(--walk); }
 [data-activity='run'] { --accent: var(--run); }
 [data-activity='cycle'] { --accent: var(--cycle); }
+[data-activity='hii'] { --accent: var(--hii); --on-accent: #1b1d1f; }
 [data-activity='ski'] { --accent: var(--ski); }
 [data-activity='view'] { --accent: var(--view); }
-[data-activity='live'] { --accent: var(--live); --on-accent: #1b1d1f; }
+[data-activity='live'] { --accent: var(--live); }
 
 /* ==========================================================================
    Base
@@ -901,7 +903,8 @@ main#view {
   transform: scale(0.98);
 }
 
-.live-tile {
+/* HII spans the grid; Live and View are short half-width buttons under the activities. */
+.wide-tile {
   grid-column: 1 / -1;
   min-height: 0;
   grid-template-columns: auto 1fr;
@@ -911,12 +914,35 @@ main#view {
   padding: 16px 18px;
 }
 
-.live-tile small {
+.wide-tile small {
   opacity: 0.75;
 }
 
-.live-tile::before {
+.wide-tile::before {
   background: rgb(0 0 0 / 0.06);
+}
+
+.mini-tile {
+  min-height: 0;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+}
+
+.mini-tile::before {
+  display: none;
+}
+
+.activity-tile.mini-tile svg {
+  width: 24px;
+  height: 24px;
+}
+
+.mini-tile strong {
+  font-size: 1.05rem;
 }
 
 .gps-chip {
@@ -1312,6 +1338,58 @@ main#view {
   text-overflow: ellipsis;
 }
 
+/* High-intensity intervals on the live screen: the current mode, time left and the next. */
+.hii-panel {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.hii-panel[hidden] {
+  display: none;
+}
+
+.hii-panel .goal-picker {
+  margin-top: 0;
+}
+
+.hii-now {
+  --mode: var(--walk);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mode) 16%, transparent);
+  border: 2px solid var(--mode);
+}
+
+.hii-now[data-mode='jog'] { --mode: var(--cycle); }
+.hii-now[data-mode='run'] { --mode: var(--run); }
+.hii-now[data-mode='sprint'] { --mode: var(--danger); }
+
+.hii-mode {
+  font-size: 1.35rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mode);
+}
+
+.hii-left {
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hii-next {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
 .goal-reset {
   border: 0;
   background: none;
@@ -1603,6 +1681,16 @@ main#view {
   margin-top: 12px;
   padding: 24px 8px 22px;
 }
+
+/* Interval modes: tiles on the Summary and bands on its elevation chart. */
+.hii-stat { --mode: var(--walk); border-top: 3px solid var(--mode); }
+.hii-stat[data-mode='jog'] { --mode: var(--cycle); }
+.hii-stat[data-mode='run'] { --mode: var(--run); }
+.hii-stat[data-mode='sprint'] { --mode: var(--danger); }
+.hii-band { opacity: 0.16; fill: var(--walk); }
+.hii-band.jog { fill: var(--cycle); }
+.hii-band.run { fill: var(--run); }
+.hii-band.sprint { fill: var(--danger); opacity: 0.24; }
 
 /* The plot area; labels are placed over it in % of its size. */
 .ele-plot {
@@ -2853,17 +2941,52 @@ a.stat.pb:active {
   white-space: nowrap;
 }
 
+.num-input {
+  width: 4.2em;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.hii-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.hii-grid label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.hii-grid label > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.hii-error {
+  color: var(--danger);
+  font-size: 0.88rem;
+}
+
 .text-input {
   width: min(180px, 45vw);
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg);
-}
-
-.view-tile svg {
-  width: 32px;
-  height: 32px;
 }
 
 .view-intro {

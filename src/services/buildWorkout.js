@@ -54,6 +54,8 @@ export function buildWorkout(text, idOverride, activityOverride) {
   };
   const prediction = predictionRecord(journal.goal);
   if (prediction) workout.prediction = prediction;
+  // The workout's high-intensity interval plans, as run (the HII status in the log).
+  if (journal.hii.length) workout.hii = journal.hii;
   return { workout, track, journal };
 }
 

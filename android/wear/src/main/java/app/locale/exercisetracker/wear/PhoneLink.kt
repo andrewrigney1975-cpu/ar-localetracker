@@ -27,11 +27,19 @@ data class PhoneStatus(
     /** Max and resting heart rate from the phone's profile, for zone colours; null without one. */
     val hrMax: Int? = null,
     val hrRest: Int = 60,
+    /** High-intensity intervals: the current mode, seconds left in it then, and the next mode. */
+    val hiiMode: String? = null,
+    val hiiLeftS: Int = 0,
+    val hiiNext: String? = null,
 ) {
     val active: Boolean get() = state == "recording" || state == "paused" || state == "autopaused"
 
     fun elapsedNow(): Long =
         elapsedMs + if (state == "recording") SystemClock.elapsedRealtime() - receivedAt else 0
+
+    /** Seconds left in the current interval, ticking down locally between updates. */
+    fun hiiLeftNow(): Int =
+        (hiiLeftS - if (state == "recording") ((SystemClock.elapsedRealtime() - receivedAt) / 1000).toInt() else 0).coerceAtLeast(0)
 }
 
 /** Messaging with the Locale phone app over the Wearable Data Layer, plus shared UI state. */
@@ -42,7 +50,7 @@ object PhoneLink {
     private const val START_GRACE_MS = 30_000L
     private const val PREFS = "locale_wear"
     private const val KEY_LAST_ACTIVITY = "lastActivity"
-    private val ACTIVITY_IDS = setOf("walk", "run", "cycle", "ski")
+    private val ACTIVITY_IDS = setOf("walk", "run", "hii", "cycle", "ski")
 
     val status = MutableStateFlow(PhoneStatus())
     val error = MutableStateFlow<String?>(null)
@@ -138,6 +146,9 @@ object PhoneLink {
             goalM = if (json.has("goalM")) json.optDouble("goalM") else null,
             hrMax = if (json.has("hrMax")) json.optInt("hrMax") else null,
             hrRest = json.optInt("hrRest", 60),
+            hiiMode = json.optString("hiiMode").ifEmpty { null },
+            hiiLeftS = json.optInt("hiiLeftS"),
+            hiiNext = json.optString("hiiNext").ifEmpty { null },
         )
         val prev = status.value
         status.value = next

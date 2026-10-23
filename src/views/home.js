@@ -39,18 +39,20 @@ export async function mount(root) {
           <div class="activity-grid">
             ${ACTIVITY_IDS.map((id) => {
               const a = ACTIVITIES[id];
-              return `<button class="activity-tile" data-activity="${id}" data-go="${id}">
+              // HII spans the screen, with what it does in place of the auto-pause note.
+              const note = id === 'hii' ? 'Walk, jog, run and sprint in random bouts, with a heads-up before each change.' : settings().autoPause[id] ? 'Auto-pause on' : 'Auto-pause off';
+              return `<button class="activity-tile${id === 'hii' ? ' wide-tile' : ''}" data-activity="${id}" data-go="${id}">
                 ${a.icon}
-                <span><strong>${a.label}</strong><small>${settings().autoPause[id] ? 'Auto-pause on' : 'Auto-pause off'}</small></span>
+                <span><strong>${a.label}</strong><small>${note}</small></span>
               </button>`;
             }).join('')}
-            <button class="activity-tile live-tile" data-activity="live" data-live>
+            <button class="activity-tile mini-tile" data-activity="live" data-live aria-label="Live: position, altitude, speed and heading; nothing is recorded">
               ${icons.locate}
-              <span><strong>Live</strong><small>Position, altitude, speed and heading. Nothing is recorded.</small></span>
+              <span><strong>Live</strong></span>
             </button>
-            <button class="activity-tile live-tile view-tile" data-activity="view" data-view>
+            <button class="activity-tile mini-tile" data-activity="view" data-view aria-label="View a course someone shared with you">
               ${icons.route}
-              <span><strong>View</strong><small>Open a course someone shared with you, on the map and in 3D.</small></span>
+              <span><strong>View</strong></span>
             </button>
           </div>
           <div data-slot="recent"></div>

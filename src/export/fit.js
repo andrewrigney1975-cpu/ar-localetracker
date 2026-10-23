@@ -22,7 +22,9 @@ const T = {
 
 // Global message numbers and enums from the FIT profile.
 const MESG = { fileId: 0, session: 18, lap: 19, record: 20, event: 21, activity: 34 };
-const SPORT = { walk: 11, run: 1, cycle: 2, ski: 13 };
+const SPORT = { walk: 11, run: 1, hii: 10, cycle: 2, ski: 13 };
+/** HII is sport training, sub-sport HIIT; everything else has no sub-sport. */
+const SUB_SPORT = { hii: 70 };
 const EVENT = { timer: 0, session: 8, lap: 9, activity: 26 };
 const EVENT_TYPE = { start: 0, stop: 1, stopAll: 4 };
 const LAP_TRIGGER_DISTANCE = 2;
@@ -286,7 +288,7 @@ export function toFIT(workout, track, { profile } = {}) {
     n ? semicircles(track.lat[0]) : null,
     n ? semicircles(track.lon[0]) : null,
     sport,
-    0,
+    SUB_SPORT[workout.activity] ?? 0,
     scaled((endMs - startMs) / 1000, 1000),
     scaled(sm.duration, 1000),
     scaled(sm.distance, 100),

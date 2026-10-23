@@ -51,7 +51,11 @@ private val ACCENT = mapOf(
     "run" to Color(0xFFF2672E),
     "cycle" to Color(0xFF2F7DF6),
     "ski" to Color(0xFF8A63F0),
+    "hii" to Color(0xFFF5C518),
 )
+/** Text on an activity colour: dark on HII's yellow, white on the others. */
+private fun onAccent(activity: String) = if (activity == "hii") Color(0xFF1B1D1F) else Color.White
+private val HII_LABELS = mapOf("walk" to "Walk", "jog" to "Jog", "run" to "Run", "sprint" to "Sprint")
 private val STOP_RED = Color(0xFFD93B3B)
 private val HEART = Color(0xFFFF5A6E)
 
@@ -115,12 +119,12 @@ private fun IdleScreen(error: String?, reachable: Boolean?, onStart: (String) ->
                     Button(onClick = onRetry, modifier = Modifier.fillMaxWidth(), label = { Text("Retry") })
                 }
             }
-            for ((id, label) in listOf("run" to "Run", "walk" to "Walk", "cycle" to "Cycle", "ski" to "Ski")) {
+            for ((id, label) in listOf("run" to "Run", "walk" to "Walk", "hii" to "HII", "cycle" to "Cycle", "ski" to "Ski")) {
                 item {
                     Button(
                         onClick = { onStart(id) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = ACCENT.getValue(id), contentColor = Color.White, iconColor = Color.White),
+                        colors = ButtonDefaults.buttonColors(containerColor = ACCENT.getValue(id), contentColor = onAccent(id), iconColor = onAccent(id)),
                         icon = { Icon(painterResource(R.drawable.ic_action_play), contentDescription = null) },
                         label = { Text("Start $label") },
                     )
@@ -200,12 +204,24 @@ private fun ActiveScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            Text(
-                if (!paused && goal != null) "${activityLabel(status.activity)} · ${(progress!! * 100).toInt()}% of ${formatGoal(goal, status.units)}"
-                else "${activityLabel(status.activity)} · ${stateLabel(status.state)}",
-                color = fg,
-                style = MaterialTheme.typography.labelMedium,
-            )
+            val hii = status.hiiMode
+            if (hii != null) {
+                // Intervals: the current mode and its time left in place of the activity line.
+                val left = status.hiiLeftNow()
+                Text(
+                    "${HII_LABELS[hii] ?: hii} %d:%02d".format(left / 60, left % 60) + (status.hiiNext?.let { " · ${HII_LABELS[it] ?: it} next" } ?: ""),
+                    color = ACCENT.getValue("hii"),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            } else {
+                Text(
+                    if (!paused && goal != null) "${activityLabel(status.activity)} · ${(progress!! * 100).toInt()}% of ${formatGoal(goal, status.units)}"
+                    else "${activityLabel(status.activity)} · ${stateLabel(status.state)}",
+                    color = fg,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
             Text(
                 formatDuration(now),
                 fontSize = 40.sp,
@@ -234,7 +250,7 @@ private fun ActiveScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilledIconButton(
                     onClick = if (paused) onResume else onPause,
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = accent, contentColor = Color.White),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = accent, contentColor = onAccent(status.activity)),
                     modifier = Modifier.size(52.dp),
                 ) {
                     Icon(
@@ -319,9 +335,10 @@ fun formatDistance(m: Double, units: String): String =
     if (units == "imperial") "%.2f mi".format(m / 1609.344) else "%.2f km".format(m / 1000)
 
 fun formatSpeed(mps: Double?, activity: String, units: String): String {
-    if (mps == null || mps < 0.3) return if (activity == "walk" || activity == "run") "--:--" else "0.0"
+    val pace = activity == "walk" || activity == "run" || activity == "hii"
+    if (mps == null || mps < 0.3) return if (pace) "--:--" else "0.0"
     val split = if (units == "imperial") 1609.344 else 1000.0
-    return if (activity == "walk" || activity == "run") {
+    return if (pace) {
         val secs = (split / mps).toInt()
         "%d:%02d /%s".format(secs / 60, secs % 60, if (units == "imperial") "mi" else "km")
     } else {

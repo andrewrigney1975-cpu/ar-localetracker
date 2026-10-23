@@ -10,7 +10,8 @@ import { describe, expect, it } from 'vitest';
 import { crc32, packTrack, toBase64 } from '../src/db/trackCodec.js';
 import { generateCalibratedCity2Surf } from '../src/seed/city2surf.js';
 import { buildWorkout } from '../src/services/buildWorkout.js';
-import { generateJournal } from '../src/tracker/synthetic.js';
+import { HII_SPEED, generateJournal } from '../src/tracker/synthetic.js';
+import { HII_DEFAULTS, hiiAt, makePlan } from '../src/hii/plan.js';
 
 const DIR = path.resolve(__dirname, '../android/app/src/test/resources/fixtures');
 
@@ -29,6 +30,17 @@ function messyRun() {
   return lines.map((l) => JSON.stringify(l)).join('\n') + '\n';
 }
 
+/** High-intensity intervals for 20 minutes, turned off at 15, the route following the plan. */
+function hiiWalk() {
+  const plan = makePlan({ durationS: 1200, ...HII_DEFAULTS, seed: 21 });
+  const speedAt = (s) => HII_SPEED[hiiAt({ ...plan, stopS: 900 }, s).mode] ?? 1.4;
+  const hii = [
+    { type: 'hii', at: 0, plan },
+    { type: 'hii', at: 900, stopS: 900 },
+  ];
+  return generateJournal({ activity: 'hii', seconds: 1500, seed: 15, stops: false, heartRate: true, cadence: 'watch', hii, speedAt }).text;
+}
+
 export const CASES = {
   'run-hr-pause': () => generateJournal({ activity: 'run', seconds: 1800, pauses: [[600, 90]], seed: 11, heartRate: true }).text,
   'walk-nobaro': () => generateJournal({ activity: 'walk', seconds: 1500, seed: 12, hasBarometer: false }).text,
@@ -38,6 +50,7 @@ export const CASES = {
   'messy-run': messyRun,
   // Watch cadence with a 2-minute gap that the phone's step counter fills.
   'walk-cadence': () => generateJournal({ activity: 'walk', seconds: 1500, seed: 14, heartRate: true, cadence: 'both' }).text,
+  hii: hiiWalk,
 };
 
 const SAMPLE = (n) => [0, Math.floor(n / 4), Math.floor(n / 2), Math.floor((3 * n) / 4), n - 1];
@@ -71,6 +84,7 @@ function expectedFor(text) {
     },
     trackBlob: toBase64(blob),
     trackCrc: crc32(blob),
+    ...(workout.hii ? { hii: workout.hii } : {}),
   };
 }
 
@@ -90,6 +104,7 @@ describe('JS ↔ Java processing fixtures', () => {
       const committed = JSON.parse(fs.readFileSync(expectedPath, 'utf8'));
       expect(committed.trackCrc).toBe(exp.trackCrc);
       expect(committed.summary).toEqual(JSON.parse(JSON.stringify(exp.summary)));
+      expect(committed.hii).toEqual(exp.hii);
     });
   }
 });

@@ -15,6 +15,8 @@ import { settings, updateSettings } from '../settings.js';
 import { estimateCalories, loadLabel, profileComplete, trimp, ZONES, zoneSeconds } from '../stats/physio.js';
 import { rejectedText, VO2_ACTIVITIES, workoutVo2max } from '../stats/vo2max.js';
 import { significantExtremes } from '../stats/extremes.js';
+import { boutsRun, intervalTotals } from '../stats/hii.js';
+import { HII_LABELS } from '../hii/plan.js';
 import { computeSplits } from '../stats/summary.js';
 import { confirmDialog, openDialog } from '../ui/dialog.js';
 import { Disposer, el, escapeHtml } from '../ui/dom.js';
@@ -435,18 +437,42 @@ function renderSummary(panel, w, track, units) {
     );
   }
   const effort = effortHTML(w, track);
+  const bouts = w.hii?.length ? boutsRun(w.hii, track, w.activeIntervals ?? []) : [];
   panel.innerHTML = `
     <div class="page">
       <div class="stat-grid num" style="margin-top:12px">${rows.join('')}</div>
       ${goalHTML(w, units)}
+      ${intervalsHTML(w, bouts, units)}
       ${effort.html}
       ${weatherHTML(w, units)}
-      <div class="card mini-profile">${miniProfileHTML(track, units)}</div>
+      <div class="card mini-profile">${miniProfileHTML(track, units, bouts)}</div>
       ${effort.notes}
       ${weatherNoteHTML(w)}
       ${w.notes ? `<div class="card notes">${escapeHtml(w.notes)}</div>` : ''}
       <p class="about">Altitude source: ${sm.hasBarometer ? 'barometer anchored to GPS' : 'GPS only'} · ${sm.pointCount.toLocaleString()} points${sm.segments > 1 ? ` · ${sm.segments} segments` : ''}${w.device ? ` · ${escapeHtml(w.device)}` : ''}</p>
     </div>`;
+}
+
+/**
+ * High-intensity intervals as run: a tile per mode with its average pace (or speed) and its
+ * time over how many bouts, so it shows whether the sprints were sprints.
+ */
+function intervalsHTML(w, bouts, units) {
+  const totals = intervalTotals(bouts);
+  if (!totals.length) return '';
+  const pace = (settings().liveSpeedMode[w.activity] ?? activityProfile(w.activity).liveSpeedMode) === 'pace';
+  const tiles = totals.map((t) => {
+    const value = pace ? formatPace(t.speed, units, false) : speedValue(t.speed, units).toFixed(1);
+    return `<div class="stat hii-stat" data-mode="${t.mode}"><label>${HII_LABELS[t.mode]}</label><div class="value">${value}<small>${pace ? paceUnit(units) : speedUnit(units)}</small></div>
+      <small class="stat-note">${formatDuration(Math.round(t.seconds))} in ${t.bouts} bout${t.bouts === 1 ? '' : 's'}</small></div>`;
+  });
+  const p = w.hii[w.hii.length - 1];
+  const ran = totals.reduce((s, t) => s + t.seconds, 0);
+  const planned = w.hii.reduce((s, x) => s + x.durationS, 0);
+  const how = [w.hii.some((x) => x.stopS != null) ? 'turned off part-way' : '', ran < planned && p.stopS == null ? 'the workout ended first' : ''].filter(Boolean).join('; ');
+  return `<div class="section-title">Intervals</div>
+    <div class="stat-grid num">${tiles.join('')}</div>
+    <p class="about">${formatDuration(Math.round(ran))} of intervals at ${['walk', 'jog', 'run', 'sprint'].map((m) => `${HII_LABELS[m].toLowerCase()} ${p.shares[m]}%`).join(', ')}${how ? ` (${how})` : ''}. Bands on the elevation chart show each bout.</p>`;
 }
 
 /** Weather at the start (services/weather.js): conditions, temperature, feels like and wind. */
@@ -567,7 +593,7 @@ function vo2AboutText(r) {
  * text isn't stretched) on the significant highs and lows (stats/extremes.js). Labels of the
  * same kind that would overlap keep the one with the bigger swing.
  */
-function miniProfileHTML(track, units) {
+function miniProfileHTML(track, units, bouts = []) {
   const W = 300;
   const H = 100;
   if (track.n < 2) return '';
@@ -598,11 +624,16 @@ function miniProfileHTML(track, units) {
     .map((p) => {
       // Keep the text inside the card at either end.
       const align = p.px < 8 ? 'start' : p.px > 92 ? 'end' : 'mid';
-      return `<span class="ele-mark ${p.type} ${align}" style="left:${p.px.toFixed(2)}%;top:${p.py.toFixed(2)}%"><b class="num">${Math.round(altitudeValue(p.alt, units)).toLocaleString().replace('-', '−')} ${altitudeUnit(units)}</b></span>`;
+      return `<span class="ele-mark ${p.type} ${align}" style="left:${p.px.toFixed(2)}%;top:${p.py.toFixed(2)}%"><b class="num">${(Math.round(altitudeValue(p.alt, units)) || 0).toLocaleString().replace('-', '−')} ${altitudeUnit(units)}</b></span>`;
     })
+    .join('');
+  // Interval bouts as bands behind the profile.
+  const bands = bouts
+    .map((b) => `<rect class="hii-band ${b.mode}" x="${((b.fromM / total) * W).toFixed(2)}" y="0" width="${Math.max(0.3, ((b.toM - b.fromM) / total) * W).toFixed(2)}" height="${H}"/>`)
     .join('');
   return `<div class="ele-plot">
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Elevation profile">
+        ${bands}
         <polygon points="0,${H} ${pts.join(' ')} ${W},${H}" fill="var(--accent)" opacity="0.18"/>
         <polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/>
       </svg>

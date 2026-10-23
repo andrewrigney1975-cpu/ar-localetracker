@@ -37,7 +37,7 @@ import { distanceUnit, distanceValue, formatDate, formatDuration, formatPace, M_
 
 // Stack and legend order: keeps cycle (blue) and ski (violet) apart, which are hard to tell
 // apart side by side with red-green colour blindness.
-const STACK_ORDER = ['cycle', 'run', 'walk', 'ski'];
+const STACK_ORDER = ['cycle', 'run', 'hii', 'walk', 'ski'];
 
 const GROUP_LABELS = { day: 'Daily', week: 'Weekly', month: 'Monthly', quarter: 'Every 3 months', year: 'Yearly' };
 

@@ -10,7 +10,7 @@ import org.json.JSONObject;
  * activities' goals added up. A day or month goal counts as its share of a week.
  */
 final class WeekGoal {
-    private static final String[] ACTIVITIES = { "walk", "run", "cycle", "ski" };
+    private static final String[] ACTIVITIES = { "walk", "run", "hii", "cycle", "ski" };
     private static final double M_PER_MI = 1609.344;
 
     private WeekGoal() {}

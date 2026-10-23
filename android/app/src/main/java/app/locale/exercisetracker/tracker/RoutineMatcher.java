@@ -153,12 +153,23 @@ final class RoutineMatcher {
 
     /** The stored route of one routine, for RouteGuard after a service restart. */
     static JSONArray signatureOf(JSONObject model, String activity, String routineId) {
+        JSONObject r = routineOf(model, activity, routineId);
+        return r != null ? r.optJSONArray("signature") : null;
+    }
+
+    /** A routine's usual duration in seconds (medianS), or 0. */
+    static int medianSOf(JSONObject model, String activity, String routineId) {
+        JSONObject r = routineOf(model, activity, routineId);
+        return r != null ? r.optInt("medianS", 0) : 0;
+    }
+
+    private static JSONObject routineOf(JSONObject model, String activity, String routineId) {
         JSONObject acts = model != null ? model.optJSONObject("activities") : null;
         JSONObject a = acts != null ? acts.optJSONObject(activity) : null;
         JSONArray routines = a != null ? a.optJSONArray("routines") : null;
-        for (int i = 0; routines != null && i < routines.length(); i++) {
+        for (int i = 0; routineId != null && routines != null && i < routines.length(); i++) {
             JSONObject r = routines.optJSONObject(i);
-            if (routineId.equals(r.optString("id"))) return r.optJSONArray("signature");
+            if (r != null && routineId.equals(r.optString("id"))) return r;
         }
         return null;
     }

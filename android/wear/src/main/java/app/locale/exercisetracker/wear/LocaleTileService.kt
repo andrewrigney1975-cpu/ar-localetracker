@@ -24,6 +24,7 @@ class LocaleTileService : TileService() {
             "run" to 0xFFF2672E.toInt(),
             "cycle" to 0xFF2F7DF6.toInt(),
             "ski" to 0xFF8A63F0.toInt(),
+            "hii" to 0xFFF5C518.toInt(),
         )
     }
 
@@ -113,7 +114,7 @@ class LocaleTileService : TileService() {
         return column(
             text("Locale", 18f, accent, bold = true),
             text("Phone records GPS", 12f, 0xFFB0BAC4.toInt()),
-            pill("Start ${activityLabel(activity).lowercase()}", accent, launch(activity)),
+            pill("Start ${activityLabel(activity).let { if (activity == "hii") it else it.lowercase() }}", accent, launch(activity)),
             text("More activities in app", 11f, 0xFF8B97A3.toInt()),
         )
     }

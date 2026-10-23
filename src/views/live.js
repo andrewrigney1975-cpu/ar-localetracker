@@ -9,12 +9,13 @@ import { verticalThreshold } from '../stats/summary.js';
 import { parseJournal } from '../tracker/journal.js';
 import { GOAL_STEPS } from '../voice/coach.js';
 import { getRoutineModel } from '../insights/model.js';
-import { predictGoal } from '../insights/routines.js';
+import { displayName, predictGoal, routineUsualS } from '../insights/routines.js';
+import { HII_LABELS, MIN_PLAN_S, hiiAt } from '../hii/plan.js';
 
-const PLURAL = { walk: 'walks', run: 'runs', cycle: 'rides', ski: 'ski days' };
+const PLURAL = { walk: 'walks', run: 'runs', hii: 'HII workouts', cycle: 'rides', ski: 'ski days' };
 const FIX_MAX_AGE_MS = 120000;
 import { tracker } from '../tracker/client.js';
-import { choiceDialog, confirmDialog } from '../ui/dialog.js';
+import { choiceDialog, confirmDialog, openDialog } from '../ui/dialog.js';
 import { Disposer, el, escapeHtml } from '../ui/dom.js';
 import { icons } from '../ui/icons.js';
 import { toast } from '../ui/toast.js';
@@ -33,6 +34,41 @@ import {
 } from '../units.js';
 
 const HOLD_MS = 1000;
+/** HII length steps on the start screen and in the prompt (minutes). */
+const HII_STEP_MIN = 5;
+const HII_MAX_MIN = 240;
+
+/** Ask how long an HII workout without a routine will be; resolves minutes, or null to cancel. */
+function askHiiMinutes(initial) {
+  return openDialog((dlg, close) => {
+    let min = initial;
+    dlg.innerHTML = `
+      <h2>How long is this workout?</h2>
+      <p>No usual routine yet, so the walk, jog, run and sprint times are shared out over your estimate.</p>
+      <div class="goal-picker">
+        <button class="icon-btn" data-step="-1" aria-label="Shorter">−</button>
+        <span class="goal-value"><small>Intervals</small><b data-ref="min"></b></span>
+        <button class="icon-btn" data-step="1" aria-label="Longer">+</button>
+      </div>
+      <div class="actions"><button class="btn ghost" data-v="cancel">Cancel</button><button class="btn primary" data-v="start" autofocus>Start</button></div>`;
+    const show = () => {
+      dlg.querySelector('[data-ref="min"]').innerHTML = `${min}<small>min</small>`;
+      dlg.querySelector('[data-step="-1"]').disabled = min <= HII_STEP_MIN;
+    };
+    dlg.querySelectorAll('[data-step]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const dir = Number(b.dataset.step);
+        // To the next whole step from wherever it is (32 → 35 or 30).
+        const next = dir > 0 ? Math.floor(min / HII_STEP_MIN + 1e-9) * HII_STEP_MIN + HII_STEP_MIN : Math.ceil(min / HII_STEP_MIN - 1e-9) * HII_STEP_MIN - HII_STEP_MIN;
+        min = Math.max(HII_STEP_MIN, Math.min(HII_MAX_MIN, next));
+        show();
+      })
+    );
+    dlg.querySelector('[data-v="cancel"]').addEventListener('click', () => close(null));
+    dlg.querySelector('[data-v="start"]').addEventListener('click', () => close(min));
+    show();
+  });
+}
 
 /** Incremental hysteresis climb counter (same algorithm as stats/summary.js). */
 class ClimbCounter {
@@ -122,6 +158,7 @@ export async function mount(root, params, _query, ctx) {
           </div>
           <div>
             <div class="goal-picker" data-ref="goal" hidden></div>
+            <div class="hii-panel" data-ref="hii" hidden></div>
             <div class="live-controls" data-ref="controls"></div>
             <div class="live-hint" data-ref="hint"></div>
           </div>
@@ -144,6 +181,7 @@ export async function mount(root, params, _query, ctx) {
 
   function renderTimer() {
     ref.elapsed.textContent = formatDuration(elapsedMs() / 1000);
+    if (status.hii) renderHii();
     const fresh = heart && performance.now() - heart.at < 15000;
     ref.hr.hidden = !fresh;
     if (fresh) ref.hrValue.textContent = String(heart.bpm);
@@ -328,8 +366,108 @@ export async function mount(root, params, _query, ctx) {
     });
   }
 
+  // ---- High-intensity intervals (src/hii/plan.js) ---------------------------------------
+  /** Length chosen with −/+ on the start screen: this workout only (minutes). */
+  let hiiOverrideMin = null;
+  let hiiHtml = '';
+  const hiiRoutine = (routineId) => Boolean(routineId && settings().hii.routines?.[routineId]);
+  /** The routine this start would most likely be, from the time and the warm-up fix. */
+  const readyRoutine = () => {
+    const p = autoPrediction();
+    return p.routineId ? p : null;
+  };
+  const usualMin = (routineId) => {
+    const sec = routineUsualS(routineModel, act.id, routineId);
+    return sec > 0 ? Math.max(Math.ceil(MIN_PLAN_S / 60), Math.round(sec / 60)) : null;
+  };
+  /** Before the start: intervals for an HII workout or a routine set to run as intervals. */
+  function hiiStart() {
+    const r = readyRoutine();
+    if (act.id !== 'hii' && !hiiRoutine(r?.routineId)) return null;
+    return { routine: r, usual: r ? usualMin(r.routineId) : null };
+  }
+
+  function renderHii() {
+    const box = ref.hii;
+    let html = '';
+    if (phase === 'ready') {
+      const h = hiiStart();
+      if (h) {
+        const min = hiiOverrideMin ?? h.usual;
+        const sub = hiiOverrideMin != null
+          ? '<button class="goal-reset" data-hii-reset>This workout · use usual</button>'
+          : h.usual ? escapeHtml(`usual ${displayName(h.routine.name)}`) : 'you set the length when you start';
+        html = min
+          ? `<div class="goal-picker"><button class="icon-btn" data-hii-step="-1" aria-label="Shorter intervals" ${min <= HII_STEP_MIN ? 'disabled' : ''}>−</button>
+              <span class="goal-value"><small>Intervals</small><b>${min}<small>min</small></b><span class="goal-sub">${sub}</span></span>
+              <button class="icon-btn" data-hii-step="1" aria-label="Longer intervals">+</button></div>`
+          : `<div class="goal-picker"><span class="goal-value"><small>Intervals</small><b>–</b><span class="goal-sub">${sub}</span></span></div>`;
+      }
+    } else if (phase !== 'saving') {
+      const plan = status.hii?.items ? status.hii : null;
+      const routineId = status.goal?.routineId ?? null;
+      const at = plan ? hiiAt(plan, elapsedMs() / 1000) : null;
+      if (at && !at.done && at.mode) {
+        html = `<div class="hii-now" data-mode="${at.mode}"><span class="hii-mode" data-h="mode"></span><span class="hii-left num" data-h="left"></span><span class="hii-next" data-h="next"></span></div>
+          <button class="chip" data-hii-toggle="off">Stop intervals</button>`;
+      } else if (plan || act.id === 'hii' || routineId) {
+        const said = !plan ? '' : plan.stopS != null ? 'Intervals stopped' : 'Intervals complete';
+        html = `${said ? `<span class="dim">${said}</span>` : ''}<button class="chip" data-hii-toggle="on">${plan ? 'Restart intervals' : 'Start intervals'}</button>`;
+      }
+    }
+    box.hidden = !html;
+    if (html !== hiiHtml) {
+      hiiHtml = html;
+      box.innerHTML = html;
+      box.querySelectorAll('[data-hii-step]').forEach((b) =>
+        b.addEventListener('click', () => {
+          const dir = Number(b.dataset.hiiStep);
+          const cur = hiiOverrideMin ?? hiiStart()?.usual ?? settings().hii.durationMin;
+          const next = dir > 0 ? Math.floor(cur / HII_STEP_MIN + 1e-9) * HII_STEP_MIN + HII_STEP_MIN : Math.ceil(cur / HII_STEP_MIN - 1e-9) * HII_STEP_MIN - HII_STEP_MIN;
+          hiiOverrideMin = Math.max(HII_STEP_MIN, Math.min(HII_MAX_MIN, next));
+          renderHii();
+        })
+      );
+      box.querySelector('[data-hii-reset]')?.addEventListener('click', () => {
+        hiiOverrideMin = null;
+        renderHii();
+      });
+      box.querySelector('[data-hii-toggle]')?.addEventListener('click', (e) => toggleHii(e.currentTarget.dataset.hiiToggle === 'on'));
+    }
+    // The current interval ticks without rebuilding the buttons.
+    const now = box.querySelector('.hii-now');
+    if (now) {
+      const at = hiiAt(status.hii, elapsedMs() / 1000);
+      now.dataset.mode = at.mode;
+      now.querySelector('[data-h="mode"]').textContent = HII_LABELS[at.mode];
+      now.querySelector('[data-h="left"]').textContent = formatDuration(Math.ceil(at.leftS));
+      now.querySelector('[data-h="next"]').textContent = at.next ? `then ${HII_LABELS[at.next].toLowerCase()}` : 'last one';
+    }
+  }
+
+  /**
+   * Intervals on or off mid-workout. On a routine (not an HII workout), this also sets the
+   * routine to run as intervals from now on, or stops it doing so.
+   */
+  async function toggleHii(on) {
+    const routineId = status.goal?.routineId ?? null;
+    const name = status.goal?.name;
+    if (act.id !== 'hii' && routineId) {
+      const h = settings().hii;
+      const routines = { ...h.routines };
+      if (on) routines[routineId] = true;
+      else delete routines[routineId];
+      await updateSettings({ hii: { ...h, routines } });
+    }
+    const elapsedS = Math.floor(elapsedMs() / 1000);
+    const left = routineUsualS(routineModel, act.id, routineId) - elapsedS;
+    await tracker.setHii(on, left >= MIN_PLAN_S ? left : settings().hii.durationMin * 60);
+    if (act.id !== 'hii' && routineId && name) toast(on ? `Intervals on, and for your ${name} from now on` : `Intervals off, and for your ${name} from now on`);
+  }
+
   function renderControls() {
     renderGoal();
+    renderHii();
     const c = ref.controls;
     c.replaceChildren();
     if (phase === 'ready') {
@@ -407,6 +545,16 @@ export async function mount(root, params, _query, ctx) {
     if (busy) return;
     busy = true;
     try {
+      // Intervals without a routine: ask how long, and remember it for starts from the watch or a widget.
+      let hiiS = null;
+      const hii = hiiStart();
+      if (hii && hiiOverrideMin != null) hiiS = hiiOverrideMin * 60;
+      else if (hii && !hii.usual) {
+        const min = await askHiiMinutes(settings().hii.durationMin);
+        if (min == null) return;
+        await updateSettings({ hii: { ...settings().hii, durationMin: min } });
+        hiiS = min * 60;
+      }
       if (!(await ensurePermissions()) || !(await checkDevice())) return;
       const workoutId = newWorkoutId();
       const fix = freshFix();
@@ -417,6 +565,7 @@ export async function mount(root, params, _query, ctx) {
         units,
         ...(goalOverride != null && settings().voice.goalMode[act.id] === 'auto' ? { goalM: goalOverride } : {}),
         ...(fix ? { fix } : {}),
+        ...(hiiS ? { hiiS } : {}),
       });
       climb.reset();
       phase = 'recording';
@@ -473,7 +622,11 @@ export async function mount(root, params, _query, ctx) {
       if (ev.state === 'idle' && phase !== 'ready') return; // stray warm-up fix
       status = { ...status, ...ev, last: ev.last ?? status.last };
       statusAt = performance.now();
-      if (phase === 'ready') renderGoal(); // the warm-up fix can place the user at a routine
+      if (phase === 'ready') {
+        // The warm-up fix can place the user at a routine.
+        renderGoal();
+        renderHii();
+      }
       if (phase === 'recording' && ev.last) climb.push(ev.last.altitude);
       renderMetrics();
       renderTimer();
@@ -515,6 +668,19 @@ export async function mount(root, params, _query, ctx) {
     })
   );
   d.add(() => clearTimeout(captionTimer));
+  d.add(
+    tracker.on('hii', (plan) => {
+      status = { ...status, hii: plan?.items ? plan : null };
+      renderHii();
+    })
+  );
+  d.add(
+    tracker.on('goal', (ev) => {
+      // The routine decides whether the Start intervals button shows.
+      if (ev.goalM) status = { ...status, goal: ev };
+      renderHii();
+    })
+  );
   d.add(
     tracker.on('hr', (ev) => {
       heart = { bpm: ev.bpm, at: performance.now() };
@@ -599,6 +765,7 @@ export async function mount(root, params, _query, ctx) {
     .then((m) => {
       routineModel = m;
       renderGoal();
+      renderHii();
     })
     .catch(() => {});
   return () => d.dispose();

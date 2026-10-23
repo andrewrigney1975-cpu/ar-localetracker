@@ -15,6 +15,7 @@ import android.os.VibratorManager
  * - countdown (metres to go): one quick tap
  * - goal set: one short tap
  * - off route: two long taps
+ * - interval (a change of walk, jog, run or sprint coming up): four quick taps
  */
 object Buzz {
     private const val MAX = 255
@@ -28,6 +29,7 @@ object Buzz {
         "goal-set" -> longArrayOf(0, 90)
         "countdown" -> longArrayOf(0, 50)
         "off-route" -> longArrayOf(0, 260, 180, 260)
+        "interval" -> longArrayOf(0, 60, 70, 60, 70, 60, 70, 60)
         else -> longArrayOf(0, 120)
     }
 

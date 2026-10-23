@@ -27,7 +27,7 @@ public class VoiceCoachTest {
     @Test
     public void replaysSharedScenarios() throws Exception {
         JSONArray scenarios = fixture();
-        assertEquals(7, scenarios.length());
+        assertEquals(9, scenarios.length());
         for (int s = 0; s < scenarios.length(); s++) {
             JSONObject sc = scenarios.getJSONObject(s);
             JSONObject c = sc.getJSONObject("cfg");
@@ -44,11 +44,15 @@ public class VoiceCoachTest {
             VoiceCoach coach = new VoiceCoach(cfg);
             JSONArray sync = sc.optJSONArray("sync");
             if (sync != null) coach.syncTo(sync.getDouble(0), sync.getLong(1));
+            JSONArray plan = sc.optJSONArray("plan");
+            if (plan != null) coach.setPlan(HiiPlan.fromJson(plan.getJSONObject(0)), plan.getLong(1));
+            long stopS = sc.has("stopS") ? sc.getLong("stopS") : -1;
 
             List<String> said = new ArrayList<>();
             JSONArray samples = sc.getJSONArray("samples");
             for (int i = 0; i < samples.length(); i++) {
                 JSONArray p = samples.getJSONArray(i);
+                if (stopS >= 0 && p.getLong(1) >= stopS * 1000 && coach.plan.stopS < 0) coach.stopPlan(stopS);
                 String text = coach.onProgress(p.getDouble(0), p.getLong(1));
                 if (text != null) said.add(i + ": " + text);
             }

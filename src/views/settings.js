@@ -8,6 +8,7 @@ import { segmented } from '../ui/segmented.js';
 import { toast } from '../ui/toast.js';
 import { App } from '@capacitor/app';
 import { INTERVAL_OPTIONS, spokenAverage, spokenDistance } from '../voice/coach.js';
+import { HII_LABELS, HII_MODES, validateHii } from '../hii/plan.js';
 
 const GOAL_MODES = ['auto', 'set', 'off'];
 const GOAL_LABELS = { auto: 'Auto goal', set: 'Set goal', off: 'Goal' };
@@ -93,7 +94,7 @@ export async function mount(root) {
                 ${segmented('voice.duck', [['true', 'Lower'], ['false', 'Pause']], String(s.voice.duck))}</div>
               <label class="setting"><span class="text">Always loud<small>Turns the media volume up to full while Locale speaks, then back to where it was</small></span>
                 <input type="checkbox" class="switch" data-toggle="loud" ${s.voice.loud ? 'checked' : ''} /></label>
-              <label class="setting"><span class="text">Vibrate the watch<small>A buzz on your Wear OS watch with each announcement: two taps for a split, one for time, three for a goal milestone</small></span>
+              <label class="setting"><span class="text">Vibrate the watch<small>A buzz on your Wear OS watch with each announcement: two taps for a split, one for time, three for a goal milestone, four quick ones before an interval change</small></span>
                 <input type="checkbox" class="switch" data-toggle="watchBuzz" ${s.voice.watchBuzz ? 'checked' : ''} /></label>
               <label class="setting"><span class="text">Say the goal at the start<small>For example "Goal 4.7 kilometres, your usual Saturday morning loop"</small></span>
                 <input type="checkbox" class="switch" data-toggle="confirmGoal" ${s.voice.confirmGoal ? 'checked' : ''} /></label>
@@ -101,6 +102,18 @@ export async function mount(root) {
                 <input type="checkbox" class="switch" data-toggle="countdown" ${s.voice.countdown ? 'checked' : ''} /></label>
               <div class="setting"><div class="text">Splits every ${imperial ? 'mile' : 'kilometre'}; goal at 25, 50, 75 and 100%<small>Auto goal: learned from your usual routes and times. Set goal: the distance chosen on the start screen. Tap a goal chip to switch. Your routines and their own announcements are under You.</small></div>
                 <button class="btn ghost" data-act="voicetest">Test</button></div>
+            </div>
+
+            <div class="section-title">High-intensity intervals</div>
+            <div class="card settings-group" data-activity="hii">
+              <div class="setting stack"><div class="text">Time in each<small>Shares of the workout, adding up to 100%</small></div>
+                <div class="hii-grid">${HII_MODES.map((m) => `<label><span>${HII_LABELS[m]}</span><span><input type="number" class="num-input" inputmode="numeric" min="0" max="100" step="5" data-hii-share="${m}" value="${s.hii.shares[m]}" />%</span></label>`).join('')}</div></div>
+              <div class="setting stack"><div class="text">Bout lengths<small>Shortest and longest of each, in seconds; every HII workout uses these</small></div>
+                <div class="hii-grid">${HII_MODES.map((m) => `<label><span>${HII_LABELS[m]}</span><span><input type="number" class="num-input" inputmode="numeric" min="5" step="5" data-hii-bout="${m}.0" value="${s.hii.bouts[m][0]}" aria-label="${HII_LABELS[m]} shortest" />–<input type="number" class="num-input" inputmode="numeric" min="5" step="5" data-hii-bout="${m}.1" value="${s.hii.bouts[m][1]}" aria-label="${HII_LABELS[m]} longest" />s</span></label>`).join('')}</div></div>
+              <label class="setting"><span class="text">Length without a routine<small>Asked when you start; used as it is for starts from the watch or a widget</small></span>
+                <span class="nowrap"><input type="number" class="num-input" inputmode="numeric" min="5" max="240" step="5" data-hii-duration value="${s.hii.durationMin}" /> min</span></label>
+              <div class="setting"><div class="text">How it runs<small>A matched routine sets the length. The order is random, but every run or sprint is followed by a walk, so a sprint never follows a run. Ten seconds before each change: "Get ready to sprint in 10 seconds, for 30 seconds." Set a routine to run as intervals under You, or from the live screen.</small></div></div>
+              <div class="setting hii-error" data-hii-error hidden></div>
             </div>
 
             <div class="section-title">Maps</div>
@@ -213,6 +226,24 @@ export async function mount(root) {
       const v = settings().voice;
       tracker.speak(text, v.duck, v.watchBuzz ? 'split' : null, v.loud).catch((e) => toast(e?.message ?? 'Text-to-speech is not available'));
     });
+    // Interval settings save when they make sense together; otherwise say what is wrong.
+    const saveHii = async () => {
+      const h = settings().hii;
+      const shares = { ...h.shares };
+      const bouts = { ...h.bouts };
+      root.querySelectorAll('[data-hii-share]').forEach((i) => (shares[i.dataset.hiiShare] = Math.round(Number(i.value) || 0)));
+      root.querySelectorAll('[data-hii-bout]').forEach((i) => {
+        const [m, k] = i.dataset.hiiBout.split('.');
+        bouts[m] = k === '0' ? [Math.round(Number(i.value) || 0), bouts[m][1]] : [bouts[m][0], Math.round(Number(i.value) || 0)];
+      });
+      const durationMin = Math.max(5, Math.min(240, Math.round(Number(root.querySelector('[data-hii-duration]').value) || h.durationMin)));
+      const err = validateHii({ shares, bouts });
+      const box = root.querySelector('[data-hii-error]');
+      box.hidden = !err;
+      box.textContent = err ?? '';
+      if (!err) await updateSettings({ hii: { ...h, shares, bouts, durationMin } });
+    };
+    root.querySelectorAll('[data-hii-share], [data-hii-bout], [data-hii-duration]').forEach((i) => i.addEventListener('change', saveHii));
     root.querySelector('[data-act="battery"]')?.addEventListener('click', () => tracker.requestIgnoreBatteryOptimizations());
     root.querySelector('[data-act="appsettings"]').addEventListener('click', () => tracker.openAppSettings());
     if (tracker.isNative) {

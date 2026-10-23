@@ -50,6 +50,8 @@ public final class WorkoutBuilder {
                     return new Profile("cycle", "Cycle", 30, 30, 1.0, 2);
                 case "ski":
                     return new Profile("ski", "Ski", 30, 45, 1.0, 4);
+                case "hii":
+                    return new Profile("hii", "HII", 25, 9, 0.4, 1.5);
                 default:
                     return new Profile("run", "Run", 25, 9, 0.8, 1.5);
             }
@@ -82,6 +84,8 @@ public final class WorkoutBuilder {
         final List<double[]> cad = new ArrayList<>(); // [t, spm, src (1 watch, 2 phone)]
         JSONObject end;
         JSONObject goal;
+        /** Interval plans in the order they started, each with stopS when turned off (journal.js). */
+        final JSONArray hii = new JSONArray();
     }
 
     private static Double num(JSONObject o, String k) {
@@ -153,6 +157,17 @@ public final class WorkoutBuilder {
                 case "goal":
                     if (o.optDouble("goalM", 0) > 0) j.goal = o;
                     break;
+                case "hii": {
+                    JSONObject plan = o.optJSONObject("plan");
+                    JSONObject last = j.hii.length() > 0 ? j.hii.optJSONObject(j.hii.length() - 1) : null;
+                    try {
+                        if (plan != null && plan.optJSONArray("items") != null) j.hii.put(new JSONObject(plan.toString()));
+                        else if (o.has("stopS") && last != null && !last.has("stopS")) last.put("stopS", o.getDouble("stopS"));
+                    } catch (JSONException ignored) {
+                        // a malformed line is skipped, as a torn one
+                    }
+                    break;
+                }
                 default:
                     break;
             }
@@ -1042,6 +1057,8 @@ public final class WorkoutBuilder {
         w.put("preview", previewPolyline(p.track, 120));
         JSONObject prediction = predictionRecord(journal.goal);
         if (prediction != null) w.put("prediction", prediction);
+        // The workout's high-intensity interval plans, as run (the HII status in the log).
+        if (journal.hii.length() > 0) w.put("hii", journal.hii);
         return new Built(w, p.track);
     }
 }
