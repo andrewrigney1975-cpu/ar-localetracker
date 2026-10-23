@@ -325,6 +325,9 @@ public class LocaleTrackerPlugin extends Plugin {
         // auto goal can be decided straight away.
         Double goalM = call.getDouble("goalM");
         if (goalM != null && goalM > 0) i.putExtra(TrackingService.EXTRA_GOAL_M, goalM.doubleValue());
+        // HII: the plan's length chosen on the start screen.
+        Integer hiiS = call.getInt("hiiS");
+        if (hiiS != null && hiiS > 0) i.putExtra(TrackingService.EXTRA_HII_S, hiiS.intValue());
         JSObject fix = call.getObject("fix");
         if (fix != null && fix.has("lat") && fix.has("lon")) {
             i.putExtra(TrackingService.EXTRA_FIX_LAT, fix.optDouble("lat"))
@@ -341,6 +344,14 @@ public class LocaleTrackerPlugin extends Plugin {
         JSObject o = new JSObject();
         o.put("workoutId", workoutId);
         call.resolve(o);
+    }
+
+    /** High-intensity intervals on (a new plan of durationS from now) or off, mid-workout. */
+    @PluginMethod
+    public void setHii(PluginCall call) {
+        TrackingService svc = TrackingService.get();
+        if (svc != null) svc.requestHii(Boolean.TRUE.equals(call.getBoolean("on", false)), call.getInt("durationS", 0));
+        call.resolve();
     }
 
     @PluginMethod

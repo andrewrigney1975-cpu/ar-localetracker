@@ -353,7 +353,29 @@ tracked the average reported accuracy (r = 0.93) and the satellite count (r = �
 
 ---
 
-## 12. High-intensity interval (HII) workouts
+## 12. High-intensity interval (HII) workouts: ✅ done (October 2026)
+
+> Built as a fifth activity, `hii` (between run and cycle; yellow, Live's old colour, with
+> Live now View's slate). The home screen shows it as a full-width button; Live and View
+> became short half-width buttons. Answers to the questions below (2026-10-23):
+> 1. **Length:** the matched routine's usual (median) duration; without a routine the app
+>    asks for an estimate when you start and remembers it (Settings → High-intensity
+>    intervals → Length without a routine), which watch and widget starts use. If the
+>    workout runs past the plan, *"Intervals complete."* and nothing more.
+> 2. **Bout lengths:** a shortest and longest per mode in Settings, used by every HII plan;
+>    short bouts are spoken in seconds ("for 30 seconds").
+> 3. **Routines:** HII applies to "this" instance of a routine and later ones until turned
+>    off (the Intervals chip in You → Learned routines, or Start/Stop intervals on the live
+>    screen, which also sets the routine). No change to past workouts. The plan (and any
+>    stop) is written to the workout's journal as `hii` lines and kept on the workout.
+> 4. **Activity:** its own activity, with run-like gating and walk-like stillness, its own
+>    goals and Insights filter, FIT sport training / sub-sport HIIT.
+>
+> `src/hii/plan.js` (`planIntervals`, seeded mulberry32) ⇄ `HiiPlan.java` with the shared
+> fixture `hii.json`; announcements in `voice/coach.js` ⇄ `VoiceCoach.java` (`voice.json`
+> scenarios `hii-*`); `TrackingService` checks every second while a plan runs. The Summary
+> shows pace, time and bouts per mode (`stats/hii.js`) and bands on the elevation chart.
+
 
 **Request:** a new **High Intensity Interval** workout type, with randomised intervals of
 walking, jogging, running and sprinting, and spoken warnings before each change.

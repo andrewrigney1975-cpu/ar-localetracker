@@ -3,12 +3,14 @@
 // talking with the screen off; this copy drives the browser simulator and is the reference
 // for the shared fixture (tests/voice.test.js ↔ VoiceCoachTest.java). Keep them in step.
 
+import { HII_LABELS, WARN_S } from '../hii/plan.js';
+
 const KM = 1000;
 const MILE = 1609.344;
 /** Below this distance an average pace is meaningless, so it isn't spoken. */
 const MIN_AVG_DISTANCE_M = 50;
 
-export const GOAL_STEPS = { walk: 1, run: 1, cycle: 5, ski: 5 };
+export const GOAL_STEPS = { walk: 1, run: 1, hii: 1, cycle: 5, ski: 5 };
 export const INTERVAL_OPTIONS = [5, 10, 15, 30];
 /** Countdown: metres to go at which it speaks, over the last kilometre to the goal. */
 export const COUNTDOWN_M = [1000, 500, 200, 100];
@@ -66,12 +68,26 @@ export class VoiceCoach {
     /** How many of COUNTDOWN_M have been passed. */
     this.countdownDone = 0;
     this.goalPaused = false;
-    /** Kind of the last announcement (for the watch buzz): goal-reached | goal | countdown | split | time. */
+    /** High-intensity interval plan (hii/plan.js) and how many of its announcements are done. */
+    this.plan = null;
+    this.hiiDone = 0;
+    /** Kind of the last announcement (for the watch buzz): interval | goal-reached | goal | countdown | split | time. */
     this.lastKind = null;
   }
 
   get enabled() {
-    return this.cfg.splits || this.cfg.time || (this.cfg.goal && this.cfg.goalM > 0) || Boolean(this.cfg.autoGoal);
+    return this.cfg.splits || this.cfg.time || (this.cfg.goal && this.cfg.goalM > 0) || Boolean(this.cfg.autoGoal) || Boolean(this.plan);
+  }
+
+  /** Run an interval plan; announcements whose time has passed are not made. */
+  setPlan(plan, elapsedMs) {
+    this.plan = plan;
+    this.hiiDone = hiiEvents(plan).filter((e) => e.ms < elapsedMs).length;
+  }
+
+  /** End the plan at `stopS` seconds of active time (the user turned intervals off). */
+  stopPlan(stopS) {
+    if (this.plan) this.plan = { ...this.plan, stopS };
   }
 
   /**
@@ -106,6 +122,7 @@ export class VoiceCoach {
     this.intervalsDone = this.cfg.intervalMin > 0 ? Math.floor(elapsedMs / (this.cfg.intervalMin * 60000)) : 0;
     this.goalMask = goalMaskAt(this.cfg, distanceM);
     this.countdownDone = countdownPassed(this.cfg.goalM, distanceM);
+    if (this.plan) this.hiiDone = hiiEvents(this.plan).filter((e) => e.ms < elapsedMs).length;
   }
 
   /** Called while recording with the running totals. Returns the text to speak, or null. */
@@ -114,6 +131,19 @@ export class VoiceCoach {
     const parts = [];
     let saidDistance = false;
     const kinds = new Set();
+
+    // Interval changes come first: they are the most pressing. When several are due at once
+    // (a gap in fixes), only the latest is said.
+    if (this.plan) {
+      const events = hiiEvents(this.plan);
+      let n = this.hiiDone;
+      while (n < events.length && events[n].ms <= elapsedMs) n++;
+      if (n > this.hiiDone) {
+        parts.push(events[n - 1].text);
+        kinds.add('interval');
+        this.hiiDone = n;
+      }
+    }
 
     const k = Math.floor(distanceM / unit);
     if (k > this.splitsDone) {
@@ -171,11 +201,11 @@ export class VoiceCoach {
       }
     }
 
-    this.lastKind = ['goal-reached', 'goal', 'countdown', 'split', 'time'].find((k) => kinds.has(k)) ?? null;
+    this.lastKind = ['interval', 'goal-reached', 'goal', 'countdown', 'split', 'time'].find((k) => kinds.has(k)) ?? null;
     if (!parts.length) return null;
-    // A countdown on its own stays short: no average.
-    const onlyCountdown = kinds.size === 1 && kinds.has('countdown');
-    if (!onlyCountdown && distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) {
+    // A countdown or an interval change on its own stays short: no average.
+    const short = [...kinds].every((k) => k === 'countdown' || k === 'interval');
+    if (!short && distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) {
       // A routine's percent milestone says the time left at the average pace instead.
       if (cfg.routine && kinds.has('goal')) parts.push(spokenTimeToGo(((cfg.goalM - distanceM) * elapsedMs) / distanceM));
       else parts.push(spokenAverage(distanceM, elapsedMs, cfg));
@@ -187,6 +217,29 @@ export class VoiceCoach {
 /** The goal milestones for this config: quarters, plus thirds for a routine of 10 km or more. */
 function milestones(cfg) {
   return cfg.routine && cfg.goalM >= THIRDS_MIN_GOAL_M ? WITH_THIRDS : QUARTERS;
+}
+
+/**
+ * An interval plan's announcements in order, at milliseconds of active time: the start, a
+ * warning WARN_S before each change, and the end. A stopped plan says nothing after stopS.
+ */
+export function hiiEvents(plan) {
+  const at = plan.atS * 1000;
+  const items = plan.items;
+  if (!items.length) return [];
+  const out = [{ ms: at, text: hiiStartPhrase(plan) }];
+  for (let i = 1; i < items.length; i++) {
+    const [mode, s, d] = items[i];
+    out.push({ ms: Math.max(at, at + (s - WARN_S) * 1000), text: `Get ready to ${mode} in ${WARN_S} seconds, for ${spokenDuration(d * 1000)}.` });
+  }
+  out.push({ ms: at + plan.durationS * 1000, text: 'Intervals complete.' });
+  return plan.stopS != null ? out.filter((e) => e.ms < plan.stopS * 1000) : out;
+}
+
+/** "Intervals for 30 minutes. Walk for 3 minutes." */
+export function hiiStartPhrase(plan) {
+  const [mode, , d] = plan.items[0];
+  return `Intervals for ${spokenDuration(plan.durationS * 1000)}. ${HII_LABELS[mode]} for ${spokenDuration(d * 1000)}.`;
 }
 
 /** goalMask with every milestone passed at this distance (0 without a goal). */

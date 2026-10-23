@@ -239,9 +239,11 @@ function routinesHTML(model, s) {
       const goal = Math.round((r.goal[imperial ? 'imperial' : 'metric'] / (imperial ? 1609.344 : 1000)) * 100) / 100;
       const hit = r.predictions ? ` · goal hit ${r.hits} of ${r.predictions}` : '';
       const custom = s.voice.routines?.[r.id] ? ' · own announcements' : '';
+      // HII routines always run as intervals; others can be set to.
+      const hii = id === 'hii' ? '' : `<button class="chip" data-hii="${escapeHtml(r.id)}" aria-pressed="${Boolean(s.hii.routines?.[r.id])}">Intervals</button>`;
       rows.push(`<div class="setting stack routine" data-activity="${id}"><span class="act-label">${ACTIVITIES[id].icon}<span class="text">${escapeHtml(r.name[0].toUpperCase() + r.name.slice(1))}
           <small>${r.user ? 'Marked by you · ' : ''}${goal} ${unit} · ${r.count} times · ${usualDays(r.weekdays)} ~${clock(r.startMin)}${hit}${r.suppressed ? ' · paused: recent goals missed' : ''}${custom}</small></span></span>
-          <span class="voice-kinds"><button class="chip" data-rename="${escapeHtml(r.id)}">Rename</button><button class="chip" data-customise="${escapeHtml(r.id)}">Customise</button><button class="chip" data-forget="${escapeHtml(r.id)}">${r.user ? 'Remove' : 'Forget'}</button></span></div>`);
+          <span class="voice-kinds"><button class="chip" data-rename="${escapeHtml(r.id)}">Rename</button><button class="chip" data-customise="${escapeHtml(r.id)}">Customise</button>${hii}<button class="chip" data-forget="${escapeHtml(r.id)}">${r.user ? 'Remove' : 'Forget'}</button></span></div>`);
     }
   }
   const excluded = s.routines.excluded.length;
@@ -414,6 +416,18 @@ export async function mount(root) {
         else routines[r.id] = { splits: result.splits, time: result.time, goal: result.goal, intervalMin: result.intervalMin };
         await updateSettings({ voice: { ...voice, routines } });
         render();
+      })
+    );
+    root.querySelectorAll('[data-hii]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const h = settings().hii;
+        const routines = { ...h.routines };
+        const on = !routines[b.dataset.hii];
+        if (on) routines[b.dataset.hii] = true;
+        else delete routines[b.dataset.hii];
+        await updateSettings({ hii: { ...h, routines } });
+        b.setAttribute('aria-pressed', String(on));
+        toast(on ? 'Runs as high-intensity intervals from the next time' : 'Intervals off for this routine');
       })
     );
     root.querySelectorAll('[data-forget]').forEach((b) =>

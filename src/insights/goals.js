@@ -14,7 +14,7 @@ export const GOAL_PERIODS = [
 export const GOAL_METRICS = ['distance', 'time', 'cardioLoad', 'calories'];
 
 /** 'all' or an activity id. */
-export const GOAL_ACTIVITIES = ['all', 'walk', 'run', 'cycle', 'ski'];
+export const GOAL_ACTIVITIES = ['all', 'walk', 'run', 'hii', 'cycle', 'ski'];
 
 export const goalKey = (activity, period) => `${activity}.${period}`;
 

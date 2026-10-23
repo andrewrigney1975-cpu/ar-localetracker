@@ -3,10 +3,11 @@
 /**
  * @param {string} text
  * @returns {{meta: object|null, points: object[], states: {t:number,state:string,reason?:string,seg?:number}[], hr: {t:number,bpm:number}[],
- *   cad: {t:number,spm:number,src:'watch'|'phone'}[], end: object|null}}
+ *   cad: {t:number,spm:number,src:'watch'|'phone'}[], end: object|null, goal: object|null, hii: object[]}}
+ *   hii: interval plans (hii/plan.js) in the order they started, each with stopS when turned off
  */
 export function parseJournal(text) {
-  const out = { meta: null, points: [], states: [], hr: [], cad: [], end: null, goal: null };
+  const out = { meta: null, points: [], states: [], hr: [], cad: [], end: null, goal: null, hii: [] };
   if (!text) return out;
   const lines = text.split('\n');
   for (const line of lines) {
@@ -42,6 +43,13 @@ export function parseJournal(text) {
         // Goal chosen for this workout (manual or predicted); a later line updates it.
         if (o.goalM > 0) out.goal = o;
         break;
+      case 'hii': {
+        // High-intensity intervals: a plan when they start, stopS when the user turns them off.
+        const last = out.hii[out.hii.length - 1];
+        if (o.plan && Array.isArray(o.plan.items)) out.hii.push({ ...o.plan });
+        else if (Number.isFinite(o.stopS) && last && last.stopS == null) last.stopS = o.stopS;
+        break;
+      }
       default:
         break;
     }

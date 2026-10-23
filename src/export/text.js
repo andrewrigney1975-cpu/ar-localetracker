@@ -10,6 +10,7 @@ import {
   formatSpeed,
 } from '../units.js';
 import { weatherLine } from '../weather/weather.js';
+import { HII_LABELS, HII_MODES, planTotals } from '../hii/plan.js';
 
 /**
  * Build a short message such as:
@@ -53,9 +54,20 @@ export function workoutShareText(workout, { units = 'metric', calories = null, f
   if (extra.length) lines.push(extra.join(' · '));
   const weather = weatherLine(workout.weather, units);
   if (weather) lines.push(weather);
+  const hii = intervalsLine(workout.hii);
+  if (hii) lines.push(hii);
 
   lines.push('Recorded with Locale');
   return lines.join('\n');
+}
+
+/** "Intervals: walk 12:00 · jog 9:00 · run 6:00 · sprint 3:00", as planned (up to any stop). */
+export function intervalsLine(plans) {
+  if (!plans?.length) return '';
+  const sum = Object.fromEntries(HII_MODES.map((m) => [m, 0]));
+  for (const p of plans) for (const [m, s] of Object.entries(planTotals(p))) sum[m] += s;
+  const parts = HII_MODES.filter((m) => sum[m] > 0).map((m) => `${HII_LABELS[m].toLowerCase()} ${formatDuration(sum[m])}`);
+  return parts.length ? `Intervals: ${parts.join(' · ')}` : '';
 }
 
 /**

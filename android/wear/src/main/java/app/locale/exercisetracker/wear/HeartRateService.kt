@@ -73,6 +73,7 @@ class HeartRateService : LifecycleService() {
             "walk" -> ExerciseType.WALKING
             "cycle" -> ExerciseType.BIKING
             "ski" -> ExerciseType.ALPINE_SKIING
+            "hii" -> ExerciseType.HIGH_INTENSITY_INTERVAL_TRAINING
             else -> ExerciseType.RUNNING
         }
     }
@@ -142,10 +143,10 @@ class HeartRateService : LifecycleService() {
                 stopSelf()
                 return
             }
-            // Cadence for walks and runs, when the watch offers it and steps are allowed; the
+            // Cadence for walks, runs and intervals, when the watch offers it and steps are allowed; the
             // phone's step counter fills in otherwise.
             val wanted = mutableSetOf<DataType<*, *>>(DataType.HEART_RATE_BPM)
-            val stepping = type == ExerciseType.WALKING || type == ExerciseType.RUNNING
+            val stepping = type == ExerciseType.WALKING || type == ExerciseType.RUNNING || type == ExerciseType.HIGH_INTENSITY_INTERVAL_TRAINING
             val stepsAllowed = checkSelfPermission(android.Manifest.permission.ACTIVITY_RECOGNITION) == android.content.pm.PackageManager.PERMISSION_GRANTED
             if (stepping && stepsAllowed) wanted += DataType.STEPS_PER_MINUTE
             val dataTypes = wanted.intersect(caps.getExerciseTypeCapabilities(type).supportedDataTypes)
@@ -250,5 +251,6 @@ fun activityLabel(id: String) = when (id) {
     "walk" -> "Walk"
     "cycle" -> "Cycle"
     "ski" -> "Ski"
+    "hii" -> "HII"
     else -> "Run"
 }

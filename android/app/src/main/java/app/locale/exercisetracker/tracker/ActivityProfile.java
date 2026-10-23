@@ -28,6 +28,8 @@ final class ActivityProfile {
                 return new ActivityProfile("cycle", "Cycle", 30f, 30f, 1.0f);
             case "ski":
                 return new ActivityProfile("ski", "Ski", 30f, 45f, 1.0f);
+            case "hii":
+                return new ActivityProfile("hii", "HII", 25f, 9f, 0.4f);
             case "run":
             default:
                 return new ActivityProfile("run", "Run", 25f, 9f, 0.8f);

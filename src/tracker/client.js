@@ -3,11 +3,12 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 import { activity as activityProfile } from '../activities.js';
 import { haversine } from '../geo/geo.js';
-import { HeartModel, SyntheticRoute } from './synthetic.js';
+import { HII_SPEED, HeartModel, SyntheticRoute } from './synthetic.js';
+import { MIN_PLAN_S, hiiAt, makePlan } from '../hii/plan.js';
 import { settings } from '../settings.js';
 import { OFF_ROUTE_PHRASE, VoiceCoach, goalConfirmation, routineVoice, voiceConfig } from '../voice/coach.js';
 import { cachedRoutineModel } from '../insights/model.js';
-import { predictGoal } from '../insights/routines.js';
+import { predictGoal, routineUsualS } from '../insights/routines.js';
 import { RouteGuard } from '../insights/routeGuard.js';
 
 const Native = registerPlugin('LocaleTracker');
@@ -25,6 +26,8 @@ function nativeTracker() {
     },
     getCapabilities: () => Native.getCapabilities(),
     start: (opts) => Native.start(opts),
+    /** High-intensity intervals on (a new plan of durationS from now) or off, mid-workout. */
+    setHii: (on, durationS = 0) => Native.setHii({ on, durationS }),
     pause: () => Native.pause(),
     resume: () => Native.resume(),
     stop: () => Native.stop(),
@@ -109,6 +112,7 @@ function simTracker() {
     hr: st.hr,
     last: st.last,
     ...(goal ? { goal } : {}),
+    ...(coach?.plan ? { hii: coach.plan } : {}),
   });
   const speakAndShow = (text) => {
     webSpeak(text);
@@ -139,12 +143,30 @@ function simTracker() {
     coach.cfg = { ...coach.cfg, goal: cfg.goal || cfg.autoGoal || g.source === 'manual', countdown: cfg.countdown && Boolean(g.routineId) };
     const rv = routineVoice(settings(), g.routineId);
     if (rv) coach.applyRoutine(rv, 0);
-    goal = { goalM: g.goalM, source: g.source, ...(g.name ? { name: g.name } : {}) };
+    goal = { goalM: g.goalM, source: g.source, ...(g.routineId ? { routineId: g.routineId } : {}), ...(g.name ? { name: g.name } : {}) };
     if (g.signature) guard = new RouteGuard(g.signature);
     goalLine = { type: 'goal', goalM: g.goalM, source: g.source, routineId: g.routineId ?? null, ...(g.name ? { name: g.name } : {}), confidence: g.confidence ?? 1 };
     append(st.workoutId, { ...goalLine, t: now() });
     if (cfg.confirmGoal && coach.cfg.goal) speakAndShow(goalConfirmation(g.goalM, cfg.imperial, g.source, g.name));
     emit('goal', goal);
+  }
+  /** Same as TrackingService.considerHii: an HII workout, or a routine set to run as intervals. */
+  function considerHii(activity, hiiS) {
+    if (coach.plan) return;
+    const routineId = goal?.routineId ?? null;
+    if (activity !== 'hii' && !settings().hii.routines?.[routineId]) return;
+    const atS = Math.floor(elapsed() / 1000);
+    const usual = routineUsualS(cachedRoutineModel(), activity, routineId);
+    startHii(hiiS > 0 ? hiiS : usual > 0 ? Math.max(MIN_PLAN_S, usual - atS) : settings().hii.durationMin * 60, atS);
+  }
+  function startHii(durationS, atS) {
+    const h = settings().hii;
+    const plan = makePlan({ durationS: Math.max(MIN_PLAN_S, durationS), shares: h.shares, bouts: h.bouts, seed: Date.now() % 2147483647, atS });
+    coach.setPlan(plan, atS * 1000);
+    append(st.workoutId, { type: 'hii', t: now(), plan });
+    const text = coach.onProgress(st.distance, elapsed());
+    if (text) speakAndShow(text);
+    emit('hii', coach.plan);
   }
   function setState(next, reason) {
     if (st.state === 'recording' && next !== 'recording') st.elapsedBase += now() - st.runningSince;
@@ -209,17 +231,18 @@ function simTracker() {
     async getCapabilities() {
       return { barometer: true, compass: true, gpsEnabled: true, ignoringBatteryOptimizations: true, manufacturer: 'Browser', model: 'Simulator', sdk: 36 };
     },
-    async start({ workoutId, activity, resume, goalM, fix }) {
+    async start({ workoutId, activity, resume, goalM, fix, hiiS }) {
       if (st.state !== 'idle') throw Object.assign(new Error('A workout is already in progress'), { code: 'busy' });
       clearInterval(warmTimer);
       simClock = Date.now();
-      route = new SyntheticRoute({ activity, ...START, seed: Date.now() % 1000 });
+      // Intervals set the pace: walk, jog, run or sprint.
+      const speedAt = () => (coach?.plan ? (HII_SPEED[hiiAt(coach.plan, elapsed() / 1000).mode] ?? null) : null);
+      route = new SyntheticRoute({ activity, ...START, seed: Date.now() % 1000, speedAt });
       heart = new HeartModel({ seed: Date.now() % 997 });
       prevAlt = null;
       st = { ...idleState(), workoutId, activity, startedAt: simClock };
       anchor = null;
       coach = new VoiceCoach(voiceConfig(settings(), activity));
-      if (!resume) startGoal(activity, { goalM, fix });
       if (!resume) {
         localStorage.removeItem(JKEY(workoutId));
         append(workoutId, { type: 'meta', v: 1, workoutId, activity, startedAt: simClock, autoPause: false, hasBarometer: true, device: 'browser simulator' });
@@ -227,8 +250,24 @@ function simTracker() {
         st.segment = 1;
       }
       setState('recording', resume ? 'restored' : 'start');
+      if (!resume) {
+        startGoal(activity, { goalM, fix });
+        considerHii(activity, hiiS);
+      }
       startTimer();
       return { workoutId };
+    },
+    async setHii(on, durationS = 0) {
+      if (st.state === 'idle' || !coach) return;
+      const atS = Math.floor(elapsed() / 1000);
+      if (!on) {
+        if (!coach.plan || coach.plan.stopS != null) return;
+        coach.stopPlan(atS);
+        append(st.workoutId, { type: 'hii', t: now(), stopS: atS });
+        emit('hii', coach.plan);
+      } else if (!coach.plan || coach.plan.stopS != null || hiiAt(coach.plan, atS).done) {
+        startHii(durationS, atS);
+      }
     },
     async pause() {
       if (st.state === 'recording' || st.state === 'autopaused') setState('paused', 'pause');

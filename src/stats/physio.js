@@ -152,7 +152,8 @@ export function metAt(track, i, activity) {
   const grade = Math.max(0, Math.min(0.25, Number.isFinite(track.alt[i]) ? gradeAt(track, i) : 0));
   switch (activity) {
     case 'walk':
-    case 'run': {
+    case 'run':
+    case 'hii': {
       // ACSM: running above ~8 km/h (or for run workouts above a slow jog), walking otherwise.
       const running = v > 2.2 || (activity === 'run' && v > 1.8);
       const vo2 = running ? 0.2 * vmin + 0.9 * vmin * grade + 3.5 : 0.1 * vmin + 1.8 * vmin * grade + 3.5;

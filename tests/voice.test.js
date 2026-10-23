@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { VoiceCoach, routineVoice, spokenAverage, spokenDistance, spokenDuration, spokenTimeToGo, voiceConfig } from '../src/voice/coach.js';
 import { DEFAULT_SETTINGS } from '../src/settings.js';
+import { HII_DEFAULTS, makePlan } from '../src/hii/plan.js';
 
 const FIXTURE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../android/app/src/test/resources/fixtures/voice.json');
 
@@ -35,14 +36,20 @@ const SCENARIOS = [
   { name: 'walk-countdown', cfg: cfg({ goal: true, goalM: 4700, countdown: true, routine: true }), samples: samples({ seconds: 3600, stepS: 3, speed: 1.4 }) },
   // Routine of 10 km or more: thirds as well as quarters, each with the time to go.
   { name: 'run-routine-12k', cfg: cfg({ splits: true, goal: true, goalM: 12000, routine: true }), samples: samples({ seconds: 4800, stepS: 2, speed: 2.7 }) },
+  // Intervals from the start with splits: changes merge with splits that fall at the same fix.
+  { name: 'hii-splits', cfg: cfg({ splits: true }), plan: [makePlan({ durationS: 1200, ...HII_DEFAULTS, seed: 3 }), 0], samples: samples({ seconds: 1500, stepS: 1, speed: 2.2 }) },
+  // Turned on part-way (at 5 minutes, 15 minutes long), stopped after 10.
+  { name: 'hii-late-stopped', cfg: cfg({ goal: true, goalM: 3000, routine: true }), plan: [makePlan({ durationS: 900, ...HII_DEFAULTS, seed: 4, atS: 300 }), 300000], stopS: 600, samples: samples({ seconds: 1300, stepS: 2, speed: 2 }) },
   { name: 'run-resumed', cfg: cfg({ splits: true, goal: true, goalM: 5000 }), sync: [2600, 900000], samples: samples({ seconds: 900, stepS: 2, speed: 2.8, startM: 2600, startMs: 900000 }) },
 ];
 
 function run(sc) {
   const coach = new VoiceCoach(sc.cfg);
   if (sc.sync) coach.syncTo(...sc.sync);
+  if (sc.plan) coach.setPlan(...sc.plan);
   const said = [];
   sc.samples.forEach(([d, ms], i) => {
+    if (sc.stopS != null && ms >= sc.stopS * 1000 && coach.plan.stopS == null) coach.stopPlan(sc.stopS);
     const text = coach.onProgress(d, ms);
     if (text) said.push({ i, text });
   });
@@ -311,6 +318,19 @@ describe('JS ↔ Java voice fixture', () => {
       '100 metres to go',
       'Goal reached: 4',
     ]);
+  });
+
+  it('interval scenarios warn before each change and stop when turned off', () => {
+    const byName = Object.fromEntries(results.map((r) => [r.name, r.expected]));
+    const hii = byName['hii-splits'];
+    expect(hii[0]).toMatchObject({ i: 0, text: expect.stringMatching(/^Intervals for 20 minutes\. \w+ for /) });
+    expect(hii.filter((e) => e.text.includes('Get ready to')).length).toBe(SCENARIOS.find((x) => x.name === 'hii-splits').plan[0].items.length - 1);
+    expect(hii.some((e) => e.text === 'Intervals complete.' || e.text.startsWith('Intervals complete.'))).toBe(true);
+    const late = byName['hii-late-stopped'];
+    expect(late[0].text).toMatch(/^Intervals for 15 minutes/);
+    expect(late.every((e) => !e.text.includes('Intervals complete'))).toBe(true);
+    // Nothing about intervals after the stop at 10 minutes (sample index 299 = 600 s).
+    expect(late.filter((e) => e.i >= 299).every((e) => !e.text.includes('Get ready'))).toBe(true);
   });
 
   it('matches the committed fixture', () => {

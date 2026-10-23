@@ -47,7 +47,7 @@ final class PhoneSettings {
         c.countdown = v.optBoolean("countdown", false);
         c.intervalMin = v.optInt("intervalMin", 10);
         JSONObject goals = v.optJSONObject("goalM");
-        double defGoal = "walk".equals(activity) ? 5000 : "cycle".equals(activity) ? 40000 : "ski".equals(activity) ? 20000 : 10000;
+        double defGoal = "walk".equals(activity) || "hii".equals(activity) ? 5000 : "cycle".equals(activity) ? 40000 : "ski".equals(activity) ? 20000 : 10000;
         c.goalM = !c.goal ? 0 : goals != null ? goals.optDouble(activity, defGoal) : defGoal;
         c.duck = v.optBoolean("duck", true);
         c.loud = v.optBoolean("loud", false);
@@ -65,6 +65,19 @@ final class PhoneSettings {
         JSONObject v = load(ctx).optJSONObject("voice");
         JSONObject routines = v != null ? v.optJSONObject("routines") : null;
         return routines != null ? routines.optJSONObject(routineId) : null;
+    }
+
+    /** High-intensity interval settings (settings().hii in src/settings.js), or an empty object. */
+    static JSONObject hii(Context ctx) {
+        JSONObject h = load(ctx).optJSONObject("hii");
+        return h != null ? h : new JSONObject();
+    }
+
+    /** Whether a routine is set to run as high-intensity intervals (You → Learned routines). */
+    static boolean hiiRoutine(Context ctx, String routineId) {
+        if (routineId == null) return false;
+        JSONObject r = hii(ctx).optJSONObject("routines");
+        return r != null && r.optBoolean(routineId, false);
     }
 
     private static boolean flag(JSONObject v, String kind, String activity, boolean def) {

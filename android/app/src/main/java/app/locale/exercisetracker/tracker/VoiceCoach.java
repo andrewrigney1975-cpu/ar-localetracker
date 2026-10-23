@@ -60,7 +60,10 @@ final class VoiceCoach {
     /** How many of COUNTDOWN_M have been passed. */
     int countdownDone;
     boolean goalPaused;
-    /** Kind of the last announcement (for the watch buzz): goal-reached | goal | countdown | split | time. */
+    /** High-intensity interval plan and how many of its announcements are done. */
+    HiiPlan plan;
+    int hiiDone;
+    /** Kind of the last announcement (for the watch buzz): interval | goal-reached | goal | countdown | split | time. */
     String lastKind;
 
     VoiceCoach(Config cfg) {
@@ -69,7 +72,56 @@ final class VoiceCoach {
     }
 
     boolean enabled() {
-        return cfg.splits || cfg.time || (cfg.goal && cfg.goalM > 0) || cfg.autoGoal;
+        return cfg.splits || cfg.time || (cfg.goal && cfg.goalM > 0) || cfg.autoGoal || plan != null;
+    }
+
+    /** Run an interval plan; announcements whose time has passed are not made. (setPlan in coach.js) */
+    void setPlan(HiiPlan p, long elapsedMs) {
+        plan = p;
+        hiiDone = hiiPassed(elapsedMs);
+    }
+
+    /** End the plan at `stopS` seconds of active time (the user turned intervals off). */
+    void stopPlan(long stopS) {
+        if (plan != null) plan.stopS = stopS;
+    }
+
+    private int hiiPassed(long elapsedMs) {
+        int n = 0;
+        for (Event e : hiiEvents(plan)) if (e.ms < elapsedMs) n++;
+        return n;
+    }
+
+    static final class Event {
+        final long ms;
+        final String text;
+
+        Event(long ms, String text) {
+            this.ms = ms;
+            this.text = text;
+        }
+    }
+
+    /**
+     * An interval plan's announcements in order, at milliseconds of active time: the start, a
+     * warning WARN_S before each change, and the end. A stopped plan says nothing after stopS.
+     * (hiiEvents in coach.js)
+     */
+    static List<Event> hiiEvents(HiiPlan plan) {
+        List<Event> out = new ArrayList<>();
+        if (plan == null || plan.items.isEmpty()) return out;
+        long at = plan.atS * 1000;
+        int[] first = plan.items.get(0);
+        out.add(new Event(at, "Intervals for " + spokenDuration(plan.durationS * 1000.0) + ". "
+            + HiiPlan.LABELS[first[0]] + " for " + spokenDuration(first[2] * 1000.0) + "."));
+        for (int i = 1; i < plan.items.size(); i++) {
+            int[] it = plan.items.get(i);
+            out.add(new Event(Math.max(at, at + (it[1] - HiiPlan.WARN_S) * 1000L), "Get ready to " + HiiPlan.MODES[it[0]]
+                + " in " + HiiPlan.WARN_S + " seconds, for " + spokenDuration(it[2] * 1000.0) + "."));
+        }
+        out.add(new Event(at + plan.durationS * 1000L, "Intervals complete."));
+        if (plan.stopS >= 0) out.removeIf(e -> e.ms >= plan.stopS * 1000);
+        return out;
     }
 
     /**
@@ -132,6 +184,7 @@ final class VoiceCoach {
         intervalsDone = cfg.intervalMin > 0 ? (long) Math.floor(elapsedMs / (cfg.intervalMin * 60000.0)) : 0;
         goalMask = goalMaskAt(distanceM);
         countdownDone = countdownPassed(cfg.goalM, distanceM);
+        if (plan != null) hiiDone = hiiPassed(elapsedMs);
     }
 
     /** Called while recording with the running totals. Returns the text to speak, or null. */
@@ -143,6 +196,20 @@ final class VoiceCoach {
         boolean kGoal = false;
         boolean kReached = false;
         boolean kCountdown = false;
+        boolean kInterval = false;
+
+        // Interval changes come first: they are the most pressing. When several are due at once
+        // (a gap in fixes), only the latest is said.
+        if (plan != null) {
+            List<Event> events = hiiEvents(plan);
+            int n = hiiDone;
+            while (n < events.size() && events.get(n).ms <= elapsedMs) n++;
+            if (n > hiiDone) {
+                parts.add(events.get(n - 1).text);
+                kInterval = true;
+                hiiDone = n;
+            }
+        }
 
         int k = (int) Math.floor(distanceM / unit);
         if (k > splitsDone) {
@@ -204,11 +271,11 @@ final class VoiceCoach {
             }
         }
 
-        lastKind = kReached ? "goal-reached" : kGoal ? "goal" : kCountdown ? "countdown" : kSplit ? "split" : kTime ? "time" : null;
+        lastKind = kInterval ? "interval" : kReached ? "goal-reached" : kGoal ? "goal" : kCountdown ? "countdown" : kSplit ? "split" : kTime ? "time" : null;
         if (parts.isEmpty()) return null;
-        // A countdown on its own stays short: no average.
-        boolean onlyCountdown = kCountdown && !kReached && !kGoal && !kSplit && !kTime;
-        if (!onlyCountdown && distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) {
+        // A countdown or an interval change on its own stays short: no average.
+        boolean isShort = !kReached && !kGoal && !kSplit && !kTime;
+        if (!isShort && distanceM >= MIN_AVG_DISTANCE_M && elapsedMs > 0) {
             // A routine's percent milestone says the time left at the average pace instead.
             if (cfg.routine && kGoal) parts.add(spokenTimeToGo(((cfg.goalM - distanceM) * elapsedMs) / distanceM));
             else parts.add(spokenAverage(distanceM, elapsedMs, cfg.pace, cfg.imperial));

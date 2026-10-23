@@ -21,7 +21,7 @@ import org.junit.Test;
  * transcendental functions between V8 and the JVM.
  */
 public class WorkoutBuilderTest {
-    private static final String[] CASES = { "run-hr-pause", "walk-nobaro", "cycle", "ski", "city2surf", "messy-run", "walk-cadence" };
+    private static final String[] CASES = { "run-hr-pause", "walk-nobaro", "cycle", "ski", "city2surf", "messy-run", "walk-cadence", "hii" };
 
     private static String read(String name) throws IOException {
         try (InputStream in = WorkoutBuilderTest.class.getResourceAsStream("/fixtures/" + name)) {
@@ -73,6 +73,11 @@ public class WorkoutBuilderTest {
                 }
             }
             assertEquals(path + " keys", e.length(), a.length());
+        } else if (expected instanceof JSONArray) {
+            JSONArray e = (JSONArray) expected;
+            JSONArray a = (JSONArray) actual;
+            assertEquals(path + " length", e.length(), a.length());
+            for (int i = 0; i < e.length(); i++) assertJsonClose(path + "[" + i + "]", e.get(i), a.get(i));
         } else if (expected instanceof Number) {
             String key = path.substring(path.lastIndexOf('.') + 1);
             close(path, ((Number) expected).doubleValue(), ((Number) actual).doubleValue(), tolerance(key));
@@ -96,6 +101,9 @@ public class WorkoutBuilderTest {
             assertEquals(name + " preview length", exp.getInt("previewLength"), built.workout.getJSONArray("preview").length());
             assertEquals(name + " intervals", exp.getJSONArray("activeIntervals").toString(),
                 built.workout.getJSONArray("activeIntervals").toString());
+            // The interval plans as run (the HII status), only on workouts that had them.
+            assertEquals(name + " has hii", exp.has("hii"), built.workout.has("hii"));
+            if (exp.has("hii")) assertJsonClose(name + ".hii", exp.getJSONArray("hii"), built.workout.getJSONArray("hii"));
         }
     }
 

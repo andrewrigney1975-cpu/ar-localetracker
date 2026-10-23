@@ -28,6 +28,19 @@ export const ACTIVITIES = {
     tcxSport: 'Running',
     icon: icon('<circle cx="15" cy="4" r="2"/><path d="M5 20l4-4 2 1"/><path d="M8 11l3-3 4 1 2 4 3 1"/><path d="M11 8l-1 6 4 2-1 5"/>'),
   },
+  hii: {
+    id: 'hii',
+    label: 'HII',
+    verb: 'Interval training',
+    // Run-like gating (sprints), walk-like stillness (the walking bouts).
+    accuracyGate: 25,
+    maxSpeed: 9,
+    stationarySpeed: 0.4,
+    processNoise: 1.5,
+    liveSpeedMode: 'pace',
+    tcxSport: 'Other',
+    icon: icon('<path d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12z"/>'),
+  },
   cycle: {
     id: 'cycle',
     label: 'Cycle',

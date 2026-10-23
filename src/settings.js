@@ -1,6 +1,7 @@
 // User settings persisted with @capacitor/preferences (localStorage on web).
 
 import { Preferences } from '@capacitor/preferences';
+import { HII_DEFAULTS } from './hii/plan.js';
 
 const KEY = 'settings.v1';
 
@@ -8,8 +9,8 @@ export const DEFAULT_SETTINGS = {
   units: 'metric',
   theme: 'system',
   keepScreenOn: true,
-  autoPause: { walk: false, run: false, cycle: true, ski: false },
-  liveSpeedMode: { walk: 'pace', run: 'pace', cycle: 'speed', ski: 'speed' },
+  autoPause: { walk: false, run: false, hii: false, cycle: true, ski: false },
+  liveSpeedMode: { walk: 'pace', run: 'pace', hii: 'pace', cycle: 'speed', ski: 'speed' },
   mapStyle: 'streets',
   exaggeration: 'auto',
   satellite3d: true,
@@ -27,10 +28,10 @@ export const DEFAULT_SETTINGS = {
   goals: {},
   /** Spoken announcements during a workout, each kind on or off per activity. */
   voice: {
-    splits: { walk: true, run: true, cycle: false, ski: false },
-    time: { walk: false, run: false, cycle: false, ski: false },
+    splits: { walk: true, run: true, hii: false, cycle: false, ski: false },
+    time: { walk: false, run: false, hii: false, cycle: false, ski: false },
     /** 'off' | 'set' (distance from the start screen) | 'auto' (predicted from routines). */
-    goalMode: { walk: 'auto', run: 'auto', cycle: 'auto', ski: 'off' },
+    goalMode: { walk: 'auto', run: 'auto', hii: 'auto', cycle: 'auto', ski: 'off' },
     /** Say the goal when it is chosen. */
     confirmGoal: true,
     /** On a recognised routine, say the metres to go: 1000, 500, 200 and 100. */
@@ -39,7 +40,7 @@ export const DEFAULT_SETTINGS = {
     watchBuzz: true,
     intervalMin: 10,
     /** Goal distance per activity in metres, set on the start screen. */
-    goalM: { walk: 5000, run: 10000, cycle: 40000, ski: 20000 },
+    goalM: { walk: 5000, run: 10000, hii: 5000, cycle: 40000, ski: 20000 },
     /** Lower other audio while speaking (true) or pause it (false). */
     duck: true,
     /** Turn the media volume up to full while speaking, then back. */
@@ -50,6 +51,12 @@ export const DEFAULT_SETTINGS = {
      */
     routines: {},
   },
+  /**
+   * High-intensity intervals (hii/plan.js): share of the time per mode (%), shortest and
+   * longest bout per mode (s), the length when no routine gives one (min), and routines
+   * that run as intervals ({[routineId]: true}) until turned off.
+   */
+  hii: { ...structuredClone(HII_DEFAULTS), routines: {} },
   /** For calories, heart-rate zones and cardio load (weight in kg); name labels shared courses. */
   profile: { name: null, birthYear: null, sex: null, heightCm: null, weightKg: null, restingHr: null, maxHr: null },
 };
@@ -70,6 +77,7 @@ export async function loadSettings() {
         profile: { ...DEFAULT_SETTINGS.profile, ...saved.profile },
         voice: mergeVoice(saved.voice),
         routines: { ...DEFAULT_SETTINGS.routines, ...saved.routines },
+        hii: mergeHii(saved.hii),
       };
     }
   } catch {
@@ -77,6 +85,11 @@ export async function loadSettings() {
   }
   applyTheme();
   return current;
+}
+
+function mergeHii(saved = {}) {
+  const d = DEFAULT_SETTINGS.hii;
+  return { ...d, ...saved, shares: { ...d.shares, ...saved.shares }, bouts: { ...d.bouts, ...saved.bouts }, routines: { ...saved.routines } };
 }
 
 function mergeVoice(saved = {}) {

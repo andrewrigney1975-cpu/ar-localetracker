@@ -43,7 +43,7 @@ public final class LocaleWidgets {
     enum Size { SMALL, WIDE, LARGE, WEEK, WEEK_CHART }
 
     /** The day chart stacks bottom to top in this order, as STACK_ORDER in src/views/insights.js. */
-    private static final String[] STACK_ORDER = { "cycle", "run", "walk", "ski" };
+    private static final String[] STACK_ORDER = { "cycle", "run", "hii", "walk", "ski" };
 
     /** The 4×2's goal message size, as in widget_week_chart.xml. */
     private static final float GOAL_TEXT_SP = 11;
@@ -129,6 +129,8 @@ public final class LocaleWidgets {
                 v.setInt(R.id.tile_last, "setBackgroundResource", tileBackground(act));
                 v.setImageViewResource(R.id.icon_last, icon(act));
                 v.setTextViewText(R.id.label_last, ActivityProfile.forId(act).label);
+                // Dark text on HII's yellow, white on the others.
+                v.setTextColor(R.id.label_last, "hii".equals(act) ? 0xFF1B1D1F : 0xFFFFFFFF);
                 v.setContentDescription(R.id.tile_last, "Start " + ActivityProfile.forId(act).label.toLowerCase(Locale.ROOT));
                 v.setOnClickPendingIntent(R.id.tile_last, startAction(ctx, act));
                 return v;
@@ -421,6 +423,8 @@ public final class LocaleWidgets {
                 return 103;
             case "ski":
                 return 104;
+            case "hii":
+                return 105;
             default:
                 return 102;
         }
@@ -434,6 +438,8 @@ public final class LocaleWidgets {
                 return R.drawable.ic_activity_cycle;
             case "ski":
                 return R.drawable.ic_activity_ski;
+            case "hii":
+                return R.drawable.ic_activity_hii;
             default:
                 return R.drawable.ic_activity_run;
         }
@@ -447,6 +453,8 @@ public final class LocaleWidgets {
                 return R.drawable.widget_tile_cycle;
             case "ski":
                 return R.drawable.widget_tile_ski;
+            case "hii":
+                return R.drawable.widget_tile_hii;
             default:
                 return R.drawable.widget_tile_run;
         }
@@ -460,6 +468,8 @@ public final class LocaleWidgets {
                 return 0xFF2F7DF6;
             case "ski":
                 return 0xFF8A63F0;
+            case "hii":
+                return 0xFFF5C518;
             default:
                 return 0xFFF2672E;
         }

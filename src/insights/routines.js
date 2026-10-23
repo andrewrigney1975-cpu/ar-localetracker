@@ -47,7 +47,7 @@ export const T = {
 };
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const PLURAL = { walk: 'walks', run: 'runs', cycle: 'rides', ski: 'ski days' };
+const PLURAL = { walk: 'walks', run: 'runs', hii: 'HII workouts', cycle: 'rides', ski: 'ski days' };
 
 // ---- Local time ------------------------------------------------------------------------------
 
@@ -482,6 +482,11 @@ export function routineLabels(model, workouts) {
 /** Routines a workout of this activity can be put in: recognised ones and those the user marked. */
 export function routineChoices(model, activity) {
   return (model?.activities?.[activity]?.routines ?? []).filter((r) => r.eligible || r.user);
+}
+
+/** A routine's usual duration in seconds (its median), or 0. Mirrors RoutineMatcher.medianSOf. */
+export function routineUsualS(model, activity, routineId) {
+  return (routineId && model?.activities?.[activity]?.routines?.find((r) => r.id === routineId)?.medianS) || 0;
 }
 
 /** The routine a workout belongs to (see routineChoices), or null. */
