@@ -78,7 +78,7 @@ sensors.
   <img src="docs/screenshots/profile.png" width="250" alt="You, Profile: resting and max heart rate, the estimated VO2max (the median of 6 walks in the last 4 weeks) and a one-row chart rating it from Very Poor to Excellent for men aged 40–49, with the estimate as a white dot in Fair at the 30th percentile, and a table of the categories and their ranges below">
 </p>
 <p align="center">
-  <img src="docs/screenshots/widget-week-chart.png" width="490" alt="4×2 widget: this week's distance, average split and speed, a chart of distance per day with a dashed daily goal line, and You're 3 km ahead of your goal! Well done!!">
+  <img src="docs/screenshots/widget-week-chart.png" width="490" alt="4×2 widget in Google Sans: this week's 109 km over 11 workouts with average split and speed, a chart of distance per day (today's letter in bold) with a dashed daily goal line, and You're 0.6 km ahead of your goal! Well done!!">
 </p>
 <p align="center">
   <img src="docs/screenshots/view-share.png" width="250" alt="Share sheet: Share course section with a Hide start and finish switch, a Share AR City2Surf 2026.gpx button and Share a link to view in a browser">
@@ -105,7 +105,7 @@ It is generated from the course map and is not a real recording. The voice and H
 screenshots come from the browser simulator (the HII summary is a generated workout whose
 route follows its interval plan). The Insights screenshots use a year of generated
 workouts in the browser build, and the Goals screenshots 16 weeks of them. The 4×2
-widget is on a Pixel 10a. The View screenshots show the sample shared as a course,
+widget is on a Pixel 10a with real workouts, in the light theme. The View screenshots show the sample shared as a course,
 and a generated walk shared with its start and finish hidden; the Locale Viewer screenshot
 is the same course opened from a link in desktop Chrome. The watch screenshots
 are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</sub>
