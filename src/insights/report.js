@@ -3,6 +3,7 @@
 // Pure (no I/O); per-workout calories and cardio load come in from effort.js.
 
 import { ACTIVITY_IDS } from '../activities.js';
+import { csvCell } from '../export/csv.js';
 
 export const GROUPINGS = [
   { id: 'day', label: 'Day' },
@@ -393,12 +394,6 @@ export function exportRows(report) {
   }
   return rows;
 }
-
-const csvCell = (v) => {
-  if (v == null) return '';
-  const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
 
 export function reportToCSV(report) {
   const header = ['period_start', 'period_end', 'period', 'activity', ...FIELDS.map(([, name]) => name)];

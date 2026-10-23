@@ -90,4 +90,25 @@ describe('GPS distance CSV', () => {
     expect(csv[7]).toBe('day1000,04:00,Lake Loop,walk,Lake Loop,14900.0,14800.0,14600.0,300.0,2.05,,,9000,,,');
     expect(csv[8]).toBe('day2000,04:00,"Lake Loop, 2 laps",walk,Lake Loop,15100.0,15000.0,14700.0,400.0,2.72,8.0,19.5,8800,Clear,11.3,11');
   });
+
+  it('keeps formula-like names inert but negative numbers as numbers', () => {
+    const rows = [{ startedAt: 1, name: '=HYPERLINK("http://x","y")', activity: 'walk', group: '+Loop', raw: 1000, gated: 990, smoothed: 1012.3, accuracy: 5, satellites: 20, points: 300 }];
+    const line = gpsStatsCSV(rows, { localTime: () => ['d', 't'] }).split('\n')[7];
+    expect(line).toBe(`d,t,"'=HYPERLINK(""http://x"",""y"")",walk,'+Loop,1000.0,990.0,1012.3,-12.3,-1.22,5.0,20.0,300,,,`);
+  });
+});
+
+describe('CSV cells', () => {
+  it('quotes, neutralises formulas and leaves numbers alone', async () => {
+    const { csvCell } = await import('../src/export/csv.js');
+    expect(csvCell(null)).toBe('');
+    expect(csvCell('plain')).toBe('plain');
+    expect(csvCell('a,b')).toBe('"a,b"');
+    expect(csvCell('say "hi"')).toBe('"say ""hi"""');
+    expect(csvCell('line\rbreak')).toBe('"line\rbreak"');
+    for (const s of ['=1+1', '+SUM(A1)', '-cmd', '@x', '\tx']) expect(csvCell(s)).toBe(`'${s}`);
+    expect(csvCell('\r=1')).toBe(`"'\r=1"`);
+    for (const v of [-12.3, '-12.3', '+5', '-0.5', '1e-3', '-.5']) expect(csvCell(v)).toBe(String(v));
+    expect(csvCell('-12.3 km')).toBe("'-12.3 km");
+  });
 });
