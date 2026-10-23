@@ -87,18 +87,31 @@ public class WearListenerService extends WearableListenerService {
         }
     }
 
+    /**
+     * Most samples of each kind read from one /locale/hr message. The watch sends every 3 s and,
+     * after the phone was unreachable, carries over at most the latest 120 of each, so a real
+     * batch is ~125. Only the paired Locale watch app can send here (the Data Layer checks the
+     * package and signing key), but a cap bounds the work if it ever misbehaved (audit I-6).
+     */
+    static final int MAX_SAMPLES = 600;
+
+    /** Index of the first sample to read from an array of {@code n}: the newest MAX_SAMPLES. */
+    static int firstToRead(int n) {
+        return Math.max(0, n - MAX_SAMPLES);
+    }
+
     private void handleHeartRate(JSONObject body) {
         TrackingService svc = TrackingService.get();
         if (svc == null) return;
         JSONArray samples = body.optJSONArray("s");
-        for (int i = 0; samples != null && i < samples.length(); i++) {
+        for (int i = samples != null ? firstToRead(samples.length()) : 0; samples != null && i < samples.length(); i++) {
             JSONArray s = samples.optJSONArray(i);
             if (s == null || s.length() < 2) continue;
             svc.onHeartRate(s.optLong(0), s.optInt(1));
         }
         // Step cadence, sent with the heart rate by watch apps that have it.
         JSONArray cad = body.optJSONArray("c");
-        for (int i = 0; cad != null && i < cad.length(); i++) {
+        for (int i = cad != null ? firstToRead(cad.length()) : 0; cad != null && i < cad.length(); i++) {
             JSONArray c = cad.optJSONArray(i);
             if (c == null || c.length() < 2) continue;
             svc.onCadence(c.optLong(0), c.optInt(1), "watch");
