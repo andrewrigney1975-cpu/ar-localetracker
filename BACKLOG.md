@@ -429,7 +429,9 @@ walking, jogging, running and sprinting, and spoken warnings before each change.
 
 ## 13. Google Sans on the home-screen widgets: ✅ done (October 2026)
 
-> Implemented with three static Google Sans fonts in `res/font/` (regular 400, medium 500, bold 700; Latin subsets of the variable font, about 85 KB each, made by `scripts/make-widget-fonts.py`). All 18 widget text views use `@font/google_sans_medium` or `@font/google_sans_regular`, and the 4×2 week chart draws its labels, and measures the goal message, with the same fonts (`LocaleWidgets.font`). The release APK grew by about 100 KB. Licence: SIL Open Font License 1.1, no Reserved Font Name (`android/app/src/main/google-sans-OFL.txt`, also in each font's name table).
+> Implemented with the phone's own Google Sans: all 18 widget text views set `android:fontFamily="google-sans-medium"` or `"google-sans"`, system font families that Pixel phones define in `/product/etc/fonts_customization.xml` (the same variable font at `opsz` 18, `GRAD` 0). The 4×2 week chart draws its labels, and measures the goal message, with `Typeface.create("google-sans" / "google-sans-bold")` (`LocaleWidgets.REGULAR` / `BOLD`). Phones without those families show the default sans-serif everywhere.
+>
+> A first version bundled static Google Sans fonts in `res/font/` and used `@font/…` in the layouts. That did nothing on the phone: launchers inflate widget layouts in a restricted context, where TextView ignores font resources. Only the chart bitmap, drawn in the app's process, changed. Don't use `@font/…` in widget layouts.
 
 **Request:** check the font on the widgets and use Google Sans, as the app does.
 
@@ -440,10 +442,9 @@ walking, jogging, running and sprinting, and spoken warnings before each change.
   `android:fontFamily="sans-serif-medium"` (12 places), and the 4×2 week chart draws its labels
   into a bitmap with `Typeface.DEFAULT` / `DEFAULT_BOLD` (`LocaleWidgets.java`, the chart's
   `Paint`s).
-- **Layouts:** add the font under `res/font/` and use `android:fontFamily="@font/…"`. The
-  launcher inflates widget layouts with the app's resources, so font resources work in
-  `RemoteViews` layouts. Android can't read the npm package's `.woff2` files, so take the TTF from
-  Google Fonts (SIL Open Font License; keep the licence text with it).
+- **Layouts:** ~~add the font under `res/font/` and use `android:fontFamily="@font/…"`~~. This
+  was wrong: the launcher inflates widget layouts in a restricted context, where font resources
+  are ignored (see the implementation note). Use system font families by name instead.
 - **Weights:** the layouts use medium, and the chart uses regular and bold (today's day). Either
   ship static instances or one variable font with `<font-family>` entries setting
   `android:fontVariationSettings` (`'wght' 500`, `'wght' 700`).

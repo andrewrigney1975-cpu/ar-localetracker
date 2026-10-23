@@ -10,7 +10,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.DashPathEffect;
@@ -299,10 +298,8 @@ public final class LocaleWidgets {
         Canvas c = new Canvas(bmp);
 
         int muted = ctx.getColor(R.color.widget_text_muted);
-        Typeface regular = font(ctx, R.font.google_sans_regular);
-        Typeface bold = font(ctx, R.font.google_sans_bold);
         Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
-        text.setTypeface(regular);
+        text.setTypeface(REGULAR);
         text.setTextSize(11 * dp);
         text.setColor(muted);
         Paint grid = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -358,30 +355,27 @@ public final class LocaleWidgets {
                 bar.setColor(accent(STACK_ORDER[a]));
                 c.drawPath(roundTop(cx - barW / 2, yTop, barW, yBase - yTop, a == last ? radius : 0), bar);
             }
-            text.setTypeface(d == today ? bold : regular);
+            text.setTypeface(d == today ? BOLD : REGULAR);
             text.setColor(d == today ? ctx.getColor(R.color.widget_text) : muted);
             c.drawText(dayName.format(dayStarts[d]).substring(0, 1).toUpperCase(Locale.getDefault()), cx, h - 3 * dp, text);
         }
         return bmp;
     }
 
-    /**
-     * Google Sans at one weight (res/font, the app's typeface; static Latin subsets of the variable
-     * font). Bitmaps drawn here use it like the layouts' {@code @font/google_sans_*}; the system
-     * default stands in if it can't be loaded.
+    /*
+     * Google Sans, the app's typeface, as the system font families Pixel phones provide
+     * (/product/etc/fonts_customization.xml). Widget layouts name the same families
+     * ("google-sans", "google-sans-medium"): the launcher inflates them in a restricted context,
+     * where font resources (@font/…) are ignored, but system families are looked up by name.
+     * Without them (other phones) Typeface.create returns the default sans-serif, as the layouts get.
      */
-    private static Typeface font(Context ctx, int fontRes) {
-        try {
-            return ctx.getResources().getFont(fontRes);
-        } catch (Resources.NotFoundException e) {
-            return Typeface.DEFAULT;
-        }
-    }
+    private static final Typeface REGULAR = Typeface.create("google-sans", Typeface.NORMAL);
+    private static final Typeface BOLD = Typeface.create("google-sans-bold", Typeface.NORMAL);
 
     /** Height in pixels of the goal message laid out at {@code widthPx}, up to its line limit. */
     private static int goalTextHeight(Context ctx, String text, int widthPx) {
         TextPaint p = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-        p.setTypeface(font(ctx, R.font.google_sans_regular)); // as goal_message in widget_week_chart.xml
+        p.setTypeface(REGULAR); // as goal_message in widget_week_chart.xml
         p.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, GOAL_TEXT_SP, ctx.getResources().getDisplayMetrics()));
         StaticLayout layout = StaticLayout.Builder.obtain(text, 0, text.length(), p, Math.max(1, widthPx))
             .setAlignment(Layout.Alignment.ALIGN_NORMAL)
