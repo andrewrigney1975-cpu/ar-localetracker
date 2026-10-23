@@ -122,6 +122,34 @@ describe('opening a course', () => {
     expect(() => parseCourse('<gpx><trk><trkseg><trkpt lat="95" lon="0"/><trkpt lat="0" lon="0"/></trkseg></trk></gpx>')).toThrow(CourseError);
   });
 
+  it('reads CDATA, self-closed and odd elements, and a point left open mid-file', () => {
+    const gpx = `<gpx><metadata><name><![CDATA[Tom & Jerry's <loop>]]></name><author><name>JB</name></author></metadata>
+      <trk><trkseg><trkpt lat="0" lon="0"><ele/></trkpt><trkpt lat="0" lon="0.001"><ele>12</ele><name>&#x110000;&#65;</name>
+      <trkpt lat="0" lon="0.002"></trkpt><gpx:trkpt lat="0" lon="0.003"><gpx:ele>14</gpx:ele></gpx:trkpt></trkseg></trk></gpx>`;
+    const c = parseCourse(gpx);
+    expect(c).toMatchObject({ name: "Tom & Jerry's <loop>", sharedBy: 'JB' });
+    // The unclosed second point runs to the next </trkpt>, as before: three points.
+    expect(c.track.n).toBe(3);
+    expect(Array.from(c.track.lon)).toEqual([0, 0.001, 0.003]);
+  });
+
+  it('reads crafted files with unclosed tags in linear time', () => {
+    const n = 40000; // ≈ 1 MB each; the old lazy regexes took seconds to minutes
+    const cases = [
+      '<gpx><trk><trkseg>' + '<trkpt lat="1" lon="2">'.repeat(n) + '</trkseg></trk></gpx>',
+      '<gpx><trk>' + '<trkseg>'.repeat(n) + '</trk></gpx>',
+      '<gpx><trk><trkseg><trkpt lat="1" lon="2">' + '<ele>'.repeat(n) + '</trkpt></trkseg></trk></gpx>',
+      '<gpx><metadata>' + '<author><course '.repeat(n) + '</metadata></gpx>',
+      '<gpx><rte><name>' + '<![CDATA['.repeat(n) + '</name></rte></gpx>',
+      '<gpx>' + '<trkpt lat="1" lon="2"'.repeat(n) + '</gpx>',
+    ];
+    for (const text of cases) {
+      const t = performance.now();
+      expect(() => parseCourse(text)).toThrow(CourseError);
+      expect(performance.now() - t).toBeLessThan(500);
+    }
+  });
+
   it('gives the same id to the same file', () => {
     expect(courseId('abc')).toBe(courseId('abc'));
     expect(courseId('abc')).not.toBe(courseId('abd'));

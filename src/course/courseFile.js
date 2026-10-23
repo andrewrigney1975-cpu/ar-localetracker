@@ -170,66 +170,115 @@ export function toCourseGPX(workout, track, { initials = '', hideEnds = false } 
 
 // ---- Reading -----------------------------------------------------------------------------------
 
-const tag = (name) => `(?:[\\w-]+:)?${name}`;
+// Course files come from other people, so reading one must stay fast however it is broken.
+// Lazy regexes such as `<trkpt…>([\s\S]*?)</trkpt>` take quadratic time on unclosed tags (a
+// crafted 20 MB file would hang the app for over half an hour), so elements are found by a
+// scanner whose searches only ever move forward: a file is read in linear time.
+
+/**
+ * Elements called `name` (with any namespace prefix) in `xml`, in order, as
+ * {attrs, inner, start, end}; `inner` is null for `<name/>`. An element that is never closed
+ * ends the scan: there is no closing tag after it, so none for any later element either.
+ */
+function* elements(xml, name) {
+  const open = new RegExp(`<(?:[\\w-]+:)?${name}(?=[\\s/>])`, 'g');
+  const close = new RegExp(`</(?:[\\w-]+:)?${name}\\s*>`, 'g');
+  let pos = 0;
+  for (;;) {
+    open.lastIndex = pos;
+    const m = open.exec(xml);
+    if (!m) return;
+    const gt = xml.indexOf('>', open.lastIndex);
+    if (gt < 0) return;
+    const attrs = xml.slice(open.lastIndex, gt);
+    if (attrs.endsWith('/')) {
+      yield { attrs: attrs.slice(0, -1), inner: null, start: m.index, end: gt + 1 };
+      pos = gt + 1;
+      continue;
+    }
+    close.lastIndex = gt + 1;
+    const c = close.exec(xml);
+    if (!c) return;
+    yield { attrs, inner: xml.slice(gt + 1, c.index), start: m.index, end: close.lastIndex };
+    pos = close.lastIndex;
+  }
+}
+
+const first = (xml, name) => elements(xml, name).next().value ?? null;
+
 const attr = (attrs, name) => {
   const m = new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`).exec(attrs);
   return m ? (m[1] ?? m[2]) : null;
 };
+
+/** CDATA sections unwrapped; an unclosed one is left as it is. */
+function unwrapCdata(s) {
+  let out = '';
+  let pos = 0;
+  for (;;) {
+    const a = s.indexOf('<![CDATA[', pos);
+    const b = a < 0 ? -1 : s.indexOf(']]>', a + 9);
+    if (b < 0) return out + s.slice(pos);
+    out += s.slice(pos, a) + s.slice(a + 9, b);
+    pos = b + 3;
+  }
+}
+
+/** A character reference, or U+FFFD when it names no character (fromCodePoint would throw). */
+const charRef = (cp) => (cp <= 0x10ffff ? String.fromCodePoint(cp) : '\ufffd');
+
 const unescapeXml = (s) =>
-  s
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+  unwrapCdata(s)
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => charRef(Number(d)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => charRef(parseInt(h, 16)))
     .replace(/&amp;/g, '&')
     .trim();
+
+/** Text of the first `name` element, '' for `<name/>`, null when there is none. */
 const textOf = (xml, name) => {
-  const m = new RegExp(`<${tag(name)}\\b[^>]*>([\\s\\S]*?)</${tag(name)}>`).exec(xml);
-  return m ? unescapeXml(m[1]) : null;
+  const e = first(xml, name);
+  return e ? unescapeXml(e.inner ?? '') : null;
 };
+
+/** Inner XML of the first `name` element, '' when there is none. */
+const block = (xml, name) => first(xml, name)?.inner ?? '';
 
 export class CourseError extends Error {}
 
 /** Points of every <trkseg> (or the whole <rte>) as [[lat, lon, ele], …] per segment. */
 function gpxSegments(xml) {
-  const pointsIn = (block, el) => {
+  const pointsIn = (inner, el) => {
     const pts = [];
-    const re = new RegExp(`<${tag(el)}\\b([^>]*?)(?:/>|>([\\s\\S]*?)</${tag(el)}>)`, 'g');
-    let m;
-    while ((m = re.exec(block))) {
-      const lat = Number(attr(m[1], 'lat'));
-      const lon = Number(attr(m[1], 'lon'));
-      const eleText = m[2] ? textOf(m[2], 'ele') : null;
-      pts.push([lat, lon, eleText != null && eleText !== '' ? Number(eleText) : NaN]);
+    for (const { attrs, inner: body } of elements(inner ?? '', el)) {
+      const eleText = body ? textOf(body, 'ele') : null;
+      pts.push([Number(attr(attrs, 'lat')), Number(attr(attrs, 'lon')), eleText != null && eleText !== '' ? Number(eleText) : NaN]);
     }
     return pts;
   };
   const segs = [];
-  const segRe = new RegExp(`<${tag('trkseg')}\\b[^>]*>([\\s\\S]*?)</${tag('trkseg')}>`, 'g');
-  let m;
-  while ((m = segRe.exec(xml))) segs.push(pointsIn(m[1], 'trkpt'));
+  for (const seg of elements(xml, 'trkseg')) segs.push(pointsIn(seg.inner, 'trkpt'));
   if (!segs.some((s) => s.length)) {
-    const rteRe = new RegExp(`<${tag('rte')}\\b[^>]*>([\\s\\S]*?)</${tag('rte')}>`, 'g');
-    while ((m = rteRe.exec(xml))) segs.push(pointsIn(m[1], 'rtept'));
+    for (const rte of elements(xml, 'rte')) segs.push(pointsIn(rte.inner, 'rtept'));
   }
   return segs.filter((s) => s.length);
 }
 
-const block = (xml, name) => new RegExp(`<${tag(name)}\\b[^>]*>([\\s\\S]*?)</${tag(name)}>`).exec(xml)?.[1] ?? '';
-
 function parseGPX(text) {
   const metadata = block(text, 'metadata');
-  const author = block(metadata, 'author');
+  const author = first(metadata, 'author');
   // <name> and <type> of the metadata and track themselves, not of the author or points.
-  const metaOwn = metadata.replace(new RegExp(`<${tag('author')}[\\s\\S]*?</${tag('author')}>`), '');
-  const trkOwn = block(text, 'trk').replace(new RegExp(`<${tag('trkseg')}[\\s\\S]*`), '');
-  const ext = /<(?:[\w-]+:)?course\b([^>]*?)\/?>/.exec(metadata)?.[1] ?? null;
+  const metaOwn = author ? metadata.slice(0, author.start) + metadata.slice(author.end) : metadata;
+  const trk = block(text, 'trk');
+  const segAt = trk.search(/<(?:[\w-]+:)?trkseg(?=[\s/>])/);
+  const trkOwn = segAt < 0 ? trk : trk.slice(0, segAt);
+  const ext = first(metadata, 'course')?.attrs ?? null;
   return {
     name: textOf(metaOwn, 'name') || textOf(trkOwn, 'name') || textOf(block(text, 'rte'), 'name'),
-    sharedBy: author ? textOf(author, 'name') : null,
+    sharedBy: author?.inner ? textOf(author.inner, 'name') : null,
     activity: (ext && attr(ext, 'activity')) || textOf(trkOwn, 'type'),
     locale: Boolean(ext),
     trimmed: Boolean(ext && attr(ext, 'trimmed') === '1'),
