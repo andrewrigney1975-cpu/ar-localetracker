@@ -542,21 +542,33 @@ npx cap sync android
 cd android
 # Point JAVA_HOME at Android Studio's bundled JDK, e.g.
 #   set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr
-gradlew.bat assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+gradlew.bat assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-You can also open `android/` in Android Studio and press **Run**.
+Use the release build on the phone you carry. It isn't debuggable, so `adb run-as` can't copy
+out its database, and Capacitor turns off WebView debugging and console logging. R8 also
+shrinks it (3.5 MB instead of 13.6 MB). `assembleDebug` is for development, and you can also
+open `android/` in Android Studio and press **Run**.
+
+**Signing** (`android/signing.gradle`, shared by both apps). Release builds use a key from
+Gradle properties in `~/.gradle/gradle.properties`, outside the repository:
+`localeReleaseStoreFile`, `localeReleaseStorePassword`, `localeReleaseKeyAlias` and
+`localeReleaseKeyPassword`. Without them they're signed with this machine's debug key, the
+same key as debug builds, so a release build installs over a debug one and keeps its
+workouts. Android only installs an app over one signed with the same key; changing the key
+means uninstalling first, which deletes every workout, so export anything you need before
+switching keys.
 
 ### Install on a Wear OS watch
 
 ```sh
-gradlew.bat :wear:assembleDebug
-adb -s <watch-serial> install -r wear/build/outputs/apk/debug/wear-debug.apk
+gradlew.bat :wear:assembleRelease
+adb -s <watch-serial> install -r wear/build/outputs/apk/release/wear-release.apk
 ```
 
-The watch app uses the phone app's application ID and must be signed with the same key.
-Debug builds from one machine already are. To enable debugging on the watch:
+The watch app uses the phone app's application ID and must be signed with the same key,
+which `signing.gradle` ensures for both build types. To enable debugging on the watch:
 1. Settings → System → About → Versions: tap **Build number** 7 times.
 2. Settings → Developer options: enable **ADB debugging** and **Wireless debugging**.
 3. Run `adb pair <ip:port>` with the code shown, then `adb connect <ip:port>`.

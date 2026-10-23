@@ -21,12 +21,18 @@ android {
         androidTest.resources.srcDirs += ['src/test/resources']
     }
     buildTypes {
+        // The build installed on the phone day to day: not debuggable (so `run-as` can't copy the
+        // database and Capacitor turns off WebView debugging and its console logging), shrunk
+        // and optimised by R8. Capacitor's consumer rules keep the plugins and their methods.
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
+
+apply from: rootProject.file('signing.gradle')
 
 repositories {
     flatDir{

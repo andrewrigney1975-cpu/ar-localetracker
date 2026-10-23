@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resources the release build's resource shrinker must keep although no code references
+     them. Play services reads android_wear_capabilities by name to advertise this phone to the
+     watch; without it the watch reports the phone as unreachable. tools:keep only works in a
+     file like this one under res/raw, not on a values file. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@array/android_wear_capabilities" />
