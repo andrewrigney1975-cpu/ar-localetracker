@@ -58,11 +58,6 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
-}
+// No Google Services plugin: Locale uses no Firebase (push, analytics, crash reporting), so the
+// template's optional `com.google.gms.google-services` was removed with its classpath entry
+// (security audit I-5). Play services location and wearable don't need it.

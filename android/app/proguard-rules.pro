@@ -19,3 +19,12 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Release builds drop verbose, debug and info logging (security audit I-4): logcat is readable
+# over ADB, and these lines describe workouts as they happen. Warnings and errors stay, for
+# diagnosing failures, and carry no personal data. Mirrored in wear/proguard-rules.pro.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}
