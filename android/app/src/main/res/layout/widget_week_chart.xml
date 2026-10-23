@@ -23,7 +23,7 @@
         android:orientation="vertical">
         <TextView
             android:id="@+id/chart_title"
-            android:fontFamily="@font/google_sans_regular"
+            android:fontFamily="google-sans"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:maxLines="1"
@@ -42,7 +42,7 @@
         <!-- LocaleWidgets.goalTextSp; dayChart leaves room for it. -->
         <TextView
             android:id="@+id/goal_message"
-            android:fontFamily="@font/google_sans_regular"
+            android:fontFamily="google-sans"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
