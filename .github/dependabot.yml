@@ -22,15 +22,22 @@ updates:
     groups:
       gradle-minor-and-patch:
         update-types: [minor, patch]
+    # Capacitor 8 builds with AGP 8.x; these wait for the move to AGP 9.
     ignore:
-      # Capacitor 8 builds with AGP 8.x; AGP 9 waits for Capacitor.
       - dependency-name: com.android.tools.build:gradle
         versions: [">= 9"]
-      # Compose 1.12+ and Wear Compose 1.7+ need AGP 9.1 (see android/wear/build.gradle).
+      # AGP 8 uses a Gradle internal API removed in Gradle 9.6.
+      - dependency-name: gradle-wrapper
+        versions: [">= 9.6"]
+      # These need AGP 9.1 and compileSdk 37 (see android/wear/build.gradle, variables.gradle).
       - dependency-name: androidx.wear.compose:*
         versions: [">= 1.7"]
       - dependency-name: androidx.compose*:*
         versions: [">= 1.12"]
+      - dependency-name: androidx.core:*
+        versions: [">= 1.19"]
+      - dependency-name: androidx.lifecycle:*
+        versions: [">= 2.11"]
 
   # The Viewer's GitHub Pages workflow, pinned to commit SHAs.
   - package-ecosystem: github-actions

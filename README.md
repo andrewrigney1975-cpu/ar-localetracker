@@ -573,9 +573,10 @@ which `signing.gradle` ensures for both build types. To enable debugging on the 
 2. Settings → Developer options: enable **ADB debugging** and **Wireless debugging**.
 3. Run `adb pair <ip:port>` with the code shown, then `adb connect <ip:port>`.
 
-> The Gradle wrapper is pinned to 9.1, because Android Studio's bundled JDK 25 is too new
-> for the Gradle 8.x that Capacitor generates. `android/local.properties` (gitignored)
-> must point `sdk.dir` at your Android SDK.
+> The Gradle wrapper is pinned to 9.5.1. Android Studio's bundled JDK 25 is too new for the
+> Gradle 8.x that Capacitor generates, and Gradle 9.6 and later drop an internal API that
+> Capacitor's Android Gradle Plugin 8.x still uses. The wrapper checks the download's SHA-256.
+> `android/local.properties` (gitignored) must point `sdk.dir` at your Android SDK.
 
 ### Testing GPS
 
