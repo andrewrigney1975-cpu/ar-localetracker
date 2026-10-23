@@ -22,11 +22,22 @@ android {
         buildConfig = true
     }
 
+    // Not debuggable and shrunk by R8, like the phone app; signed with the same key (signing.gradle).
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
     }
 }
+
+apply from: rootProject.file('signing.gradle')
 
 kotlin {
     compilerOptions {

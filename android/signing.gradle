@@ -1,0 +1,38 @@
+// Release signing, applied by :app and :wear: the phone and watch apps must share a key for
+// the Wearable Data Layer, so they always take it from here.
+//
+// A dedicated key comes from Gradle properties, kept outside the repo in
+// ~/.gradle/gradle.properties: localeReleaseStoreFile, localeReleaseStorePassword,
+// localeReleaseKeyAlias, localeReleaseKeyPassword. Without them, release builds are signed with
+// this machine's debug key (~/.android/debug.keystore, created by the first debug build). That
+// key is unique to the machine, and it lets a release build install over the debug build the
+// devices already have and keep its data: a build with a different key can only be installed
+// after uninstalling, which deletes every workout.
+
+android {
+    signingConfigs {
+        release {
+            def storePath = findProperty('localeReleaseStoreFile')
+            if (storePath) {
+                storeFile file(storePath)
+                storePassword findProperty('localeReleaseStorePassword')
+                keyAlias findProperty('localeReleaseKeyAlias')
+                keyPassword findProperty('localeReleaseKeyPassword')
+            } else {
+                def debugStore = new File(System.getProperty('user.home'), '.android/debug.keystore')
+                if (!debugStore.exists()) {
+                    logger.warn("Release signing: ${debugStore} not found; run a debug build once to create it, or set localeReleaseStoreFile.")
+                }
+                storeFile debugStore
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+}
