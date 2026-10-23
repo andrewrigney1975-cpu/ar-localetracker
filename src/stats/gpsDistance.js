@@ -2,6 +2,7 @@
 // min/max/mean/SD statistics and CSV for Insights → Export → GPS distance (backlog 11).
 // Pure, so it is unit-tested.
 
+import { csvCell } from '../export/csv.js';
 import { haversine } from '../geo/geo.js';
 
 /** Fixes the phone rated at least this good count towards the "gated" raw distance. */
@@ -95,11 +96,6 @@ export function groupStats(rows) {
   return out;
 }
 
-const cell = (v) => {
-  if (v == null) return '';
-  const s = String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
 const fixed = (v, d) => (v == null || !Number.isFinite(v) ? null : v.toFixed(d));
 
 /**
@@ -111,7 +107,7 @@ export function gpsStatsCSV(rows, { localTime }) {
   const lines = [['group', 'series', 'unit', 'n', 'min', 'max', 'mean', 'sd', 'cv_pct'].join(',')];
   for (const s of groupStats(rows)) {
     const d = s.unit === '%' ? 2 : 1;
-    lines.push([s.group, s.series, s.unit, s.n, fixed(s.min, d), fixed(s.max, d), fixed(s.mean, d), fixed(s.sd, d), fixed(s.cv, 2)].map(cell).join(','));
+    lines.push([s.group, s.series, s.unit, s.n, fixed(s.min, d), fixed(s.max, d), fixed(s.mean, d), fixed(s.sd, d), fixed(s.cv, 2)].map(csvCell).join(','));
   }
   lines.push('');
   lines.push(
@@ -156,7 +152,7 @@ export function gpsStatsCSV(rows, { localTime }) {
         fixed(wx?.tempC, 1),
         fixed(wx?.windMs == null ? null : wx.windMs * 3.6, 0),
       ]
-        .map(cell)
+        .map(csvCell)
         .join(',')
     );
   }

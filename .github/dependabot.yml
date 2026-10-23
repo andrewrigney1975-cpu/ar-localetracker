@@ -1,0 +1,42 @@
+# Dependabot opens a pull request when a dependency has a newer version or a security fix.
+# Monthly and grouped, so updates arrive as a few PRs rather than one per package; security
+# updates are separate and come as soon as an advisory is published.
+version: 2
+updates:
+  # The app, the Viewer and the build tools (package.json).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Android phone and watch apps (android/*.gradle, android/variables.gradle).
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      gradle-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Capacitor 8 builds with AGP 8.x; AGP 9 waits for Capacitor.
+      - dependency-name: com.android.tools.build:gradle
+        versions: [">= 9"]
+      # Compose 1.12+ and Wear Compose 1.7+ need AGP 9.1 (see android/wear/build.gradle).
+      - dependency-name: androidx.wear.compose:*
+        versions: [">= 1.7"]
+      - dependency-name: androidx.compose*:*
+        versions: [">= 1.12"]
+
+  # The Viewer's GitHub Pages workflow, pinned to commit SHAs.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

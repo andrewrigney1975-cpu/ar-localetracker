@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What Auto Backup (Google Drive) and device-to-device transfer copy. Everything is included
+  except the folders below: the workouts database, settings, learned routines and courses are
+  the history worth restoring; the rest is transient or rebuilds itself.
+
+  Cloud backups only run when the device can encrypt them end to end, i.e. it has a screen lock:
+  the database holds every GPS fix and heart-rate sample, so it must never sit in Drive readable
+  by Google. Cache folders (cache, code_cache, no_backup) are never backed up anyway.
+-->
+<data-extraction-rules>
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <!-- Journals of a workout in progress: finalised into the database when it stops. -->
+        <exclude domain="file" path="journal/" />
+        <!-- TrackingService's snapshot of a live workout; restored without its journal it would
+             describe a workout that isn't running. -->
+        <exclude domain="sharedpref" path="locale_tracker.xml" />
+        <!-- WebView storage: Insights caches that rebuild from the database, and the old
+             IndexedDB copy of the workouts kept after the SQLite migration. -->
+        <exclude domain="root" path="app_webview/" />
+        <exclude domain="root" path="app_textures/" />
+        <exclude domain="root" path="app_dxmaker_cache/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="journal/" />
+        <exclude domain="sharedpref" path="locale_tracker.xml" />
+        <exclude domain="root" path="app_webview/" />
+        <exclude domain="root" path="app_textures/" />
+        <exclude domain="root" path="app_dxmaker_cache/" />
+    </device-transfer>
+</data-extraction-rules>
