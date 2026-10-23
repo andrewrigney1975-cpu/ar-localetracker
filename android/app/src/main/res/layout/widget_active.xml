@@ -25,7 +25,7 @@
             android:id="@+id/active_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/google_sans_medium"
             android:maxLines="1"
             android:text="@string/widget_recording"
             android:textColor="@color/widget_accent"
@@ -35,7 +35,7 @@
         android:id="@+id/active_time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:fontFamily="sans-serif-medium"
+        android:fontFamily="@font/google_sans_medium"
         android:maxLines="1"
         android:textColor="@color/widget_text"
         android:textSize="28sp" />

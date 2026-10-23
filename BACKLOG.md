@@ -427,7 +427,9 @@ walking, jogging, running and sprinting, and spoken warnings before each change.
 
 ---
 
-## 13. Google Sans on the home-screen widgets
+## 13. Google Sans on the home-screen widgets: ✅ done (October 2026)
+
+> Implemented with three static Google Sans fonts in `res/font/` (regular 400, medium 500, bold 700; Latin subsets of the variable font, about 85 KB each, made by `scripts/make-widget-fonts.py`). All 18 widget text views use `@font/google_sans_medium` or `@font/google_sans_regular`, and the 4×2 week chart draws its labels, and measures the goal message, with the same fonts (`LocaleWidgets.font`). The release APK grew by about 100 KB. Licence: SIL Open Font License 1.1, no Reserved Font Name (`android/app/src/main/google-sans-OFL.txt`, also in each font's name table).
 
 **Request:** check the font on the widgets and use Google Sans, as the app does.
 
