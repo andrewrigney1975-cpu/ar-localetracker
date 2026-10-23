@@ -47,8 +47,8 @@ kotlin {
 
 dependencies {
     // Pinned to the Compose generation that supports AGP 8.x (Capacitor's toolchain);
-    // Compose 1.12+ / Wear Compose 1.7+ require AGP 9.1.
-    implementation "androidx.activity:activity-compose:1.12.4"
+    // Compose 1.12+ / Wear Compose 1.7+ / Lifecycle 2.11+ require AGP 9.1.
+    implementation "androidx.activity:activity-compose:1.13.0"
     implementation "androidx.fragment:fragment:$androidxFragmentVersion"
     implementation "androidx.wear.compose:compose-material3:1.6.2"
     implementation "androidx.wear.compose:compose-foundation:1.6.2"
@@ -58,7 +58,7 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.11.0"
     implementation "androidx.lifecycle:lifecycle-service:2.10.0"
     implementation "androidx.lifecycle:lifecycle-runtime-compose:2.10.0"
-    implementation "androidx.wear:wear:1.3.0"
+    implementation "androidx.wear:wear:1.4.0"
     implementation "androidx.wear:wear-ongoing:1.1.0"
     implementation "androidx.wear.tiles:tiles:1.6.2"
     implementation "androidx.wear.protolayout:protolayout:1.4.2"
