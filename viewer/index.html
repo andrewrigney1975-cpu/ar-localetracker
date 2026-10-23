@@ -6,6 +6,9 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#4b6584" />
     <meta name="description" content="Explore a course shared from Locale Exercise Tracker on a map and in 3D. Courses open in your browser; nothing is uploaded." />
+    <!-- Course names come from links and files anyone can make: no inline or foreign script
+         may run. Same as the app's policy (index.html) without the weather hosts. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.tile.opentopomap.org https://server.arcgisonline.com https://tiles.openfreemap.org; font-src 'self' data:; connect-src 'self' https://tiles.openfreemap.org https://*.tile.opentopomap.org https://server.arcgisonline.com; object-src 'none'; base-uri 'none'; form-action 'none'" />
     <title>Locale Viewer</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%234b6584' d='M12 2a7 7 0 0 0-7 7c0 5.3 7 13 7 13s7-7.7 7-13a7 7 0 0 0-7-7z'/%3E%3C/svg%3E" />
   </head>

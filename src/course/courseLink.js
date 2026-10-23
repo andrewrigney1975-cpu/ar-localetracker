@@ -7,7 +7,7 @@
 // [lat, lon, alt, Δlat, Δlon, Δalt, …]: latitude and longitude in 1e-5° (about 1 m) and
 // altitude in decimetres, each a change from the previous point; a missing altitude is null.
 
-import { courseSegments, writeCourseGPX } from './courseFile.js';
+import { CourseError, MAX_OPEN_POINTS, courseSegments, writeCourseGPX } from './courseFile.js';
 import { haversine } from '../geo/geo.js';
 import { verticalGainLoss } from '../stats/summary.js';
 
@@ -20,12 +20,44 @@ const ALT = 10;
 
 /** Links longer than this are refused: chat apps and some browsers cut very long URLs. */
 export const MAX_LINK_CHARS = 60000;
+/**
+ * Most JSON a link may inflate to. A link at the length limit holds ~45 kB of deflate, which
+ * real courses inflate to a few hundred kB; deflate can expand ~1000×, so a crafted link
+ * could otherwise fill the tab's memory.
+ */
+const MAX_PAYLOAD_BYTES = 2 * 1024 * 1024;
 
 export class CourseLinkError extends Error {}
+
+const DAMAGED = 'This course link is incomplete or damaged. Ask for the link again, or for the .gpx file.';
 
 async function pipe(bytes, stream) {
   const out = new Response(new Blob([bytes]).stream().pipeThrough(stream));
   return new Uint8Array(await out.arrayBuffer());
+}
+
+/** Inflated bytes, read a chunk at a time so a deflate bomb stops at the cap. */
+async function inflate(bytes, cap) {
+  const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > cap) {
+      await reader.cancel().catch(() => {});
+      throw new CourseLinkError(DAMAGED);
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.length;
+  }
+  return out;
 }
 
 function toBase64Url(bytes) {
@@ -60,8 +92,16 @@ function packSegment(pts) {
   return out;
 }
 
+/** Whole numbers only (altitude may be null): anything else would give NaN coordinates. */
+function validSegment(flat) {
+  if (!Array.isArray(flat) || flat.length % 3) return false;
+  for (let k = 0; k < flat.length; k++) {
+    if (!Number.isSafeInteger(flat[k]) && !(k % 3 === 2 && flat[k] === null)) return false;
+  }
+  return true;
+}
+
 function unpackSegment(flat) {
-  if (!Array.isArray(flat) || flat.length % 3) throw new CourseLinkError('This course link is damaged.');
   const pts = [];
   let lat = 0;
   let lon = 0;
@@ -101,18 +141,27 @@ export async function courseLinkURL(course) {
 
 /**
  * The course GPX a link carries, ready for parseCourse.
- * @throws {CourseLinkError} when the link is damaged or from a newer version
+ * Links come from anyone, so the size is checked at each step: the link's length, the
+ * inflated JSON, then the number of points before any are unpacked.
+ * @throws {CourseLinkError} when the link is damaged, too large or from a newer version
+ * @throws {CourseError} when the route has more points than View can draw
  */
 export async function decodeCourseLink(value) {
+  if (typeof value !== 'string' || value.length > MAX_LINK_CHARS) {
+    throw new CourseLinkError('This course link is longer than Locale makes. Ask for the .gpx file instead.');
+  }
   let payload;
   try {
-    const bytes = await pipe(fromBase64Url(value), new DecompressionStream('deflate-raw'));
-    payload = JSON.parse(new TextDecoder().decode(bytes));
+    payload = JSON.parse(new TextDecoder().decode(await inflate(fromBase64Url(value), MAX_PAYLOAD_BYTES)));
   } catch {
-    throw new CourseLinkError('This course link is incomplete or damaged. Ask for the link again, or for the .gpx file.');
+    throw new CourseLinkError(DAMAGED);
   }
   if (payload?.v !== VERSION) throw new CourseLinkError('This course link is from a newer version of Locale.');
-  const segments = (payload.s ?? []).map(unpackSegment);
+  const flat = payload.s ?? [];
+  if (!Array.isArray(flat) || !flat.every(validSegment)) throw new CourseLinkError(DAMAGED);
+  const n = flat.reduce((s, x) => s + x.length / 3, 0);
+  if (n > MAX_OPEN_POINTS) throw new CourseError(`This route has ${n.toLocaleString()} points, more than View can draw (${MAX_OPEN_POINTS.toLocaleString()}).`);
+  const segments = flat.map(unpackSegment);
   let distance = 0;
   let gain = 0;
   let loss = 0;
