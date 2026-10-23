@@ -17,7 +17,7 @@ export const COURSE_MIME = 'application/gpx+xml';
 
 const THIN_TOLERANCE_M = 2;
 const MAX_SHARED_POINTS = 5000;
-const MAX_OPEN_POINTS = 50000;
+export const MAX_OPEN_POINTS = 50000;
 const HIDE_ENDS_M = 200;
 
 // ---- Initials and file name ------------------------------------------------------------------

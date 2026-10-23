@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseCourse, toCourseGPX } from '../src/course/courseFile.js';
-import { CourseLinkError, VIEWER_URL, courseLinkURL, decodeCourseLink, encodeCourseLink } from '../src/course/courseLink.js';
+import { CourseError, MAX_OPEN_POINTS, parseCourse, toCourseGPX } from '../src/course/courseFile.js';
+import { CourseLinkError, MAX_LINK_CHARS, VIEWER_URL, courseLinkURL, decodeCourseLink, encodeCourseLink } from '../src/course/courseLink.js';
 import { buildWorkout } from '../src/services/buildWorkout.js';
 import { generateJournal } from '../src/tracker/synthetic.js';
 
@@ -56,5 +56,26 @@ describe('course links', () => {
     const link = await encodeCourseLink(sharedCourse({ seconds: 600 }));
     await expect(decodeCourseLink(link.slice(0, link.length >> 1))).rejects.toThrow(CourseLinkError);
     await expect(decodeCourseLink('not a link!')).rejects.toThrow(CourseLinkError);
+  });
+
+  it('refuses crafted links before they use much memory', async () => {
+    // A link from any payload, as an attacker would make one.
+    const linkOf = async (payload) => {
+      const out = new Response(new Blob([JSON.stringify(payload)]).stream().pipeThrough(new CompressionStream('deflate-raw')));
+      return Buffer.from(await out.arrayBuffer()).toString('base64url');
+    };
+    // Longer than the app ever makes.
+    await expect(decodeCourseLink('A'.repeat(MAX_LINK_CHARS + 1))).rejects.toThrow(/longer than Locale makes/);
+    // A deflate bomb: 30 MB of name in a link under the length limit.
+    const bomb = await linkOf({ v: 1, n: 'x'.repeat(30 * 1024 * 1024), s: [] });
+    expect(bomb.length).toBeLessThan(MAX_LINK_CHARS);
+    await expect(decodeCourseLink(bomb)).rejects.toThrow(CourseLinkError);
+    // Coordinates that aren't whole numbers.
+    await expect(decodeCourseLink(await linkOf({ v: 1, n: 'x', s: [[1, 'a', null, 2, 3, 4]] }))).rejects.toThrow(CourseLinkError);
+    await expect(decodeCourseLink(await linkOf({ v: 1, n: 'x', s: [[1, 2, 3.5, 2, 3, 4]] }))).rejects.toThrow(CourseLinkError);
+    await expect(decodeCourseLink(await linkOf({ v: 1, n: 'x', s: 'abc' }))).rejects.toThrow(CourseLinkError);
+    // More points than View draws, refused before they are unpacked.
+    const many = await linkOf({ v: 1, n: 'x', s: [new Array((MAX_OPEN_POINTS + 1) * 3).fill(0)] });
+    await expect(decodeCourseLink(many)).rejects.toThrow(CourseError);
   });
 });
