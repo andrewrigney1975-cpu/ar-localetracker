@@ -140,7 +140,8 @@ async function initStorage() {
  * Files): read it natively, keep it in View and show it.
  */
 async function openIncomingCourse(url) {
-  if (!url || !/^(content|file):/i.test(url)) return;
+  // content: only, as in the manifest; readUri refuses anything else too.
+  if (!url || !/^content:/i.test(url)) return;
   try {
     const [{ LocaleStore }, { saveCourse }, { CourseError }] = await Promise.all([
       import('./db/nativeStore.js'),

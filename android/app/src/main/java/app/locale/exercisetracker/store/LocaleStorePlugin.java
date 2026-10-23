@@ -1,5 +1,6 @@
 package app.locale.exercisetracker.store;
 
+import android.content.pm.ProviderInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
@@ -59,22 +60,40 @@ public class LocaleStorePlugin extends Plugin {
     private static final int MAX_COURSE_BYTES = 20 * 1024 * 1024;
 
     /**
+     * Whether a URI is one another app shared with us: content: from a provider that isn't
+     * Locale's own. Reads run with Locale's permissions, so a file: path or one of our own
+     * providers (the FileProvider over cache and external storage) would let any app that can
+     * send a VIEW intent make Locale read its private files. {@code authorityPackage} is the
+     * provider's package, or null when it doesn't resolve: package visibility hides other
+     * apps' providers, but never our own, so null means it isn't ours.
+     */
+    static boolean isForeignContent(String scheme, String authority, String authorityPackage, String ownPackage) {
+        if (!"content".equals(scheme) || authority == null || authority.isEmpty()) return false;
+        return !ownPackage.equals(authorityPackage);
+    }
+
+    /**
      * Text of a file another app handed us (a course opened from Messages, Gmail or Files):
      * {uri} → {text, name}. Reads through the ContentResolver, which holds the temporary read
-     * grant that came with the VIEW intent.
+     * grant that came with the VIEW intent. Only foreign content: URIs are read.
      */
     @PluginMethod
     public void readUri(PluginCall call) {
         io.execute(() -> {
             try {
-                Uri uri = Uri.parse(call.getString("uri"));
+                String raw = call.getString("uri");
+                Uri uri = raw == null ? null : Uri.parse(raw);
+                ProviderInfo provider = uri == null || uri.getAuthority() == null ? null
+                    : getContext().getPackageManager().resolveContentProvider(uri.getAuthority(), 0);
+                if (uri == null || !isForeignContent(uri.getScheme(), uri.getAuthority(), provider != null ? provider.packageName : null, getContext().getPackageName())) {
+                    call.reject("Only files shared by another app can be opened", "uri");
+                    return;
+                }
                 String name = null;
-                if ("content".equals(uri.getScheme())) {
-                    try (Cursor cur = getContext().getContentResolver().query(uri, new String[] { OpenableColumns.DISPLAY_NAME }, null, null, null)) {
-                        if (cur != null && cur.moveToFirst()) name = cur.getString(0);
-                    } catch (Exception ignored) {
-                        // Some providers don't answer queries; the name is only a fallback label.
-                    }
+                try (Cursor cur = getContext().getContentResolver().query(uri, new String[] { OpenableColumns.DISPLAY_NAME }, null, null, null)) {
+                    if (cur != null && cur.moveToFirst()) name = cur.getString(0);
+                } catch (Exception ignored) {
+                    // Some providers don't answer queries; the name is only a fallback label.
                 }
                 if (name == null) name = uri.getLastPathSegment();
                 ByteArrayOutputStream out = new ByteArrayOutputStream();
