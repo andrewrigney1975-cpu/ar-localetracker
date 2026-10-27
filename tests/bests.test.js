@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fastestSplit, personalBests, sustainedSpeed } from '../src/insights/bests.js';
+import { fastestSplit, personalBests, sustainedSpeed, TOP_SPEED_WINDOW_S } from '../src/insights/bests.js';
 import { maxSustainedSpeed } from '../src/stats/summary.js';
 
 /** A straight track at the given speeds (m/s), one point per second. */
@@ -24,18 +24,18 @@ describe('personal bests', () => {
     expect(fastestSplit(track(Array(100).fill(5)), 1000)).toBeNull();
   });
 
-  it('takes the fastest speed over a few seconds, so a one-point GPS jump does not count', () => {
+  it('takes the fastest speed over 30 s, so GPS jumps barely count', () => {
     // Walking at 1.5 m/s with one 20 m jump in a single second.
     const speeds = Array(120).fill(1.5);
     speeds[60] = 20;
     const t = track(speeds);
     expect(Math.max(...t.speed)).toBe(20);
-    expect(sustainedSpeed(t, 5)).toBeCloseTo((4 * 1.5 + 20) / 5, 5);
-    expect(sustainedSpeed(t, 5)).toBeLessThan(5.3);
-    // A real sprint held for 10 s shows in full.
-    const sprint = track([...Array(30).fill(3), ...Array(10).fill(7), ...Array(30).fill(3)]);
-    expect(sustainedSpeed(sprint, 5)).toBeCloseTo(7, 5);
-    expect(sustainedSpeed(track([2, 2]), 5)).toBeNull();
+    expect(TOP_SPEED_WINDOW_S).toBe(30);
+    expect(sustainedSpeed(t, TOP_SPEED_WINDOW_S)).toBeCloseTo((29 * 1.5 + 20) / 30, 5);
+    // A real effort held for 40 s shows in full.
+    const sprint = track([...Array(30).fill(3), ...Array(40).fill(5), ...Array(30).fill(3)]);
+    expect(sustainedSpeed(sprint, TOP_SPEED_WINDOW_S)).toBeCloseTo(5, 5);
+    expect(sustainedSpeed(track(Array(20).fill(2)), TOP_SPEED_WINDOW_S)).toBeNull();
   });
 
   it('picks each best per activity, with the workout it came from', () => {
