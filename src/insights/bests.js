@@ -4,19 +4,19 @@
 // workout version; a cold cache loads each track once (like effort.js).
 
 import { getTrack } from '../db/workouts.js';
-import { computeSplits, sustainedSpeed } from '../stats/summary.js';
+import { computeSplits, MAX_SPEED_WINDOW_S, sustainedSpeed } from '../stats/summary.js';
 import { M_PER_MI } from '../units.js';
 
-const KEY = 'insights.splits.v2';
+const KEY = 'insights.splits.v3';
 
 /** Best average pace only counts workouts at least this long (a 300 m dash isn't a best). */
 export const MIN_AVG_DISTANCE_M = 1000;
 
 /**
- * Fastest speed is averaged over at least this much moving time, so a single GPS jump
- * (a walk "at" 14 km/h) doesn't count.
+ * Fastest speed is averaged over at least this much moving time, so GPS jumps (a walk "at"
+ * 14 km/h) don't count. The same window as the workout Summary's max speed.
  */
-export const TOP_SPEED_WINDOW_S = 5;
+export const TOP_SPEED_WINDOW_S = MAX_SPEED_WINDOW_S;
 
 /** Ski days include lifts, so their pace and splits mean nothing. */
 const SPLIT_ACTIVITIES = new Set(['walk', 'run', 'cycle']);
@@ -26,6 +26,8 @@ let cache = null;
 function load() {
   if (cache) return cache;
   try {
+    // v2: fastest speed over 5 s.
+    localStorage.removeItem('insights.splits.v2');
     cache = JSON.parse(localStorage.getItem(KEY) ?? '{}') ?? {};
   } catch {
     cache = {};

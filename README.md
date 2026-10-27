@@ -242,7 +242,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
     ("GPS ±4 m avg")
   - time, moving time and stationary time
   - average speed and average pace
-  - max speed
+  - max speed and best pace, held for at least 30 seconds so GPS glitches don't inflate them
   - climb, descent and net vertical
   - min and max altitude
 - **Ski extras:** runs, lifts, ski vertical, lift time and max run speed.
@@ -389,7 +389,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   repeat, and what affects it. Journals are read once per workout and cached.
 - **Personal bests**, per activity over all time (following the activity and routine
   filters): best average pace or speed, best km or mile split, fastest speed (held for
-  at least 5 seconds, so a GPS glitch doesn't count) and longest workout. Tap one to open
+  at least 30 seconds, so GPS glitches don't count) and longest workout. Tap one to open
   the workout. Ski days show only fastest speed and longest workout.
 - Calories and cardio load need the profile (You tab). They are worked out from each
   workout's full recording and cached on the device until the workout or profile changes.
