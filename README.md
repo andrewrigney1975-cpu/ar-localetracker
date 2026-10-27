@@ -37,7 +37,7 @@ sensors.
   <img src="docs/screenshots/map.jpeg" width="250" alt="Map view with speed-coloured route, distance marker popover, and elevation profile with heart-rate line">
 </p>
 <p align="center">
-  <img src="docs/screenshots/3d.jpeg" width="250" alt="3D route over satellite imagery with exaggerated altitude">
+  <img src="docs/screenshots/3d.jpeg" width="250" alt="3D route over the street map with exaggerated altitude">
   &nbsp;
   <img src="docs/screenshots/splits.png" width="250" alt="Per-kilometre splits with pace, elevation change, heart rate and time">
   &nbsp;
@@ -88,7 +88,7 @@ sensors.
 <p align="center">
   <img src="docs/screenshots/view-map.png" width="250" alt="A shared course on the map in one colour, with a readout of distance, altitude, grade and climb so far, and the elevation profile">
   &nbsp;
-  <img src="docs/screenshots/view-3d.png" width="250" alt="A shared course in 3D over satellite imagery, drawn in one colour">
+  <img src="docs/screenshots/view-3d.png" width="250" alt="A shared course in 3D over the street map, drawn in one colour">
 </p>
 <p align="center">
   <img src="docs/screenshots/viewer.jpeg" width="760" alt="Locale Viewer in a desktop browser: the City2Surf course from a link, full width on the map with its elevation profile">
