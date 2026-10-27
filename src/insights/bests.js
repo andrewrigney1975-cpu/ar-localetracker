@@ -7,7 +7,7 @@ import { getTrack } from '../db/workouts.js';
 import { computeSplits, MAX_SPEED_WINDOW_S, sustainedSpeed } from '../stats/summary.js';
 import { M_PER_MI } from '../units.js';
 
-const KEY = 'insights.splits.v3';
+const KEY = 'insights.splits.v4';
 
 /** Best average pace only counts workouts at least this long (a 300 m dash isn't a best). */
 export const MIN_AVG_DISTANCE_M = 1000;
@@ -26,8 +26,9 @@ let cache = null;
 function load() {
   if (cache) return cache;
   try {
-    // v2: fastest speed over 5 s.
+    // v2: fastest speed over 5 s; v3: over 30 s.
     localStorage.removeItem('insights.splits.v2');
+    localStorage.removeItem('insights.splits.v3');
     cache = JSON.parse(localStorage.getItem(KEY) ?? '{}') ?? {};
   } catch {
     cache = {};

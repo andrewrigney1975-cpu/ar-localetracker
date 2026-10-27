@@ -425,7 +425,7 @@ function renderSummary(panel, w, track, units) {
   const alt = (m) => (m == null ? '–' : Math.round(altitudeValue(m, units)).toLocaleString());
   const au = altitudeUnit(units);
   const pace = formatPace(sm.avgMovingSpeed, units, false);
-  // Best 30 s average from the track, so workouts saved with the old instantaneous max show it too.
+  // Best 10 s average from the track, so workouts saved with the old instantaneous max show it too.
   const top = track?.n ? maxSustainedSpeed(track) : sm.maxSpeed;
   const rows = [
     `<div class="stat feature distance-tile"><div class="distance-main">${statHTML('Distance', distanceValue(sm.distance, units).toFixed(2), distanceUnit(units), 'bare')}${gpsErrorHTML(track, units)}</div><select class="select routine-pick" data-ref="routine" aria-label="Routine" hidden></select></div>`,
