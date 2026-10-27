@@ -2,6 +2,7 @@
 // migration source on Android). Same API as nativeStore.js.
 
 import { tx } from './idb.js';
+import { crc32, fromBase64, packTrack, toBase64, unpackTrack } from './trackCodec.js';
 
 export async function saveWorkout(workout, track, rawText) {
   const raw = rawText != null ? await gzip(rawText) : null;
@@ -54,6 +55,39 @@ export function deleteWorkout(id) {
 
 export async function hasWorkout(id) {
   return Boolean(await tx('workouts', 'readonly', ({ workouts }, p) => p(workouts.getKey(id))));
+}
+
+/** A workout as a save item ({workout, track: {blob, crc32}, raw?: {gzip, crc32}}, base64), for backups. */
+export async function exportItem(id) {
+  const workout = await getWorkout(id);
+  const track = await getTrack(id);
+  if (!workout || !track) return null;
+  const blob = packTrack(track);
+  const item = { workout, track: { blob: toBase64(blob), crc32: crc32(blob) } };
+  const raw = await getRawGzipBytes(id);
+  if (raw) item.raw = { gzip: toBase64(raw), crc32: crc32(raw) };
+  return item;
+}
+
+/** Store save items, checking each CRC as SQLite does. @returns {{id, n, trackCrc, rawCrc}[]} */
+export async function importItems(items) {
+  const results = [];
+  for (const item of items) {
+    const blob = fromBase64(item.track.blob);
+    if (crc32(blob) !== item.track.crc32) throw new Error(`Track CRC mismatch for ${item.workout.id}`);
+    const track = unpackTrack(blob);
+    let rawText = null;
+    let rawCrc = -1;
+    if (item.raw) {
+      const bytes = fromBase64(item.raw.gzip);
+      rawCrc = crc32(bytes);
+      if (rawCrc !== item.raw.crc32) throw new Error(`Raw journal CRC mismatch for ${item.workout.id}`);
+      rawText = await gunzip(new Blob([bytes], { type: 'application/gzip' }));
+    }
+    await saveWorkout(item.workout, track, rawText);
+    results.push({ id: item.workout.id, n: track.n, trackCrc: crc32(packTrack(await getTrack(item.workout.id))), rawCrc });
+  }
+  return results;
 }
 
 /** Migration helpers. */

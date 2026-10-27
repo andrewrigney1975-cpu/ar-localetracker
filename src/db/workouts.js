@@ -23,3 +23,5 @@ export const getRawJournal = (...args) => backend.getRawJournal(...args);
 export const updateWorkout = (...args) => backend.updateWorkout(...args);
 export const deleteWorkout = (...args) => backend.deleteWorkout(...args);
 export const hasWorkout = (...args) => backend.hasWorkout(...args);
+export const exportItem = (...args) => backend.exportItem(...args);
+export const importItems = (...args) => backend.importItems(...args);

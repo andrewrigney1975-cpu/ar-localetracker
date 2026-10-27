@@ -33,13 +33,13 @@ export async function listCourses() {
  * (moved to the top of the list).
  * @throws {CourseError} when the file has no usable route
  */
-export async function saveCourse(text, filename = '') {
+export async function saveCourse(text, filename = '', { addedAt = Date.now() } = {}) {
   const parsed = parseCourse(text, filename);
   const id = courseId(text);
   const list = await readIndex();
   const existing = list.find((c) => c.id === id);
   if (existing) {
-    existing.addedAt = Date.now();
+    existing.addedAt = addedAt;
     await writeIndex(list);
     return existing;
   }
@@ -55,11 +55,21 @@ export async function saveCourse(text, filename = '') {
     gain: parsed.summary.elevGain,
     loss: parsed.summary.elevLoss,
     preview: previewPolyline(parsed.track, 60),
-    addedAt: Date.now(),
+    addedAt,
   };
   list.push(entry);
   await writeIndex(list);
   return entry;
+}
+
+/** Every saved course as {entry, text} (its original file), for backups. */
+export async function exportCourses() {
+  const out = [];
+  for (const entry of await listCourses()) {
+    const { data } = await Filesystem.readFile({ path: path(entry.id), directory: Directory.Data, encoding: Encoding.UTF8 });
+    out.push({ entry, text: typeof data === 'string' ? data : await data.text() });
+  }
+  return out;
 }
 
 /** A saved course, parsed: {entry, name, sharedBy, activity, track, summary}, or null. */

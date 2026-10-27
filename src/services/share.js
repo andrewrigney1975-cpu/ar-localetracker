@@ -56,7 +56,7 @@ export function openSms(uri) {
 }
 
 /** Share a text (string) or binary (Uint8Array) export. */
-export async function shareFile({ filename, content, mime, title }) {
+export async function shareFile({ filename, content, mime, title, dialogTitle = 'Export workout' }) {
   const binary = content instanceof Uint8Array;
   if (!Capacitor.isNativePlatform()) {
     const url = URL.createObjectURL(new Blob([content], { type: mime }));
@@ -77,7 +77,7 @@ export async function shareFile({ filename, content, mime, title }) {
     recursive: true,
   });
   try {
-    await Share.share({ title, files: [uri], dialogTitle: 'Export workout' });
+    await Share.share({ title, files: [uri], dialogTitle });
   } catch (e) {
     // Dismissing the share sheet rejects with "Share canceled"; that is not an error.
     if (!/cancel/i.test(String(e?.message ?? e))) throw e;

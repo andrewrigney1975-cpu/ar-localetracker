@@ -409,6 +409,12 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   IndexedDB data migrates automatically on first launch, verified per track by CRC-32.
   A workout stopped from the watch, a widget or the notification is processed and saved
   natively right away. The browser build keeps IndexedDB.
+- **Backup and restore** (Settings → Backup): one gzipped file holding every workout (with
+  its GPS track and raw sensor log), your courses and settings, shared to Drive, Files or
+  wherever you like. Restoring checks the file is a complete Locale backup, then adds its
+  workouts and courses (one with the same id is replaced; nothing is deleted) and replaces
+  your settings. Each track is checked by CRC-32 as it's stored. Use it to move to a new
+  phone, or before reinstalling.
 
 ## Auto goals: how Locale learns your routines
 
@@ -597,6 +603,7 @@ src/
   export/    FIT, GPX, TCX, KML, GeoJSON, CSV
   map/       MapLibre workout map, Live position map    profile/  elevation side view
   view3d/    Three.js 3D view, map ground, display smoothing
+  backup/    backup file format and restore (I/O in services/backup.js)
   seed/      City2Surf sample workout (course data + generator)
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, insights,
