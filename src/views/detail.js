@@ -1,8 +1,9 @@
 import { ACTIVITIES, ACTIVITY_IDS, activity as activityProfile } from '../activities.js';
-import { deleteWorkout, getTrack, getWorkout, updateWorkout } from '../db/workouts.js';
+import { deleteWorkout, getTrack, getWorkout, listWorkouts, updateWorkout } from '../db/workouts.js';
 import { EXPORT_FORMATS, renderExport } from '../export/index.js';
 import { getRoutineModel, rebuildRoutineModel } from '../insights/model.js';
 import { assignWorkout, displayName, isUsable, routineChoices, routineOf } from '../insights/routines.js';
+import { routineBests } from '../insights/trophies.js';
 import { navigate } from '../router.js';
 import { workoutShareText, smsUri } from '../export/text.js';
 import { changeActivity } from '../services/workoutService.js';
@@ -18,6 +19,7 @@ import { significantExtremes } from '../stats/extremes.js';
 import { boutsRun, intervalTotals } from '../stats/hii.js';
 import { HII_LABELS } from '../hii/plan.js';
 import { computeSplits, maxSustainedSpeed } from '../stats/summary.js';
+import { celebrate } from '../ui/celebrate.js';
 import { confirmDialog, openDialog } from '../ui/dialog.js';
 import { Disposer, el, escapeHtml } from '../ui/dom.js';
 import { icons } from '../ui/icons.js';
@@ -330,7 +332,19 @@ export async function mount(root, params, query, ctx) {
     navigate('/history', { replace: true });
   });
 
+  let gone = false;
+  d.add(() => (gone = true));
   await showTab(tab);
+  if (tab === 'summary') celebrateBest();
+
+  // The routine's quickest time: confetti, an overlay and a fanfare once when the Summary opens.
+  async function celebrateBest() {
+    const [model, all] = await Promise.all([getRoutineModel().catch(() => null), listWorkouts()]);
+    const best = routineBests(model, all).get(w.id);
+    if (!best || gone) return;
+    d.add(celebrate({ title: 'Personal Best Time!!', detail: `${displayName(best.routineName)} · ${formatDuration(best.duration)}` }));
+  }
+
   return () => d.dispose();
 }
 
