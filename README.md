@@ -391,6 +391,11 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   filters): best average pace or speed, best km or mile split, fastest speed (held for
   at least 30 seconds, so GPS glitches don't count) and longest workout. Tap one to open
   the workout. Ski days show only fastest speed and longest workout.
+- **Routine trophies:** the quickest workout of each routine (lowest time, among those that
+  went at least 97% of the routine's usual distance, so a cut-short one can't win) gets a
+  gold cup on its row in Track and History. Opening its Summary fires confetti, shows
+  *"Personal Best Time!!"* and plays a short fanfare, all fading after 5 seconds (tap to
+  dismiss sooner; no confetti with reduced motion turned on).
 - Calories and cardio load need the profile (You tab). They are worked out from each
   workout's full recording and cached on the device until the workout or profile changes.
 
@@ -646,6 +651,8 @@ the feature requests.
 - **FIT protocol:** files are validated in tests with Garmin's
   [FIT SDK](https://developer.garmin.com/fit/) (a dev dependency only; it isn't shipped
   in the app).
+- **Personal-best fanfare:** "Classic fanfare lick" by fvcalderan,
+  [OpenGameArt](https://opengameart.org/content/classic-fanfare-lick) (CC0).
 - **Font:** [Google Sans](https://fonts.google.com/specimen/Google+Sans) (SIL Open Font
   License) in the app. The home-screen widgets use the phone's own Google Sans (the
   `google-sans` system font families on Pixel phones), and the default font elsewhere.

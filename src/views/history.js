@@ -1,6 +1,7 @@
 import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
-import { rebuildRoutineModel } from '../insights/model.js';
+import { getRoutineModel, rebuildRoutineModel } from '../insights/model.js';
+import { routineBests } from '../insights/trophies.js';
 import { syncWorkouts } from '../services/sync.js';
 import { settings, updateSettings } from '../settings.js';
 import { openDialog } from '../ui/dialog.js';
@@ -49,7 +50,9 @@ export async function mount(root, params, query, ctx) {
 
   async function render() {
     chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.f === filter)));
-    all = await listWorkouts();
+    let model;
+    [all, model] = await Promise.all([listWorkouts(), getRoutineModel().catch(() => null)]);
+    const bests = routineBests(model, all);
     const shown = all.filter((w) => filter === 'all' || w.activity === filter);
     if (!shown.length) {
       list.innerHTML = `<div class="empty">${icons.history}<div>No workouts yet.</div></div>`;
@@ -67,7 +70,7 @@ export async function mount(root, params, query, ctx) {
         const time = items.reduce((a, w) => a + w.summary.duration, 0);
         return `
           <div class="section-title month-head"><span>${month}</span><small class="num">${items.length} · ${formatDistance(dist, units, 1)} · ${formatDuration(time)}</small></div>
-          <div class="workout-list">${items.map((w) => workoutItemHTML(w, units)).join('')}</div>`;
+          <div class="workout-list">${items.map((w) => workoutItemHTML(w, units, bests.get(w.id))).join('')}</div>`;
       })
       .join('');
     syncSelection();
@@ -179,6 +182,7 @@ export async function mount(root, params, query, ctx) {
   );
   await render();
   d.add(on(window, 'workouts-changed', render));
+  d.add(on(window, 'routines-changed', render));
   // Pull down to pick up workouts recorded from the watch, a widget or the notification.
   d.add(
     pullToRefresh(root.querySelector('.body'), async () => {

@@ -30,5 +30,8 @@ export const icons = {
   info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7h.01"/>'),
   folder: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
   route: svg('<circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H17a3.5 3.5 0 0 0 0-7H7a3.5 3.5 0 0 1 0-7h8.5"/>'),
+  // Gold cup for personal bests (coloured by .trophy).
+  trophy:
+    '<svg class="trophy" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 3h10v5a5 5 0 0 1-10 0z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M7 5H4.5v1.5A3.5 3.5 0 0 0 8 10M17 5h2.5v1.5A3.5 3.5 0 0 1 16 10"/><path fill="currentColor" d="M10.5 12h3v5h-3z"/><rect fill="currentColor" x="7.5" y="17" width="9" height="3.5" rx="1"/></svg>',
   logo: svg('<path d="M12 22s-7-6.4-7-12.2a7 7 0 0 1 14 0C19 15.6 12 22 12 22z"/><path d="M8.5 11.5l2.2-3 2 2.2 2.8-3.7"/>'),
 };

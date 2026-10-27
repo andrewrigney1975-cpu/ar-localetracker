@@ -1,5 +1,7 @@
 import { ACTIVITIES, ACTIVITY_IDS, activity } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
+import { getRoutineModel } from '../insights/model.js';
+import { routineBests } from '../insights/trophies.js';
 import { syncWorkouts } from '../services/sync.js';
 import { settings } from '../settings.js';
 import { tracker } from '../tracker/client.js';
@@ -10,13 +12,15 @@ import { routeThumbSVG } from '../ui/thumb.js';
 import { toast } from '../ui/toast.js';
 import { formatDate, formatDistance, formatDuration } from '../units.js';
 
-export function workoutItemHTML(w, units) {
+/** A workout's row. `best` (from routineBests) adds a gold cup: the routine's quickest time. */
+export function workoutItemHTML(w, units, best = null) {
   const a = activity(w.activity);
+  const trophy = best ? `<span class="pb-cup" title="Quickest ${escapeHtml(best.routineName)}" aria-label="Personal best">${icons.trophy}</span>` : '';
   return `
     <a class="workout-item card" href="#/workout/${encodeURIComponent(w.id)}" data-activity="${a.id}">
       ${routeThumbSVG(w.preview)}
       <div style="min-width:0">
-        <div class="title">${escapeHtml(w.name)}</div>
+        <div class="title"><span>${escapeHtml(w.name)}</span>${trophy}</div>
         <div class="meta">${formatDate(w.startedAt)}</div>
       </div>
       <div class="stat num">${formatDistance(w.summary.distance, units)}<small>${formatDuration(w.summary.duration)}</small></div>
@@ -90,19 +94,21 @@ export async function mount(root) {
 
   const renderRecent = async () => {
     const slot = root.querySelector('[data-slot="recent"]');
-    const all = await listWorkouts();
+    const [all, model] = await Promise.all([listWorkouts(), getRoutineModel().catch(() => null)]);
     if (!all.length) {
       slot.innerHTML = `<div class="empty">${icons.route}<div>Your workouts will appear here.</div></div>`;
       return;
     }
+    const bests = routineBests(model, all);
     slot.innerHTML = `
       <div class="section-title">Recent</div>
-      <div class="workout-list">${all.slice(0, 4).map((w) => workoutItemHTML(w, units)).join('')}</div>
+      <div class="workout-list">${all.slice(0, 4).map((w) => workoutItemHTML(w, units, bests.get(w.id))).join('')}</div>
       ${all.length > 4 ? '<p style="text-align:center"><a class="btn ghost" href="#/history">See all workouts</a></p>' : ''}`;
   };
 
   await Promise.all([renderActive(), renderRecent()]);
   d.add(on(window, 'workouts-changed', renderRecent));
+  d.add(on(window, 'routines-changed', renderRecent));
   d.add(tracker.on('state', renderActive));
   // Pull down to pick up workouts recorded from the watch, a widget or the notification.
   d.add(
