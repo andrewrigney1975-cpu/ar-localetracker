@@ -37,7 +37,7 @@ function loadPrefs() {
   } catch {
     // Storage blocked: defaults for this visit.
   }
-  return { units: defaultUnits(), mapStyle: 'streets', terrain3d: true, smooth3d: true, exaggeration: 'auto', ...saved };
+  return { units: defaultUnits(), mapStyle: 'streets', map3d: true, smooth3d: true, exaggeration: 'auto', ...saved };
 }
 
 const prefs = loadPrefs();
@@ -178,8 +178,9 @@ async function showTab(id) {
         units: prefs.units,
         course: true,
         exaggeration: prefs.exaggeration,
-        terrain: prefs.terrain3d,
-        onTerrainChange: (terrain3d) => setPref({ terrain3d }),
+        mapGround: prefs.map3d,
+        mapStyle: prefs.mapStyle,
+        onMapGroundChange: (map3d) => setPref({ map3d }),
         smooth: prefs.smooth3d,
         onSmoothChange: (smooth3d) => setPref({ smooth3d }),
       });

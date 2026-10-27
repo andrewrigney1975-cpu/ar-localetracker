@@ -122,8 +122,8 @@ export async function mount(root) {
                 ${segmented('mapStyle', Object.entries(MAP_STYLE_LABELS), s.mapStyle)}</div>
               <div class="setting stack"><div class="text">3D vertical exaggeration<small>Auto fits the climb to the route size</small></div>
                 ${segmented('exaggeration', [['auto', 'Auto'], ['2', '2×'], ['5', '5×'], ['10', '10×']], s.exaggeration)}</div>
-              <label class="setting"><span class="text">Terrain in 3D<small>Show shaded relief under the 3D route (needs a connection)</small></span>
-                <input type="checkbox" class="switch" data-toggle="terrain3d" ${s.terrain3d ? 'checked' : ''} /></label>
+              <label class="setting"><span class="text">Map in 3D<small>Show the map (in the Map tab's style) under the 3D route (needs a connection)</small></span>
+                <input type="checkbox" class="switch" data-toggle="map3d" ${s.map3d ? 'checked' : ''} /></label>
               <label class="setting"><span class="text">Smooth 3D route<small>Draw the 3D route as a 10-second average (stats are unaffected)</small></span>
                 <input type="checkbox" class="switch" data-toggle="smooth3d" ${s.smooth3d ? 'checked' : ''} /></label>
             </div>
@@ -148,7 +148,7 @@ export async function mount(root) {
 
             <div class="about">
               <p><strong>Locale Exercise Tracker</strong> <span data-ref="version"></span><br>${workouts.length} workout${workouts.length === 1 ? '' : 's'} stored on this device.</p>
-              <p>Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors. Tiles by <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA). 3D terrain from <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noopener">Terrain Tiles</a> (Mapzen, Open Data on AWS): SRTM, GMTED, ETOPO1 and USGS 3DEP (public domain); © Commonwealth of Australia (Geoscience Australia) 2017 (CC BY 4.0); EU-DEM, produced using Copernicus data and information funded by the European Union; and others. <a href="https://open-meteo.com" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a> (CC BY 4.0).</p>
+              <p>Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors. Tiles by <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>, <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (CC-BY-SA). <a href="https://open-meteo.com" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a> (CC BY 4.0).</p>
               ${tracker.isNative ? '' : '<p>Running in the browser with simulated GPS. Add <code>?sim=10</code> to the URL to speed it up.</p>'}
             </div>
           </div>
@@ -182,7 +182,7 @@ export async function mount(root) {
       render();
     });
     root.querySelector('[data-toggle="keepScreenOn"]').addEventListener('change', (e) => updateSettings({ keepScreenOn: e.target.checked }));
-    root.querySelector('[data-toggle="terrain3d"]').addEventListener('change', (e) => updateSettings({ terrain3d: e.target.checked }));
+    root.querySelector('[data-toggle="map3d"]').addEventListener('change', (e) => updateSettings({ map3d: e.target.checked }));
     root.querySelector('[data-toggle="smooth3d"]').addEventListener('change', (e) => updateSettings({ smooth3d: e.target.checked }));
     root.querySelector('[data-toggle="weather"]').addEventListener('change', async (e) => {
       await updateSettings({ weather: e.target.checked });
