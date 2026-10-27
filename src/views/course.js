@@ -94,8 +94,9 @@ export async function mount(root, params, query, ctx) {
           units,
           course: true,
           exaggeration: settings().exaggeration,
-          satellite: settings().satellite3d,
-          onSatelliteChange: (on) => updateSettings({ satellite3d: on }),
+          mapGround: settings().map3d,
+          mapStyle: settings().mapStyle,
+          onMapGroundChange: (on) => updateSettings({ map3d: on }),
           smooth: settings().smooth3d,
           onSmoothChange: (on) => updateSettings({ smooth3d: on }),
         });

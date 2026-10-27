@@ -9,7 +9,7 @@ sets the goal distance for a workout on its own once it knows them. A **Live** m
 altitude, speed and heading without recording anything.
 Afterwards you can review each workout as stats, heart-rate effort (calories, cardio load,
 zones), splits, an interactive map with an elevation side view, or a 3D plot over
-satellite imagery. Then you can export it as **FIT** (for Strava and Garmin Connect),
+the map. Then you can export it as **FIT** (for Strava and Garmin Connect),
 GPX, TCX, KML, GeoJSON or CSV. **Insights** reports your totals and averages by day, week,
 month, quarter or year, per activity or routine, shows your **personal bests**, and
 exports the report as CSV or JSON. Set **goals** for distance, time, cardio load or
@@ -37,7 +37,7 @@ sensors.
   <img src="docs/screenshots/map.jpeg" width="250" alt="Map view with speed-coloured route, distance marker popover, and elevation profile with heart-rate line">
 </p>
 <p align="center">
-  <img src="docs/screenshots/3d.jpeg" width="250" alt="3D route over satellite imagery with exaggerated altitude">
+  <img src="docs/screenshots/3d.jpeg" width="250" alt="3D route over the street map with exaggerated altitude">
   &nbsp;
   <img src="docs/screenshots/splits.png" width="250" alt="Per-kilometre splits with pace, elevation change, heart rate and time">
   &nbsp;
@@ -88,7 +88,7 @@ sensors.
 <p align="center">
   <img src="docs/screenshots/view-map.png" width="250" alt="A shared course on the map in one colour, with a readout of distance, altitude, grade and climb so far, and the elevation profile">
   &nbsp;
-  <img src="docs/screenshots/view-3d.png" width="250" alt="A shared course in 3D over satellite imagery, drawn in one colour">
+  <img src="docs/screenshots/view-3d.png" width="250" alt="A shared course in 3D over the street map, drawn in one colour">
 </p>
 <p align="center">
   <img src="docs/screenshots/viewer.jpeg" width="760" alt="Locale Viewer in a desktop browser: the City2Surf course from a link, full width on the map with its elevation profile">
@@ -284,7 +284,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   profile, and the two follow each other.
 - **3D view:**
   - Three.js plot with an altitude exaggeration slider from 1× to 10×.
-  - **Satellite imagery** on the ground.
+  - **Map** on the ground, in the Map tab's style.
   - Direction arrows, and the same clickable distance markers as the map.
   - **Smooth** route: a 10-second time-weighted average removes GPS noise and altitude
     bounce from the drawn line (display only; stats and exports use the raw track).
@@ -323,7 +323,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - **Map**: the course in one colour (there's no speed to colour it by), distance
     markers, start and finish, and the elevation profile. The readout shows distance,
     altitude, grade and the climb so far, and nothing about time or performance.
-  - **3D**: the same course in one colour over satellite imagery, with the vertical
+  - **3D**: the same course in one colour over the map, with the vertical
     exaggeration and Smooth (averaged over 25 m, as there are no times).
   - Opened courses are kept in their own list in View, apart from your workouts, so they
     never show up in History, Insights or your routines. View also opens other GPX
@@ -596,7 +596,7 @@ src/
              (idbStore), track codec, one-time migration
   export/    FIT, GPX, TCX, KML, GeoJSON, CSV
   map/       MapLibre workout map, Live position map    profile/  elevation side view
-  view3d/    Three.js 3D view, satellite imagery, display smoothing
+  view3d/    Three.js 3D view, map ground, display smoothing
   seed/      City2Surf sample workout (course data + generator)
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, insights,
@@ -632,7 +632,6 @@ the feature requests.
 - **Map data:** © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
 - **Map tiles:** [OpenFreeMap](https://openfreemap.org) and
   [OpenTopoMap](https://opentopomap.org) (CC-BY-SA).
-- **Satellite imagery:** © Esri, Maxar, Earthstar Geographics.
 - **Sample course elevation:** Copernicus GLO-90 DEM via [Open-Meteo](https://open-meteo.com).
 - **Weather:** [Open-Meteo](https://open-meteo.com) (CC BY 4.0), from national weather
   services' models and ERA5 reanalysis.

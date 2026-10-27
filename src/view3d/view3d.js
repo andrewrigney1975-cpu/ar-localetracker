@@ -12,18 +12,18 @@ import { rampRGB, speedRange } from '../ui/colors.js';
 import { cssVar, Disposer } from '../ui/dom.js';
 import { markerInfoHTML, Popover } from '../ui/popover.js';
 import { distanceUnit, formatAltitude, formatPace, splitLength } from '../units.js';
-import { IMAGERY, latToPx, loadImagery, lonToPx } from './imagery.js';
+import { MAP_GROUND_ATTRIBUTION, loadMapGround, mercX, mercY } from './mapGround.js';
 import { SMOOTH_DISTANCE_M, SMOOTH_WINDOW_S, distanceAxis, smoothForDisplay } from './smooth.js';
 
 const WORLD = 100; // horizontal extent normalised to this many scene units
 
 /**
  * @param {HTMLElement} root
- * @param {{workout:object, track:object, units:string, exaggeration:'auto'|number, satellite?:boolean, onSatelliteChange?:(on:boolean)=>void, smooth?:boolean, onSmoothChange?:(on:boolean)=>void, course?:boolean}} opts
+ * @param {{workout:object, track:object, units:string, exaggeration:'auto'|number, mapGround?:boolean, onMapGroundChange?:(on:boolean)=>void, mapStyle?:string, smooth?:boolean, onSmoothChange?:(on:boolean)=>void, course?:boolean}} opts
  *   course: a shared course (View): the line in one colour, no split pace in markers, and
  *   smoothing over distance since there is no time
  */
-export function mountView3D(root, { workout, track, units, exaggeration = 'auto', satellite = true, onSatelliteChange, smooth = true, onSmoothChange, course = false }) {
+export function mountView3D(root, { workout, track, units, exaggeration = 'auto', mapGround = true, onMapGroundChange, mapStyle = 'streets', smooth = true, onSmoothChange, course = false }) {
   const d = new Disposer();
   let disposed = false;
   d.add(() => {
@@ -32,9 +32,9 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
   root.innerHTML = `
     <div class="view3d">
       <div class="view3d-hint">Drag to orbit · pinch to zoom · two fingers to pan</div>
-      <div class="view3d-attrib" hidden>${IMAGERY.attribution}</div>
+      <div class="view3d-attrib" hidden>${MAP_GROUND_ATTRIBUTION[mapStyle] ?? MAP_GROUND_ATTRIBUTION.default}</div>
       <div class="view3d-controls">
-        <button class="chip" data-act="satellite" aria-pressed="false">Satellite</button>
+        <button class="chip" data-act="map" aria-pressed="false" title="The map under the route">Map</button>
         <button class="chip" data-act="smooth" aria-pressed="false" title="${course ? `Average the drawn route over ${SMOOTH_DISTANCE_M} m` : `Average the drawn route over ${SMOOTH_WINDOW_S} s`}">Smooth</button>
         <span class="chips-break"></span>
         <label for="exag">Vertical</label>
@@ -124,26 +124,26 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
   grid.position.set(center.x, 0, center.z);
   scene.add(grid);
 
-  // Satellite ground plane, loaded on demand. Each vertex gets UVs from its own Web Mercator
-  // position, so the imagery lines up exactly with the locally projected route.
+  // Map ground plane (the Map tab's style), loaded on demand. Each vertex gets UVs from its own
+  // Web Mercator position, so the map lines up exactly with the locally projected route.
   const ground = { mesh: null, texture: null, loading: false };
-  let satOn = satellite;
-  const satBtn = root.querySelector('[data-act="satellite"]');
+  let groundOn = mapGround;
+  const groundBtn = root.querySelector('[data-act="map"]');
   const attribution = root.querySelector('.view3d-attrib');
 
   function applyGround() {
-    const showing = satOn && Boolean(ground.mesh);
-    if (ground.mesh) ground.mesh.visible = satOn;
+    const showing = groundOn && Boolean(ground.mesh);
+    if (ground.mesh) ground.mesh.visible = groundOn;
     grid.visible = !showing;
     attribution.hidden = !showing;
-    satBtn.setAttribute('aria-pressed', String(satOn));
+    groundBtn.setAttribute('aria-pressed', String(groundOn));
     render();
   }
 
   async function loadGround() {
     if (ground.mesh || ground.loading) return;
     ground.loading = true;
-    satBtn.disabled = true;
+    groundBtn.disabled = true;
     const pad = Math.max(200, extentM * 0.12);
     const x0 = minX - pad;
     const x1 = maxX + pad;
@@ -153,7 +153,8 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
     const [north, east] = proj.toLatLon(x1, y1);
     try {
       const maxPx = Math.min(4096, renderer.capabilities.maxTextureSize);
-      const img = await loadImagery([west, south, east, north], { maxPx, isCancelled: () => disposed });
+      const img = await loadMapGround([west, south, east, north], mapStyle, { maxPx, isCancelled: () => disposed });
+      const [bw, bs, be, bn] = img.bounds;
       if (disposed) return;
       const geom = new THREE.PlaneGeometry((x1 - x0) * scale, (y1 - y0) * scale, 48, 48);
       geom.rotateX(-Math.PI / 2);
@@ -162,11 +163,7 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
       const uv = geom.attributes.uv;
       for (let i = 0; i < pos.count; i++) {
         const [lat, lon] = proj.toLatLon(pos.getX(i) / scale, -pos.getZ(i) / scale);
-        uv.setXY(
-          i,
-          (lonToPx(lon, img.z) - img.originX) / img.canvas.width,
-          1 - (latToPx(lat, img.z) - img.originY) / img.canvas.height
-        );
+        uv.setXY(i, (mercX(lon) - mercX(bw)) / (mercX(be) - mercX(bw)), (mercY(lat) - mercY(bs)) / (mercY(bn) - mercY(bs)));
       }
       uv.needsUpdate = true;
       const tex = new THREE.CanvasTexture(img.canvas);
@@ -180,13 +177,13 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
       scene.add(ground.mesh);
     } catch (e) {
       if (disposed) return;
-      console.warn('3D imagery', e);
-      flashHint('Satellite imagery unavailable offline');
-      satOn = false;
+      console.warn('3D map', e);
+      flashHint('Map unavailable offline');
+      groundOn = false;
     } finally {
       ground.loading = false;
       if (!disposed) {
-        satBtn.disabled = false;
+        groundBtn.disabled = false;
         applyGround();
       }
     }
@@ -201,10 +198,10 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
     setTimeout(() => hint.remove(), 3500);
   }
 
-  satBtn.addEventListener('click', () => {
-    satOn = !satOn;
-    onSatelliteChange?.(satOn);
-    if (satOn && !ground.mesh) loadGround();
+  groundBtn.addEventListener('click', () => {
+    groundOn = !groundOn;
+    onMapGroundChange?.(groundOn);
+    if (groundOn && !ground.mesh) loadGround();
     else applyGround();
   });
 
@@ -492,8 +489,8 @@ export function mountView3D(root, { workout, track, units, exaggeration = 'auto'
 
   build();
   resize();
-  satBtn.setAttribute('aria-pressed', String(satOn));
-  if (satOn) loadGround();
+  groundBtn.setAttribute('aria-pressed', String(groundOn));
+  if (groundOn) loadGround();
 
   const smoothBtn = root.querySelector('[data-act="smooth"]');
   smoothBtn.setAttribute('aria-pressed', String(smoothOn));
