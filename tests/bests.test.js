@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fastestSplit, personalBests, sustainedSpeed } from '../src/insights/bests.js';
+import { maxSustainedSpeed } from '../src/stats/summary.js';
 
 /** A straight track at the given speeds (m/s), one point per second. */
 function track(speeds) {
@@ -67,5 +68,19 @@ describe('personal bests', () => {
   it('has no pace or split bests for skiing (lifts count as time)', () => {
     const [ski] = personalBests([w('s1', 'ski', { distance: 30000, movingTime: 9000, maxSpeed: 20 })], new Map([['s1', { km: 60, mi: 99, top: 20 }]]));
     expect(ski).toMatchObject({ avgSpeed: null, split: null, maxSpeed: { value: 20 }, longest: { value: 30000 } });
+  });
+});
+
+describe('summary max speed', () => {
+  it('is the best 30 s average, so a few seconds of GPS jumps barely move it', () => {
+    // Walking at 1.5 m/s with a 10 s burst "at" 6 m/s.
+    const speeds = Array(300).fill(1.5);
+    for (let i = 100; i < 110; i++) speeds[i] = 6;
+    expect(maxSustainedSpeed(track(speeds))).toBeCloseTo((20 * 1.5 + 10 * 6) / 30, 5);
+  });
+
+  it('falls back to the whole average when the workout is shorter than 30 s', () => {
+    expect(maxSustainedSpeed(track([2, 4, 6]))).toBeCloseTo(4, 5);
+    expect(maxSustainedSpeed(track([]))).toBe(0);
   });
 });
