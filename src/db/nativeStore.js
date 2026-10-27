@@ -57,6 +57,20 @@ export async function hasWorkout(id) {
   return (await LocaleStore.hasWorkout({ id })).exists;
 }
 
+/** A workout as a save item (see saveItem), straight from SQLite, for backups; null if missing. */
+export async function exportItem(id) {
+  const workout = await getWorkout(id);
+  const { blob } = await LocaleStore.getTrack({ id });
+  if (!workout || !blob) return null;
+  const item = { workout, track: { blob, crc32: crc32(fromBase64(blob)) } };
+  const { gzip: raw } = await LocaleStore.getRawJournal({ id });
+  if (raw) item.raw = { gzip: raw, crc32: crc32(fromBase64(raw)) };
+  return item;
+}
+
+/** Store save items (from exportItem); SQLite checks each CRC. @returns {{id, n, trackCrc, rawCrc}[]} as stored */
+export const importItems = (items) => bulkImport(items);
+
 // Used by the migration runner.
 export const bulkImport = async (items) => (await LocaleStore.bulkImport({ items })).results;
 export const stats = () => LocaleStore.stats();

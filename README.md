@@ -396,19 +396,26 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 
 ### General
 - **Tabs:** Track, History, Insights, **You** (your profile, VO2max, goals and learned
-  routines) and Settings (units, watch, widgets, voice, maps, tracking). When the tabs don't
+  routines) and Settings (units, watch, widgets, voice, maps, weather, backup, tracking). When the tabs don't
   fit on one row (a narrow screen or a large font size), the ones on the right move into a
   **⋮ More** menu; the current tab always stays on the bar.
 - **Units:** metric by default, imperial in Settings.
 - **Theme:** light, dark and auto.
 - **Font:** Google Sans, bundled for offline use.
-- **Privacy:** workouts are stored only on the device. The network is used for map tiles
+- **Privacy:** workouts are stored only on the device (and in a backup file only where you
+  save it). The network is used for map tiles
   and the weather lookup, which sends Open-Meteo each workout's start time and start
   position rounded to about 1 km (Settings → Weather turns it off). Nothing else is sent.
 - **Storage:** on Android, workouts live in an app-private **SQLite** database. Existing
   IndexedDB data migrates automatically on first launch, verified per track by CRC-32.
   A workout stopped from the watch, a widget or the notification is processed and saved
   natively right away. The browser build keeps IndexedDB.
+- **Backup and restore** (Settings → Backup): one gzipped file holding every workout (with
+  its GPS track and raw sensor log), your courses and settings, shared to Drive, Files or
+  wherever you like. Restoring checks the file is a complete Locale backup, then adds its
+  workouts and courses (one with the same id is replaced; nothing is deleted) and replaces
+  your settings. Each track is checked by CRC-32 as it's stored. Use it to move to a new
+  phone, or before reinstalling.
 
 ## Auto goals: how Locale learns your routines
 
@@ -557,8 +564,8 @@ Gradle properties in `~/.gradle/gradle.properties`, outside the repository:
 `localeReleaseKeyPassword`. Without them they're signed with this machine's debug key, the
 same key as debug builds, so a release build installs over a debug one and keeps its
 workouts. Android only installs an app over one signed with the same key; changing the key
-means uninstalling first, which deletes every workout, so export anything you need before
-switching keys.
+means uninstalling first, which deletes every workout, so make a backup first (Settings →
+Backup → Back up) and restore it once the newly signed build is installed.
 
 ### Install on a Wear OS watch
 
@@ -597,6 +604,7 @@ src/
   export/    FIT, GPX, TCX, KML, GeoJSON, CSV
   map/       MapLibre workout map, Live position map    profile/  elevation side view
   view3d/    Three.js 3D view, map ground, display smoothing
+  backup/    backup file format and restore (I/O in services/backup.js)
   seed/      City2Surf sample workout (course data + generator)
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, insights,

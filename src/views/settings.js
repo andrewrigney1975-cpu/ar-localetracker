@@ -1,11 +1,14 @@
 import { ACTIVITIES, ACTIVITY_IDS } from '../activities.js';
 import { listWorkouts } from '../db/workouts.js';
 import { settings, updateSettings } from '../settings.js';
+import { applyBackup, canRestore, readBackupFile, shareBackup } from '../services/backup.js';
 import { fillWeather } from '../services/weather.js';
 import { tracker } from '../tracker/client.js';
 import { Disposer, escapeHtml } from '../ui/dom.js';
 import { segmented } from '../ui/segmented.js';
 import { toast } from '../ui/toast.js';
+import { confirmDialog } from '../ui/dialog.js';
+import { formatClock, formatDate } from '../units.js';
 import { App } from '@capacitor/app';
 import { INTERVAL_OPTIONS, spokenAverage, spokenDistance } from '../voice/coach.js';
 import { HII_LABELS, HII_MODES, validateHii } from '../hii/plan.js';
@@ -134,6 +137,15 @@ export async function mount(root) {
                 <input type="checkbox" class="switch" data-toggle="weather" ${s.weather ? 'checked' : ''} /></label>
             </div>
 
+            <div class="section-title">Backup</div>
+            <div class="card settings-group">
+              <div class="setting"><div class="text">Back up all data<small>Workouts with their GPS tracks and raw logs, courses and settings, in one file to save to Drive or Files</small></div>
+                <button class="btn ghost" data-act="backup">Back up</button></div>
+              <div class="setting"><div class="text">Restore a backup<small>Adds its workouts and courses (replacing any with the same id; nothing is deleted) and replaces your settings</small></div>
+                <button class="btn ghost" data-act="restore">Restore</button></div>
+              <input type="file" data-ref="restore-file" hidden />
+            </div>
+
             <div class="section-title">Tracking reliability</div>
             <div class="card settings-group">
               <div class="setting"><div class="text">Location permission<small>${perms?.location === 'granted' ? 'Precise location while using the app' : 'Not granted'}</small></div>
@@ -244,6 +256,57 @@ export async function mount(root) {
       if (!err) await updateSettings({ hii: { ...h, shares, bouts, durationMin } });
     };
     root.querySelectorAll('[data-hii-share], [data-hii-bout], [data-hii-duration]').forEach((i) => i.addEventListener('change', saveHii));
+    root.querySelector('[data-act="backup"]').addEventListener('click', async (e) => {
+      const b = e.currentTarget;
+      b.disabled = true;
+      try {
+        const r = await shareBackup({ onProgress: (done, total) => (b.textContent = `${done}/${total}`) });
+        toast(`Backup ready: ${r.workouts} workout${r.workouts === 1 ? '' : 's'}, ${(r.bytes / 1e6).toFixed(1)} MB`);
+      } catch (err) {
+        console.error('Backup failed', err);
+        toast(`Backup failed: ${err?.message ?? err}`, 4000);
+      } finally {
+        b.disabled = false;
+        b.textContent = 'Back up';
+      }
+    });
+    const fileInput = root.querySelector('[data-ref="restore-file"]');
+    // The picker has to open straight from the tap (user activation), so the workout check comes after.
+    root.querySelector('[data-act="restore"]').addEventListener('click', () => {
+      fileInput.value = '';
+      fileInput.click();
+    });
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      if (!(await canRestore())) return toast('Stop the workout before restoring');
+      const b = root.querySelector('[data-act="restore"]');
+      let backup;
+      try {
+        backup = await readBackupFile(file);
+      } catch (err) {
+        return toast(err?.message ?? 'Could not read the backup', 4000);
+      }
+      const { header, workouts: ws, courses } = backup;
+      const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+      const ok = await confirmDialog({
+        title: 'Restore backup?',
+        message: `From ${formatDate(header.createdAt)} at ${formatClock(header.createdAt)}: ${plural(ws.length, 'workout')}, ${plural(courses.length, 'course')}${backup.prefs.length ? ' and your settings' : ''}. Workouts and courses already here are kept unless the backup has the same one, which replaces it. Settings are replaced.`,
+        confirmLabel: 'Restore',
+      });
+      if (!ok) return;
+      b.disabled = true;
+      try {
+        const r = await applyBackup(backup, { onProgress: (done, total) => (b.textContent = `${done}/${total}`) });
+        toast(`Restored ${plural(r.workouts, 'workout')} and ${plural(r.courses, 'course')}${r.skippedCourses ? ` (${r.skippedCourses} unreadable course${r.skippedCourses === 1 ? '' : 's'} skipped)` : ''}`, 4000);
+        await render();
+      } catch (err) {
+        console.error('Restore failed', err);
+        toast(`Restore failed: ${err?.message ?? err}`, 5000);
+        b.disabled = false;
+        b.textContent = 'Restore';
+      }
+    });
     root.querySelector('[data-act="battery"]')?.addEventListener('click', () => tracker.requestIgnoreBatteryOptimizations());
     root.querySelector('[data-act="appsettings"]').addEventListener('click', () => tracker.openAppSettings());
     if (tracker.isNative) {
