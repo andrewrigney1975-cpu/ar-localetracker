@@ -135,8 +135,8 @@ export async function mount(root, params, query, ctx) {
             track,
             units,
             exaggeration: s.exaggeration,
-            satellite: settings().satellite3d,
-            onSatelliteChange: (on) => updateSettings({ satellite3d: on }),
+            terrain: settings().terrain3d,
+            onTerrainChange: (on) => updateSettings({ terrain3d: on }),
             smooth: settings().smooth3d,
             onSmoothChange: (on) => updateSettings({ smooth3d: on }),
           });

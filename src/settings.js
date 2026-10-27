@@ -13,7 +13,7 @@ export const DEFAULT_SETTINGS = {
   liveSpeedMode: { walk: 'pace', run: 'pace', hii: 'pace', cycle: 'speed', ski: 'speed' },
   mapStyle: 'streets',
   exaggeration: 'auto',
-  satellite3d: true,
+  terrain3d: true,
   smooth3d: true,
   coordFormat: 'decimal',
   /** Look up the weather at each workout's start from Open-Meteo (services/weather.js). */
@@ -68,7 +68,8 @@ export async function loadSettings() {
   try {
     const { value } = await Preferences.get({ key: KEY });
     if (value) {
-      const saved = JSON.parse(value);
+      // satellite3d went with the Esri imagery (terrain3d replaced it); drop the stale key.
+      const { satellite3d: _satellite, ...saved } = JSON.parse(value);
       current = {
         ...DEFAULT_SETTINGS,
         ...saved,

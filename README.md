@@ -9,7 +9,7 @@ sets the goal distance for a workout on its own once it knows them. A **Live** m
 altitude, speed and heading without recording anything.
 Afterwards you can review each workout as stats, heart-rate effort (calories, cardio load,
 zones), splits, an interactive map with an elevation side view, or a 3D plot over
-satellite imagery. Then you can export it as **FIT** (for Strava and Garmin Connect),
+shaded terrain. Then you can export it as **FIT** (for Strava and Garmin Connect),
 GPX, TCX, KML, GeoJSON or CSV. **Insights** reports your totals and averages by day, week,
 month, quarter or year, per activity or routine, shows your **personal bests**, and
 exports the report as CSV or JSON. Set **goals** for distance, time, cardio load or
@@ -284,7 +284,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   profile, and the two follow each other.
 - **3D view:**
   - Three.js plot with an altitude exaggeration slider from 1× to 10×.
-  - **Satellite imagery** on the ground.
+  - **Terrain**: shaded relief on the ground, with the sea drawn flat.
   - Direction arrows, and the same clickable distance markers as the map.
   - **Smooth** route: a 10-second time-weighted average removes GPS noise and altitude
     bounce from the drawn line (display only; stats and exports use the raw track).
@@ -323,7 +323,7 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
   - **Map**: the course in one colour (there's no speed to colour it by), distance
     markers, start and finish, and the elevation profile. The readout shows distance,
     altitude, grade and the climb so far, and nothing about time or performance.
-  - **3D**: the same course in one colour over satellite imagery, with the vertical
+  - **3D**: the same course in one colour over shaded terrain, with the vertical
     exaggeration and Smooth (averaged over 25 m, as there are no times).
   - Opened courses are kept in their own list in View, apart from your workouts, so they
     never show up in History, Insights or your routines. View also opens other GPX
@@ -596,7 +596,7 @@ src/
              (idbStore), track codec, one-time migration
   export/    FIT, GPX, TCX, KML, GeoJSON, CSV
   map/       MapLibre workout map, Live position map    profile/  elevation side view
-  view3d/    Three.js 3D view, satellite imagery, display smoothing
+  view3d/    Three.js 3D view, shaded terrain, display smoothing
   seed/      City2Surf sample workout (course data + generator)
   stats/physio.js  heart-rate zones, TRIMP, calories
   views/     home, live (workout), position (Live mode), history, detail, insights,
@@ -632,7 +632,10 @@ the feature requests.
 - **Map data:** © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
 - **Map tiles:** [OpenFreeMap](https://openfreemap.org) and
   [OpenTopoMap](https://opentopomap.org) (CC-BY-SA).
-- **Satellite imagery:** © Esri, Maxar, Earthstar Geographics.
+- **3D terrain:** [Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Mapzen, Open Data on AWS):
+  SRTM, GMTED, ETOPO1 and USGS 3DEP (public domain); © Commonwealth of Australia
+  (Geoscience Australia) 2017 (CC BY 4.0); EU-DEM, produced using Copernicus data and
+  information funded by the European Union; and others.
 - **Sample course elevation:** Copernicus GLO-90 DEM via [Open-Meteo](https://open-meteo.com).
 - **Weather:** [Open-Meteo](https://open-meteo.com) (CC BY 4.0), from national weather
   services' models and ERA5 reanalysis.
