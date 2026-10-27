@@ -28,3 +28,13 @@
     public static int d(...);
     public static int i(...);
 }
+
+# Capacitor reads each plugin's @CapacitorPlugin(permissions = {@Permission ...}) at run time.
+# Nothing in code ever creates those annotation types, so R8's full mode treated
+# PluginHandle.getPluginAnnotation() as always null and deleted Bridge.getPermissionStates()'s
+# loop: every alias read as not granted ("Location permission: Not granted", "Start from
+# watch: Allow") and LocaleTracker.start() refused, while Android had granted everything.
+# Keep the annotation types and their values.
+-keepattributes RuntimeVisibleAnnotations,AnnotationDefault
+-keep @interface com.getcapacitor.annotation.** { *; }
+-keep class com.getcapacitor.PluginHandle { *; }
