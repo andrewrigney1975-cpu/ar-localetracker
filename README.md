@@ -396,13 +396,14 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
 
 ### General
 - **Tabs:** Track, History, Insights, **You** (your profile, VO2max, goals and learned
-  routines) and Settings (units, watch, widgets, voice, maps, tracking). When the tabs don't
+  routines) and Settings (units, watch, widgets, voice, maps, weather, backup, tracking). When the tabs don't
   fit on one row (a narrow screen or a large font size), the ones on the right move into a
   **⋮ More** menu; the current tab always stays on the bar.
 - **Units:** metric by default, imperial in Settings.
 - **Theme:** light, dark and auto.
 - **Font:** Google Sans, bundled for offline use.
-- **Privacy:** workouts are stored only on the device. The network is used for map tiles
+- **Privacy:** workouts are stored only on the device (and in a backup file only where you
+  save it). The network is used for map tiles
   and the weather lookup, which sends Open-Meteo each workout's start time and start
   position rounded to about 1 km (Settings → Weather turns it off). Nothing else is sent.
 - **Storage:** on Android, workouts live in an app-private **SQLite** database. Existing
@@ -563,8 +564,8 @@ Gradle properties in `~/.gradle/gradle.properties`, outside the repository:
 `localeReleaseKeyPassword`. Without them they're signed with this machine's debug key, the
 same key as debug builds, so a release build installs over a debug one and keeps its
 workouts. Android only installs an app over one signed with the same key; changing the key
-means uninstalling first, which deletes every workout, so export anything you need before
-switching keys.
+means uninstalling first, which deletes every workout, so make a backup first (Settings →
+Backup → Back up) and restore it once the newly signed build is installed.
 
 ### Install on a Wear OS watch
 
