@@ -913,17 +913,43 @@ public final class WorkoutBuilder {
         return o;
     }
 
+    /** Max speed is averaged over this much active time so a GPS jump can't inflate it. Mirrors summary.js MAX_SPEED_WINDOW_S. */
+    static final double MAX_SPEED_WINDOW_S = 30;
+
+    /** Highest average speed over any stretch of at least windowS active seconds, or NaN when shorter. Mirrors summary.js sustainedSpeed. */
+    static double sustainedSpeed(Track track, double windowS) {
+        double best = Double.NaN;
+        int i = 0;
+        for (int j = 1; j < track.n; j++) {
+            // Shortest stretch ending at j that still spans the window.
+            while (i + 1 < j && track.active[j] - track.active[i + 1] >= windowS) i++;
+            double dt = track.active[j] - track.active[i];
+            if (dt < windowS) continue;
+            double v = (track.dist[j] - track.dist[i]) / dt;
+            if (isFinite(v) && (Double.isNaN(best) || v > best)) best = v;
+        }
+        return best;
+    }
+
+    /** Sustained max speed, or the whole average when the track is shorter than the window. Mirrors summary.js maxSustainedSpeed. */
+    static double maxSustainedSpeed(Track track) {
+        int n = track.n;
+        double best = sustainedSpeed(track, MAX_SPEED_WINDOW_S);
+        if (!Double.isNaN(best)) return best;
+        double dt = n > 1 ? track.active[n - 1] - track.active[0] : 0;
+        return dt > 0 ? (track.dist[n - 1] - track.dist[0]) / dt : 0;
+    }
+
     static JSONObject summary(Track track, Info info) throws JSONException {
         int n = track.n;
         double distance = n > 0 ? track.dist[n - 1] : 0;
         double duration = info.activeSeconds != 0 ? info.activeSeconds : (n > 0 ? track.active[n - 1] : 0);
         double stationaryTime = Math.min(duration, stationarySeconds(track));
         double movingTime = Math.max(0, duration - stationaryTime);
-        double maxSpeed = 0;
+        double maxSpeed = maxSustainedSpeed(track);
         double minAlt = Double.POSITIVE_INFINITY;
         double maxAlt = Double.NEGATIVE_INFINITY;
         for (int i = 0; i < n; i++) {
-            if (track.speed[i] > maxSpeed) maxSpeed = track.speed[i];
             double a = track.alt[i];
             if (isFinite(a)) {
                 if (a < minAlt) minAlt = a;

@@ -229,6 +229,40 @@ export function cadenceStats(track) {
   return { avg: sum / time, source: phone === 0 ? 'watch' : watch === 0 ? 'phone' : 'mixed' };
 }
 
+/**
+ * The workout's max speed is the best average over this much active time, so a GPS jump of
+ * a few seconds can't inflate it (a walk "at" 9 km/h). Mirrors WorkoutBuilder.MAX_SPEED_WINDOW_S.
+ */
+export const MAX_SPEED_WINDOW_S = 30;
+
+/**
+ * Highest average speed (m/s) over any stretch of at least `windowS` active seconds, or null
+ * when the track is shorter. Mirrors WorkoutBuilder.sustainedSpeed.
+ */
+export function sustainedSpeed(track, windowS = MAX_SPEED_WINDOW_S) {
+  const { n, dist, active } = track;
+  let best = null;
+  let i = 0;
+  for (let j = 1; j < n; j++) {
+    // Shortest stretch ending at j that still spans the window.
+    while (i + 1 < j && active[j] - active[i + 1] >= windowS) i++;
+    const dt = active[j] - active[i];
+    if (dt < windowS) continue;
+    const v = (dist[j] - dist[i]) / dt;
+    if (Number.isFinite(v) && (best == null || v > best)) best = v;
+  }
+  return best;
+}
+
+/** Max speed for the summary: sustained over MAX_SPEED_WINDOW_S, or the whole average when shorter. */
+export function maxSustainedSpeed(track) {
+  const { n } = track;
+  const best = sustainedSpeed(track);
+  if (best != null) return best;
+  const dt = n > 1 ? track.active[n - 1] - track.active[0] : 0;
+  return dt > 0 ? (track.dist[n - 1] - track.dist[0]) / dt : 0;
+}
+
 /** Summary stats stored with the workout (unit-independent). */
 export function computeSummary(track, info) {
   const act = activityProfile(info.activity);
@@ -237,11 +271,10 @@ export function computeSummary(track, info) {
   const duration = info.activeSeconds || (n ? track.active[n - 1] : 0);
   const stationaryTime = Math.min(duration, stationarySeconds(track));
   const movingTime = Math.max(0, duration - stationaryTime);
-  let maxSpeed = 0;
+  const maxSpeed = maxSustainedSpeed(track);
   let minAlt = Infinity;
   let maxAlt = -Infinity;
   for (let i = 0; i < n; i++) {
-    if (track.speed[i] > maxSpeed) maxSpeed = track.speed[i];
     const a = track.alt[i];
     if (Number.isFinite(a)) {
       if (a < minAlt) minAlt = a;

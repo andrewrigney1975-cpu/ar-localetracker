@@ -17,7 +17,7 @@ import { rejectedText, VO2_ACTIVITIES, workoutVo2max } from '../stats/vo2max.js'
 import { significantExtremes } from '../stats/extremes.js';
 import { boutsRun, intervalTotals } from '../stats/hii.js';
 import { HII_LABELS } from '../hii/plan.js';
-import { computeSplits } from '../stats/summary.js';
+import { computeSplits, maxSustainedSpeed } from '../stats/summary.js';
 import { confirmDialog, openDialog } from '../ui/dialog.js';
 import { Disposer, el, escapeHtml } from '../ui/dom.js';
 import { icons } from '../ui/icons.js';
@@ -410,13 +410,16 @@ function renderSummary(panel, w, track, units) {
   const alt = (m) => (m == null ? '–' : Math.round(altitudeValue(m, units)).toLocaleString());
   const au = altitudeUnit(units);
   const pace = formatPace(sm.avgMovingSpeed, units, false);
+  // Best 30 s average from the track, so workouts saved with the old instantaneous max show it too.
+  const top = track?.n ? maxSustainedSpeed(track) : sm.maxSpeed;
   const rows = [
     `<div class="stat feature distance-tile"><div class="distance-main">${statHTML('Distance', distanceValue(sm.distance, units).toFixed(2), distanceUnit(units), 'bare')}${gpsErrorHTML(track, units)}</div><select class="select routine-pick" data-ref="routine" aria-label="Routine" hidden></select></div>`,
     statHTML('Time', formatDuration(sm.duration)),
     statHTML('Moving time', formatDuration(sm.movingTime)),
     statHTML('Avg speed', speedValue(sm.avgMovingSpeed, units).toFixed(1), speedUnit(units)),
     statHTML('Avg pace', pace, paceUnit(units)),
-    statHTML('Max speed', speedValue(sm.maxSpeed, units).toFixed(1), speedUnit(units)),
+    statHTML('Max speed', speedValue(top, units).toFixed(1), speedUnit(units)),
+    statHTML('Best pace', formatPace(top, units, false), paceUnit(units)),
     statHTML('Stationary', formatDuration(sm.stationaryTime)),
     statHTML('Climb', `+${alt(sm.elevGain)}`, au),
     statHTML('Descent', `−${alt(sm.elevLoss)}`, au),

@@ -4,7 +4,7 @@
 // workout version; a cold cache loads each track once (like effort.js).
 
 import { getTrack } from '../db/workouts.js';
-import { computeSplits } from '../stats/summary.js';
+import { computeSplits, sustainedSpeed } from '../stats/summary.js';
 import { M_PER_MI } from '../units.js';
 
 const KEY = 'insights.splits.v2';
@@ -52,21 +52,7 @@ export function fastestSplit(track, splitLen) {
   return best;
 }
 
-/** Highest average speed (m/s) over any stretch of at least `windowS` moving seconds, or null. */
-export function sustainedSpeed(track, windowS = TOP_SPEED_WINDOW_S) {
-  const { n, dist, active } = track;
-  let best = null;
-  let i = 0;
-  for (let j = 1; j < n; j++) {
-    // Shortest stretch ending at j that still spans the window.
-    while (i + 1 < j && active[j] - active[i + 1] >= windowS) i++;
-    const dt = active[j] - active[i];
-    if (dt < windowS) continue;
-    const v = (dist[j] - dist[i]) / dt;
-    if (Number.isFinite(v) && (best == null || v > best)) best = v;
-  }
-  return best;
-}
+export { sustainedSpeed };
 
 /**
  * Fastest kilometre, mile and sustained speed of each workout, loading tracks only for
@@ -96,7 +82,7 @@ export async function splitTimesFor(workouts, { onProgress, isCancelled } = {}) 
           km = fastestSplit(track, 1000);
           mi = fastestSplit(track, M_PER_MI);
         }
-        top = sustainedSpeed(track);
+        top = sustainedSpeed(track, TOP_SPEED_WINDOW_S);
       }
     } catch (e) {
       console.warn('Insights: no track for', w.id, e);
