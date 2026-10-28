@@ -233,7 +233,7 @@ export function cadenceStats(track) {
  * The workout's max speed is the best average over this much active time, so a GPS jump of
  * a few seconds can't inflate it (a walk "at" 9 km/h). Mirrors WorkoutBuilder.MAX_SPEED_WINDOW_S.
  */
-export const MAX_SPEED_WINDOW_S = 30;
+export const MAX_SPEED_WINDOW_S = 10;
 
 /**
  * Highest average speed (m/s) over any stretch of at least `windowS` active seconds, or null

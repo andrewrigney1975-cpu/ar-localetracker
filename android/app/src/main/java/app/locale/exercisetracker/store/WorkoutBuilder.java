@@ -914,7 +914,7 @@ public final class WorkoutBuilder {
     }
 
     /** Max speed is averaged over this much active time so a GPS jump can't inflate it. Mirrors summary.js MAX_SPEED_WINDOW_S. */
-    static final double MAX_SPEED_WINDOW_S = 30;
+    static final double MAX_SPEED_WINDOW_S = 10;
 
     /** Highest average speed over any stretch of at least windowS active seconds, or NaN when shorter. Mirrors summary.js sustainedSpeed. */
     static double sustainedSpeed(Track track, double windowS) {
