@@ -164,6 +164,8 @@ are from a Pixel Watch 3; the workout screen uses the debug build's demo mode.</
     as in Insights. With a distance [goal](#goals) it draws the goal's share per day as a
     dashed line and says how the week is going: *"You're 3 km ahead of your goal! Well
     done!!"* or *"You're a bit behind your goal – you need to go 4.5 km today to catch up"*.
+    Beside the workout count it shows the watch's battery (a watch icon and *76%*), asked
+    for every 10 minutes and hidden when the watch hasn't answered for half an hour.
 - **Live screen:**
   - elapsed time
   - distance

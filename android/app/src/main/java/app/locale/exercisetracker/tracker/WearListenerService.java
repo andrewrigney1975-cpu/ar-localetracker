@@ -22,7 +22,8 @@ import org.json.JSONObject;
  * Receives commands and heart-rate samples from the Locale watch app.
  *
  * Paths (watch → phone): /locale/start {activity}, /locale/pause, /locale/resume,
- * /locale/stop, /locale/hr {s: [[epochMs, bpm], ...], c: [[epochMs, stepsPerMin], ...]}, /locale/status-request.
+ * /locale/stop, /locale/hr {s: [[epochMs, bpm], ...], c: [[epochMs, stepsPerMin], ...]}, /locale/status-request,
+ * /locale/battery {pct, charging} (the reply to WatchBattery's request).
  */
 public class WearListenerService extends WearableListenerService {
     private static final String TAG = "LocaleWear";
@@ -52,6 +53,9 @@ public class WearListenerService extends WearableListenerService {
                     break;
                 case "/locale/status-request":
                     sendStatus();
+                    break;
+                case WatchBattery.PATH:
+                    WatchBattery.onReport(this, new JSONObject(body));
                     break;
                 default:
                     Log.d(TAG, "Unknown path " + path);

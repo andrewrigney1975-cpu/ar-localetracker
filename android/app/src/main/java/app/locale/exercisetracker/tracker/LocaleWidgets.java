@@ -244,6 +244,9 @@ public final class LocaleWidgets {
         SimpleDateFormat day = new SimpleDateFormat("d MMM", Locale.getDefault());
         v.setTextViewText(R.id.week_range, day.format(from) + " – " + day.format(addDays(from, 6)));
         v.setTextViewText(R.id.week_count, count == 0 ? "No workouts yet" : count == 1 ? "1 workout" : count + " workouts");
+        String battery = size == Size.WEEK_CHART ? WatchBattery.label(ctx) : null;
+        v.setTextViewText(R.id.watch_battery, battery != null ? battery : "");
+        v.setViewVisibility(R.id.watch_battery, battery != null ? View.VISIBLE : View.GONE);
         String split = WeekStats.split(meters, movingS, imperial);
         String speed = WeekStats.speed(meters, movingS, imperial);
         v.setTextViewText(R.id.week_split, split != null ? split : "");
@@ -251,7 +254,7 @@ public final class LocaleWidgets {
         v.setViewVisibility(R.id.week_split, split != null ? View.VISIBLE : View.GONE);
         v.setViewVisibility(R.id.week_speed, speed != null ? View.VISIBLE : View.GONE);
         v.setContentDescription(R.id.widget_root, String.format(Locale.US, "This week %.1f %s, %d workouts",
-            value, imperial ? "miles" : "kilometres", count) + (split != null ? ", " + split + ", " + speed : "") + (goalText != null ? ". " + goalText : ""));
+            value, imperial ? "miles" : "kilometres", count) + (split != null ? ", " + split + ", " + speed : "") + (goalText != null ? ". " + goalText : "") + (battery != null ? ". Watch battery " + battery : ""));
         v.setOnClickPendingIntent(R.id.widget_root, openApp(ctx));
         scheduleNewWeek(ctx, to);
         return v;
