@@ -78,7 +78,7 @@ sensors.
   <img src="docs/screenshots/profile.png" width="250" alt="You, Profile: resting and max heart rate, the estimated VO2max (the median of 6 walks in the last 4 weeks) and a one-row chart rating it from Very Poor to Excellent for men aged 40–49, with the estimate as a white dot in Fair at the 30th percentile, and a table of the categories and their ranges below">
 </p>
 <p align="center">
-  <img src="docs/screenshots/widget-week-chart.png" width="490" alt="4×2 widget in Google Sans: this week's 109 km over 11 workouts with average split and speed, a chart of distance per day (today's letter in bold) with a dashed daily goal line, and You're 0.6 km ahead of your goal! Well done!!">
+  <img src="docs/screenshots/widget-week-chart.png" width="490" alt="4×2 widget in Google Sans: this week's 73.0 km over 7 workouts with average split and speed, the watch's battery at 65% beside the workout count, a chart of distance per day (today's letter in bold) with a dashed daily goal line, and On track – 17.5 km today keeps you on your goal">
 </p>
 <p align="center">
   <img src="docs/screenshots/view-share.png" width="250" alt="Share sheet: Share course section with a Hide start and finish switch, a Share AR City2Surf 2026.gpx button and Share a link to view in a browser">
