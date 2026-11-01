@@ -16,18 +16,18 @@
     "android:build": "npm run sync && cd android && gradlew.bat assembleDebug"
   },
   "dependencies": {
-    "@capacitor/android": "^8.5.3",
+    "@capacitor/android": "^8.6.0",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",
     "@capacitor/filesystem": "^8.1.5",
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/share": "^8.0.3",
     "@fontsource-variable/google-sans": "^5.3.2",
-    "maplibre-gl": "^6.15.0",
+    "maplibre-gl": "^6.16.0",
     "three": "^0.186.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.5.3",
+    "@capacitor/cli": "^8.6.0",
     "@garmin/fitsdk": "^21.218.0",
     "fast-xml-parser": "^5.11.2",
     "vite": "^8.3.5",
